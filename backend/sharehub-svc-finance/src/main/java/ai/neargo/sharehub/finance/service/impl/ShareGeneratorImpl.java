@@ -194,6 +194,9 @@ public class ShareGeneratorImpl implements ShareGenerator {
         // 那是静默少付合作伙伴，与「静默免单」同一性质。
         if (roles.isEmpty()) {
             if (e.agentNo() == null || e.agentNo().isBlank()) return 0;  // 平台直营，本来就没有代理分成
+            // 单均固定额（C11 / SHR-02，finance.share.fixed_enabled=1 才生效）：商家按每单固定额分，不按比例
+            BigDecimal fixed = params.intOf(KEY_FIXED_ENABLED, 0) == 1 ? agentDirectory.fixedPerOrder(e.agentNo(), onDate) : null;
+            if (fixed != null) return writeFixed(e, e.agentNo(), fixed, base);
             ShareRule r = ruleOf("AGENT", e.agentNo(), FALLBACK_BASIS);
             log.info("站点 {} 未配责任行，代理分成回落到 share_rule(AGENT, {})，依据记为 {}",
                     e.siteNo(), e.agentNo(), FALLBACK_BASIS);
@@ -202,8 +205,16 @@ public class ShareGeneratorImpl implements ShareGenerator {
         }
 
         int n = 0;
+        boolean fixedOn = params.intOf(KEY_FIXED_ENABLED, 0) == 1;
+        java.util.Set<String> fixedPaid = new java.util.HashSet<>();
         for (SiteAgentBrief role : roles) {
             if (REFER.equalsIgnoreCase(role.role())) continue;
+            // 单均固定额是「每单给这个商家多少」，不分责任 —— 同一商家多条责任行只付一次，且不再按比例分
+            BigDecimal fixed = fixedOn ? agentDirectory.fixedPerOrder(role.agentNo(), onDate) : null;
+            if (fixed != null) {
+                if (fixedPaid.add(role.agentNo())) n += writeFixed(e, role.agentNo(), fixed, base);
+                continue;
+            }
             ShareRule r = role.ruleNo() == null || role.ruleNo().isBlank()
                     ? ruleOf("AGENT", role.agentNo(), role.role())
                     : ruleByNo(role.ruleNo());
@@ -278,6 +289,42 @@ public class ShareGeneratorImpl implements ShareGenerator {
                 .min(Comparator.comparingInt((ShareRule r) -> r.getPriority() == null ? Integer.MAX_VALUE : r.getPriority())
                         .thenComparing(r -> r.getRuleNo() == null ? "" : r.getRuleNo()))
                 .orElse(null);
+    }
+
+    static final String KEY_FIXED_ENABLED = "finance.share.fixed_enabled";
+
+    /**
+     * 单均固定额写一条明细：rate 记 0、金额 = 固定额（不随基数变）。幂等键与比例分成同一套（订单 × 维度 × 依据）。
+     * 固定额高于本单基数也照付 —— 那是合作条款，不是计算误差；打 INFO 便于对账时解释。
+     */
+    private int writeFixed(OrderSettledEvent e, String agentNo, BigDecimal fixed, ShareBaseMode.Base base) {
+        ShareRecord r = new ShareRecord();
+        r.setRecordNo(FinNos.nextNo(records, "record_no", BizKey.SHARE_RECORD, 6));
+        r.setOrderNo(e.orderNo());
+        r.setDimension(ai.neargo.sharehub.finance.ShareDimension.AGENT.name());
+        r.setBasis(FALLBACK_BASIS);
+        r.setPayeeType(ai.neargo.sharehub.finance.ShareDimension.AGENT.name());
+        r.setPayeeNo(agentNo);
+        r.setRate(BigDecimal.ZERO);
+        r.setGrossAmount(e.grossAmount());
+        r.setBaseMode(base.mode().name());
+        r.setTaxRate(base.taxRate());
+        r.setBaseAmount(base.amount());
+        r.setAmount(fixed.setScale(shareScale(), RoundingMode.HALF_UP));
+        r.setCurrency(e.currency());
+        r.setMode(ShareMode.LEDGER.name());
+        r.setStatus(ShareRecordStatus.PENDING.name());
+        r.setPeriod(e.period());
+        r.setSourceNo("FIXED_PER_ORDER");
+        if (fixed.compareTo(base.amount()) > 0) {
+            log.info("单均固定额高于本单分成基数，照固定额记 orderNo={} agentNo={} fixed={} base={}", e.orderNo(), agentNo, fixed, base.amount());
+        }
+        try {
+            records.insert(r);
+            return 1;
+        } catch (DuplicateKeyException dup) {
+            return 0;   // 事件重投
+        }
     }
 
     private int write(OrderSettledEvent e, String dimension, String basis, String payeeNo,

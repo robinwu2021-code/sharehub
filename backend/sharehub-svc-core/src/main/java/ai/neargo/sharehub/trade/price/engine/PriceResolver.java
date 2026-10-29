@@ -334,6 +334,51 @@ public class PriceResolver {
         return s.isBlank() ? null : new BigDecimal(s);
     }
 
+    /**
+     * 服务费（C09，第 6 批）：借出时把当时的配置并进快照 —— 影响钱的配置随订单定格，改了只对之后的单生效。
+     * {@code fee} 为 0 或 null 时不写，快照与此前逐字相同。
+     */
+    @SuppressWarnings("unchecked")
+    public static String withServiceFee(String snapshot, BigDecimal fee, boolean vatApplicable, boolean inShareBase) {
+        if (fee == null || fee.signum() <= 0) return snapshot;
+        Map<String, Object> m = snapshot == null || snapshot.isBlank() ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(Json.read(snapshot, Map.class));
+        m.put("serviceFee", fee.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+        m.put("serviceFeeVat", vatApplicable);
+        m.put("serviceFeeInShareBase", inShareBase);
+        return Json.write(m);
+    }
+
+    /** 本单定格的服务费；没有返回 null。 */
+    public static ServiceFee serviceFeeFromSnapshot(String snapshot) {
+        if (snapshot == null || snapshot.isBlank()) return null;
+        Map<?, ?> m = Json.read(snapshot, Map.class);
+        Object v = m == null ? null : m.get("serviceFee");
+        if (v == null || String.valueOf(v).isBlank()) return null;
+        BigDecimal fee = new BigDecimal(String.valueOf(v));
+        if (fee.signum() <= 0) return null;
+        return new ServiceFee(fee, !Boolean.FALSE.equals(m.get("serviceFeeVat")), Boolean.TRUE.equals(m.get("serviceFeeInShareBase")));
+    }
+
+    /**
+     * @param vatApplicable 是否计 VAT（发票上拆税时是否把它算进应税额）
+     * @param inShareBase   是否进分成基数
+     */
+    public record ServiceFee(BigDecimal amount, boolean vatApplicable, boolean inShareBase) {
+
+        /**
+         * 加到应付上。<b>只在有应付时收</b>：免费时长内归还、全额免单的单不收服务费 —— 一笔没发生的交易没有交易费。
+         */
+        public BigDecimal addTo(BigDecimal payable) {
+            return payable == null || payable.signum() <= 0 ? payable : payable.add(amount);
+        }
+
+        /** 这单的应收里是否已含服务费（应付为正即含，见 {@link #addTo}）。 */
+        public BigDecimal includedIn(BigDecimal amountCharged) {
+            return amountCharged != null && amountCharged.compareTo(amount) >= 0 && amountCharged.signum() > 0 ? amount : BigDecimal.ZERO;
+        }
+    }
+
     /** 从订单快照还原规格 —— 结算时用它，**不回读 price_plan**。 */
     @SuppressWarnings("unchecked")
     public static List<PriceItemSpec> fromSnapshot(String snapshot) {

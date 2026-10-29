@@ -7,7 +7,7 @@ import type {
   ShareSummary, RechargeOrder, RechargePackage, PageQuery,
   ReconHandleStatus, ReconHandleResult, ReconAction, ReconStats,
   InvoiceStatus, InvoiceAction,
-  PayoutAccount, PayReceiptPayload, WithdrawApplyPayload, InvoiceView, TaxInvoice, SelfBill,} from "../../types";
+  PayoutAccount, PayReceiptPayload, WithdrawApplyPayload, InvoiceView, TaxInvoice, SelfBill, PayableRow,} from "../../types";
 import {
   STL_TRANSITIONS, canSettlementTransition,
   RECON_TRANSITIONS, canReconTransition, RECON_TERMINAL,
@@ -447,6 +447,31 @@ export const taxInvoices: TaxInvoice[] = orders.filter((o) => o.feeAmount > 0).s
     ...taxSplit(-Math.min(5, ref.grossAmount), 5), lineDesc: `Credit note for ${ref.invoiceNo}`,
   });
 }
+// 跨期应付（SHR-05）：与后端同一口径 —— 应得 = 分润明细合计，已出结算单 = 已确认 + 已付，未付 = 应得 − 已付
+export const listPayables = (q: PageQuery & { payeeType?: string; payeeNo?: string; fromPeriod?: string; toPeriod?: string; onlyOutstanding?: boolean } = {}) => {
+  const rows = new Map<string, PayableRow>();
+  for (const r of shareRecords) {
+    if (!r.payeeNo) continue;
+    const k = `${r.dimension}|${r.payeeNo}|${r.period}`;
+    const row = rows.get(k) ?? { payeeType: r.dimension, payeeNo: r.payeeNo, payeeName: r.payeeName ?? null, period: r.period,
+      currency: r.currency ?? "AED", earned: 0, settled: 0, paid: 0, outstanding: 0 };
+    row.earned = round2(row.earned + Number(r.amount));
+    rows.set(k, row);
+  }
+  for (const st of settlements) {
+    const row = rows.get(`${st.payeeType}|${st.payeeNo}|${st.period}`);
+    if (!row) continue;
+    if (st.status === "CONFIRMED" || st.status === "PAID") row.settled = round2(row.settled + Number(st.totalAmount));
+    if (st.status === "PAID") row.paid = round2(row.paid + Number(st.totalAmount));
+  }
+  const list = [...rows.values()].map((r) => ({ ...r, outstanding: round2(r.earned - r.paid) }))
+    .sort((a, b) => b.period.localeCompare(a.period) || a.payeeNo.localeCompare(b.payeeNo));
+  return paginate(list, q.page, q.size, (r) =>
+    (!q.payeeType || r.payeeType === q.payeeType) && (!q.payeeNo || r.payeeNo === q.payeeNo.trim())
+    && (!q.fromPeriod || r.period >= q.fromPeriod) && (!q.toPeriod || r.period <= q.toPeriod)
+    && (!q.onlyOutstanding || r.outstanding !== 0));
+};
+
 // 商家分成自开票（V183，C10）：后端在提现到账时出；mock 不预置，补出走 issueSelfBill，规则与后端一致
 export const selfBills: SelfBill[] = [];
 export const listSelfBills = (q: PageQuery & { agentNo?: string } = {}) =>

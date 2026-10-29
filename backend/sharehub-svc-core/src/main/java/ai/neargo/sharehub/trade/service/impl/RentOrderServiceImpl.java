@@ -100,6 +100,8 @@ public class RentOrderServiceImpl implements RentOrderService {
     /** 订单列表的商家名与支付渠道（第 5 批）：批量取，不逐行回表。 */
     private final ObjectProvider<ai.neargo.sharehub.api.platform.port.AgentDirectoryPort> agentDirectory;
     private final ai.neargo.sharehub.trade.pay.mapper.PayOrderMapper payOrders;
+    /** 服务费等借出时定格的配置（C09，rent.service_fee.*）。 */
+    private final ai.neargo.sharehub.api.platform.port.SysParamPort params;
 
     /** C 端税务发票（V181）：收款即开 / 结单才开，按 invoice.b2c.* 配置；失败不影响收款。 */
     private final ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices;
@@ -122,7 +124,9 @@ public class RentOrderServiceImpl implements RentOrderService {
                                 ai.neargo.sharehub.trade.pay.service.PaymentService payments,
                                 ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices,
                                 ObjectProvider<ai.neargo.sharehub.api.platform.port.AgentDirectoryPort> agentDirectory,
-                                ai.neargo.sharehub.trade.pay.mapper.PayOrderMapper payOrders) {
+                                ai.neargo.sharehub.trade.pay.mapper.PayOrderMapper payOrders,
+                                ai.neargo.sharehub.api.platform.port.SysParamPort params) {
+        this.params = params;
         this.agentDirectory = agentDirectory;
         this.payOrders = payOrders;
         this.payments = payments;
@@ -321,7 +325,7 @@ public class RentOrderServiceImpl implements RentOrderService {
             }
             java.math.BigDecimal fromPlan = PriceResolver.lostChargeFromSnapshot(e.getPriceSnapshot());
             java.math.BigDecimal chosen = exact != null ? exact : fromPlan != null ? fromPlan : fallback;
-            java.math.BigDecimal price = chosen == null ? java.math.BigDecimal.ZERO : chosen;
+            java.math.BigDecimal price = withServiceFee(e, chosen == null ? java.math.BigDecimal.ZERO : chosen);
             e.setRentEndAt(nowUtc());
             e.setAmount(price);
             e.setFeeAmount(price.doubleValue());   // 过渡期双写，同 returnOrder
@@ -440,7 +444,11 @@ public class RentOrderServiceImpl implements RentOrderService {
         // 时段倍率按**下单时刻**解析一次并随快照定格（ADR-028 §四：跨时段长单不分段）。
         priced = priced.withMultiplier(multipliers.resolve(pq.regionId(), pq.at()));
         e.setPricePlanNo(priced.planNo());
-        e.setPriceSnapshot(priced.toSnapshot());
+        // 服务费（C09）：payer=USER 才向用户收；PLATFORM 由平台承担，不进本单
+        java.math.BigDecimal serviceFee = "USER".equalsIgnoreCase(params.textOf("rent.service_fee.payer", "USER").trim())
+                ? params.decimalOf("rent.service_fee.amount", java.math.BigDecimal.ZERO) : java.math.BigDecimal.ZERO;
+        e.setPriceSnapshot(PriceResolver.withServiceFee(priced.toSnapshot(), serviceFee,
+                params.intOf("rent.service_fee.vat_applicable", 1) == 1, params.intOf("rent.service_fee.in_share_base", 0) == 1));
         e.setCurrency(priced.currency() == null ? CURRENCY : priced.currency());
 
         /*
@@ -667,7 +675,7 @@ public class RentOrderServiceImpl implements RentOrderService {
             charged = chargeChain.charge(gross, multiplier, member, null, capTotal, waiver);
         }
 
-        e.setAmount(charged.payable());
+        e.setAmount(withServiceFee(e, charged.payable()));
         // 与 couponNo/couponAmount 同一套路：等级答「凭什么打折」，金额答「折了多少」。
         // 后者事后推不出来 —— 权益配置会改，而折扣额还取决于当时的应收
         e.setMemberLevel(rights == null ? null : rights.level());
@@ -716,7 +724,7 @@ public class RentOrderServiceImpl implements RentOrderService {
                     PriceResolver.multiplierFromSnapshot(e.getPriceSnapshot()),
                     memberOf(rights), couponOf(e, false), capTotal, waiverOf(e, false));
             return new ai.neargo.sharehub.trade.dto.TradeLegacyDtos.FeeEstimate(
-                    (int) min, charged.payable(), charged.couponUsed(), charged.waivedAmount(),
+                    (int) min, withServiceFee(e, charged.payable()), charged.couponUsed(), charged.waivedAmount(),
                     charged.buyout(), e.getCurrency());
         });
     }
@@ -850,8 +858,9 @@ public class RentOrderServiceImpl implements RentOrderService {
             }
             String before = e.getStatus();
             e.setStatus(stateMachine.next(before, "OVERDUE_CHARGE"));
-            e.setAmount(max);
-            e.setFeeAmount(max.doubleValue());   // 过渡期双写，同 returnOrder
+            java.math.BigDecimal charge = withServiceFee(e, max);
+            e.setAmount(charge);
+            e.setFeeAmount(charge.doubleValue());   // 过渡期双写，同 returnOrder
             e.setOverdueChargedAt(java.time.LocalDateTime.now());
             try {
                 updateOrConflict(e);
@@ -1009,7 +1018,20 @@ public class RentOrderServiceImpl implements RentOrderService {
                 e.getOrderNo(), e.getCabinetNo(),
                 cab == null ? null : cab.getSiteNo(),
                 cab == null ? null : cab.getAgentNo(),
-                e.getAmount(), e.getCurrency(), period, settledOn.toString()));
+                shareGross(e), e.getCurrency(), period, settledOn.toString()));
+    }
+
+    /** 服务费（C09）：按本单快照加到应付上；没有服务费原样返回。 */
+    private static java.math.BigDecimal withServiceFee(OrdOrder e, java.math.BigDecimal payable) {
+        PriceResolver.ServiceFee f = PriceResolver.serviceFeeFromSnapshot(e.getPriceSnapshot());
+        return f == null ? payable : f.addTo(payable);
+    }
+
+    /** 分成基数：服务费不进基数（rent.service_fee.in_share_base=0，快照定格）时从应收里扣掉。 */
+    private static java.math.BigDecimal shareGross(OrdOrder e) {
+        PriceResolver.ServiceFee f = PriceResolver.serviceFeeFromSnapshot(e.getPriceSnapshot());
+        if (f == null || f.inShareBase() || e.getAmount() == null) return e.getAmount();
+        return e.getAmount().subtract(f.includedIn(e.getAmount()));
     }
 
     /**

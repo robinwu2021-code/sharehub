@@ -94,8 +94,27 @@ public class TaxInvoiceServiceImpl implements TaxInvoiceService {
         inv.setCurrency(o.getCurrency() == null ? "AED" : o.getCurrency());
         inv.setLineDesc("Power bank rental " + nz(o.getRentStartAt()) + " ~ " + nz(o.getRentEndAt())
                 + (o.getCabinetNo() == null ? "" : " @" + o.getCabinetNo()));
-        split(inv, o.getPaidAmount() == null ? BigDecimal.ZERO : o.getPaidAmount());
+        BigDecimal paid = o.getPaidAmount() == null ? BigDecimal.ZERO : o.getPaidAmount();
+        BigDecimal feeIn = splitPaid(inv, o, paid);
+        if (feeIn.signum() > 0) inv.setLineDesc(inv.getLineDesc() + " + service fee " + feeIn.toPlainString());
         insert(inv);
+    }
+
+    /**
+     * 按本单收款额拆税。服务费不计 VAT（C09 rent.service_fee.vat_applicable=0，借出时定格）时只对租金部分拆税，
+     * 服务费原额并入净额与总额。返回本单所含服务费（0 = 无）。
+     */
+    private static BigDecimal splitPaid(OrdTaxInvoice inv, OrdOrder o, BigDecimal paid) {
+        var fee = o == null ? null : ai.neargo.sharehub.trade.price.engine.PriceResolver.serviceFeeFromSnapshot(o.getPriceSnapshot());
+        BigDecimal feeIn = fee == null ? BigDecimal.ZERO : fee.includedIn(paid);
+        if (feeIn.signum() > 0 && !fee.vatApplicable()) {
+            split(inv, paid.subtract(feeIn));
+            inv.setNetAmount(inv.getNetAmount().add(feeIn));
+            inv.setGrossAmount(inv.getGrossAmount().add(feeIn));
+        } else {
+            split(inv, paid);
+        }
+        return feeIn;
     }
 
     /** 建一张票并快照主体；主体不全 → BLOCKED，原因写明缺哪项。 */
@@ -260,8 +279,10 @@ public class TaxInvoiceServiceImpl implements TaxInvoiceService {
         BigDecimal net = t.getNetAmount();
         applyIssuer(t);
         if (KIND_INVOICE.equals(t.getKind())) {
-            // 按新主体的税率重拆：原始金额是当时的收款额，含税口径下即 gross，价外税下即 net
-            split(t, t.getTaxIncluded() != 0 ? gross : net);
+            // 按新主体的税率重拆：原始金额是当时的收款额（落库的 gross）；服务费免税口径同开票时
+            OrdOrder o = order(t.getOrderNo());
+            BigDecimal paid = o != null && o.getPaidAmount() != null ? o.getPaidAmount() : (t.getTaxIncluded() != 0 ? gross : net);
+            splitPaid(t, o, paid);
         }
         if (mapper.updateById(t) == 0) throw BizException.conflict("error.common.state_changed");
         log.info("重试开税务发票 invoiceNo={} status={} reason={}", invoiceNo, t.getStatus(), t.getFailReason());

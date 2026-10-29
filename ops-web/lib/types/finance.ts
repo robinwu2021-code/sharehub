@@ -576,6 +576,19 @@ export interface TaxInvoice {
   createdAt: string;
 }
 
+/** 跨期应付一行（SHR-05）：收款方 × 期间。未付 = 应得 − 已付；应得含退款冲回的负数明细。 */
+export interface PayableRow {
+  payeeType: "AGENT" | "VENUE" | string;
+  payeeNo: string;
+  payeeName: string | null;
+  period: string;
+  currency: string;
+  earned: number;
+  settled: number;
+  paid: number;
+  outstanding: number;
+}
+
 /** 商家分成自开票单据（V183，C10）：提现到账时平台代商家开出；供方 = 商家，收货方 = 平台开票主体。 */
 export interface SelfBill {
   billNo: string;

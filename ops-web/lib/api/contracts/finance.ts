@@ -1,8 +1,8 @@
 // 覆盖范围：分账规则与流水、总账、结算、提现审批、对账、发票、分润统计、充值订单。
-import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ, TaxInvoiceQ, TaxInvoiceExportQ, SelfBillQ, ReportQ, PayoutAccountQ, WithdrawalQ, AdjustmentQ } from "../query";
+import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ, TaxInvoiceQ, TaxInvoiceExportQ, SelfBillQ, PayableQ, ReportQ, PayoutAccountQ, WithdrawalQ, AdjustmentQ } from "../query";
 import type {
   PageResult, ShareRule, LedgerEntry, Settlement, SettlementDraft, Withdrawal,
-  ShareRecord, Reconcile, ReconAction, ReconDiff, ReconStats, Invoice, InvoiceView, TaxInvoice, SelfBill, ShareSummary, RechargeOrder,
+  ShareRecord, Reconcile, ReconAction, ReconDiff, ReconStats, Invoice, InvoiceView, TaxInvoice, SelfBill, PayableRow, ShareSummary, RechargeOrder,
 
   VoucherDetail,
   VoucherCreatePayload, PayoutAccount, PayReceiptPayload, WithdrawApplyPayload,
@@ -109,6 +109,8 @@ export interface FinanceApi {
   downloadTaxInvoicePdf(invoiceNo: string): Promise<void>;
   /** 商家分成自开票（V183，C10）：到账自动出；补出 = 对一笔已到账提现补一张（已出过原样返回）。 */
   listSelfBills(q?: SelfBillQ): Promise<PageResult<SelfBill>>;
+  /** 跨期应付（SHR-05）：收款方 × 期间 的应得 / 已出结算单 / 已付 / 未付。 */
+  listPayables(q?: PayableQ): Promise<PageResult<PayableRow>>;
   issueSelfBill(withdrawNo: string): Promise<SelfBill>;
   downloadSelfBillPdf(billNo: string): Promise<void>;
   saveShareRule(x: Partial<ShareRule> & { ruleNo?: string }): Promise<ShareRule>;

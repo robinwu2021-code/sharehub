@@ -49,6 +49,7 @@ public class FinanceController {
     private final ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoiceService;
     private final TaxInvoiceDocuments taxInvoiceDocs;
     private final ai.neargo.sharehub.finance.service.SelfBillService selfBills;
+    private final ai.neargo.sharehub.finance.service.PayableReportService payables;
 
     public FinanceController(ShareService shareService, SettlementService settlementService,
                              WithdrawalService withdrawalService,
@@ -58,7 +59,9 @@ public class FinanceController {
                              ai.neargo.sharehub.trade.order.service.DepositService depositService,
                              ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoiceService,
                              TaxInvoiceDocuments taxInvoiceDocs,
-                             ai.neargo.sharehub.finance.service.SelfBillService selfBills) {
+                             ai.neargo.sharehub.finance.service.SelfBillService selfBills,
+                             ai.neargo.sharehub.finance.service.PayableReportService payables) {
+        this.payables = payables;
         this.selfBills = selfBills;
         this.taxInvoiceService = taxInvoiceService;
         this.taxInvoiceDocs = taxInvoiceDocs;
@@ -428,6 +431,18 @@ public class FinanceController {
         boolean truncated = list.size() > cap;
         taxInvoiceDocs.register(ai.neargo.sharehub.common.export.ExportFormat.of(format),
                 truncated ? list.subList(0, cap) : list, truncated, filter).writeTo(response);
+    }
+
+    // ——————————— 跨期应付（SHR-05，第 6 批）：收款方 × 期间 的 应得 / 已出结算单 / 已付 / 未付 ———————————
+
+    @GetMapping("/api/trade/payables")
+    @PreAuthorize("@perm.can('finance:share_record:read')")
+    public PageResult<ai.neargo.sharehub.finance.service.PayableReportService.PayableRow> payables(
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String payeeType, @RequestParam(required = false) String payeeNo,
+            @RequestParam(required = false) String fromPeriod, @RequestParam(required = false) String toPeriod,
+            @RequestParam(required = false) Boolean onlyOutstanding) {
+        return payables.page(page, size, payeeType, payeeNo, fromPeriod, toPeriod, Boolean.TRUE.equals(onlyOutstanding));
     }
 
     // ——————————— 商家分成自开票（C10，V183）———————————

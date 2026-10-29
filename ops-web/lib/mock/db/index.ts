@@ -80,7 +80,7 @@ export {
 
 export {
   shareRules, settlements, withdrawals, ledger, shareRecords, reconciles, invoices,
-  listShareRecords, listReconciles, listInvoices, getInvoice, taxInvoices, listTaxInvoices, getTaxInvoice, retryTaxInvoice, selfBills, listSelfBills, issueSelfBill, saveShareRule, saveInvoice, auditWithdrawal, payWithdrawal, resubmitWithdrawalApproval, retryWithdrawalApprovalEffect, applyWithdrawal,
+  listShareRecords, listReconciles, listInvoices, getInvoice, taxInvoices, listTaxInvoices, getTaxInvoice, retryTaxInvoice, selfBills, listSelfBills, issueSelfBill, listPayables, saveShareRule, saveInvoice, auditWithdrawal, payWithdrawal, resubmitWithdrawalApproval, retryWithdrawalApprovalEffect, applyWithdrawal,
   shareSummaries, listShareSummaries,
   rechargeOrders, listRechargeOrders,
   rechargePackages, listRechargePackages, saveRechargePackage,

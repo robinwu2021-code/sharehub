@@ -59,6 +59,12 @@ public interface AgentDirectoryPort {
     }
 
     /**
+     * 商家在 {@code onDate} 生效的「单均固定额」（{@code agt_commission}，dimension=ORDER_COUNT、ACTIVE、
+     * 生效日不晚于当天的最新一条）。没有返回 {@code null}。C11 / SHR-02：此前这一列存得进、从没人读。
+     */
+    java.math.BigDecimal fixedPerOrder(String agentNo, String onDate);
+
+    /**
      * 运维分成系数（批次 F5，裁决 #1）：该代理在 {@code period}（YYYY-MM，订单归属账期）适用的系数 ——
      * 取上一月考核的结果；没有考核记录按 1（不打折）。乘在 OPERATE 分润比例上。
      */

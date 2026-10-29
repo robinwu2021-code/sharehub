@@ -35552,6 +35552,103 @@
   },
   {
    "verb": "GET",
+   "path": "/api/trade/payables",
+   "perm": "finance:share_record:read",
+   "perms": [
+    "finance:share_record:read"
+   ],
+   "handler": "FinanceController#payables",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "payeeType",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "payeeNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "fromPeriod",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "toPeriod",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "onlyOutstanding",
+     "type": "Boolean",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<ai.neargo.sharehub.finance.service.PayableReportService.PayableRow>",
+   "returnContainer": "PageResult",
+   "returnElement": "ai.neargo.sharehub.finance.service.PayableReportService.PayableRow",
+   "responseShape": [
+    {
+     "name": "payeeType",
+     "type": "String"
+    },
+    {
+     "name": "payeeNo",
+     "type": "String"
+    },
+    {
+     "name": "payeeName",
+     "type": "String"
+    },
+    {
+     "name": "period",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "earned",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "settled",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "paid",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "outstanding",
+     "type": "BigDecimal"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/trade/payee-sharing",
    "perm": "finance:share_rule:read",
    "perms": [
@@ -50462,10 +50559,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 568,
-  "records": 528,
-  "withPerm": 486,
+  "endpoints": 569,
+  "records": 529,
+  "withPerm": 487,
   "withBody": 234,
-  "shapedResponses": 439
+  "shapedResponses": 440
  }
 }

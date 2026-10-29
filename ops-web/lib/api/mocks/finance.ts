@@ -5,7 +5,7 @@ import * as pt from "../../mock/db/payout-task";
 import { currentAuth } from "../../auth";
 // 走具体模块不改变行为——同一份模块级状态，只是绕过桶文件
 import type { FinanceApi } from "../contracts/finance";
-import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ, TaxInvoiceQ, SelfBillQ, ReportQ, WithdrawalQ } from "../query";
+import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ, TaxInvoiceQ, SelfBillQ, PayableQ, ReportQ, WithdrawalQ } from "../query";
 import { wait } from "./_wait";
 import { fail } from "../../biz-error";
 
@@ -61,6 +61,7 @@ export const financeMock: FinanceApi = {
   // 文件由后端生成；演示数据模式如实拒绝，不下载假文件
   exportTaxInvoices: async () => fail("演示数据模式不生成文件，接真后端后可导出", "Export needs the real backend; not available in demo mode"),
   listSelfBills: (q: SelfBillQ = {}) => wait(db.listSelfBills(q)),
+  listPayables: (q: PayableQ = {}) => wait(db.listPayables(q)),
   issueSelfBill: async (withdrawNo) => wait(db.issueSelfBill(withdrawNo)),
   downloadSelfBillPdf: async () => fail("演示数据模式不生成文件，接真后端后可下载", "Download needs the real backend; not available in demo mode"),
   downloadTaxInvoicePdf: async () => fail("演示数据模式不生成文件，接真后端后可下载", "Download needs the real backend; not available in demo mode"),

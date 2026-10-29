@@ -16,6 +16,7 @@ import { PayoutAccountDrawer } from "@/components/finance/payout-account-drawer"
 import { PayoutTasks } from "@/components/finance/payout-tasks";
 import { TaxInvoicePanel } from "@/components/finance/tax-invoice-panel";
 import { SelfBillPanel } from "@/components/finance/self-bill-panel";
+import { PayablesPanel } from "@/components/finance/payables-panel";
 import { DataTable, type Column, type SortDir } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -1537,6 +1538,8 @@ export function FinanceWorkspace({ path, tabKeys }: {
           代价是错误态要自己接——上面每个列表都接了，棘轮 lib/table-wiring.test.ts 守住不回退。 */}
       {/* 调整项视图自带分页（PagedTable），这里的分页属于上面那张共享列表 */}
       {q.data && tab !== "adjustments" && !(tab === "invoices" && invView !== "B2B") && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
+      {/* 跨期应付（SHR-05）：分润统计只看单期，这里看各期累积下来还欠多少 */}
+      {tab === "summary" && <PayablesPanel />}
 
       {/* 提现审批抽屉：通过 → 转打款中；驳回必填原因；审批人取当前登录账号 */}
       <Drawer
