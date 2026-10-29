@@ -1,6 +1,6 @@
 // 仓库管理与供应商（V201）mock：与后端 WarehouseAdminServiceImpl / SupplierServiceImpl 同规则。
 // 归档仓前须：不是默认回仓仓、仓里没有设备、没有未结待检单 —— 一次列全原因。
-import type { Supplier, SupplierReq, Warehouse, WarehouseReq, PageResult } from "../../types";
+import type { IntakeItemType, StockThreshold, StockThresholdReq, Supplier, SupplierReq, Warehouse, WarehouseReq, PageResult } from "../../types";
 import type { ArchiveQ } from "../../api/query";
 import { fail, notFound } from "../../biz-error";
 import { cabinets, powerbanks } from "./device";
@@ -92,4 +92,30 @@ export function unarchiveSupplier(no: string): Supplier {
 export function activeSupplierName(no: string): string | null {
   const s = suppliers.find((x) => x.supplierNo === no);
   return s && !s.archivedAt ? s.name : null;
+}
+
+// ————————————————————————————— 安全库存（V204） —————————————————————————————
+
+const minQty = new Map<string, number>();
+const TYPES: IntakeItemType[] = ["CABINET", "POWERBANK"];
+
+function thresholdRow(w: Warehouse, itemType: IntakeItemType): StockThreshold {
+  const available = itemType === "CABINET"
+    ? cabinets.filter((c) => c.warehouseNo === w.warehouseNo && c.status === "IN_STOCK" && !c.locationNo && !c.issuedAgentNo && !c.archivedAt).length
+    : powerbanks.filter((p) => p.warehouseNo === w.warehouseNo && p.status === "IN_STOCK" && !p.cabinetNo && !p.archivedAt).length;
+  const min = minQty.get(`${w.warehouseNo}:${itemType}`) ?? 0;
+  return { warehouseNo: w.warehouseNo, warehouseName: w.name, itemType, minQty: min, available, low: min > 0 && available < min };
+}
+
+export function listStockThresholds(warehouseNo?: string): StockThreshold[] {
+  return WAREHOUSES.filter((w) => !w.archivedAt && (!warehouseNo || w.warehouseNo === warehouseNo))
+    .flatMap((w) => TYPES.map((t) => thresholdRow(w, t)));
+}
+
+export function saveStockThreshold(x: StockThresholdReq): StockThreshold {
+  if (!TYPES.includes(x?.itemType)) fail("设备类型不对", "Invalid item type");
+  if (!Number.isInteger(x.minQty) || x.minQty < 0) fail("下限须为非负整数", "Min qty must be a non-negative integer");
+  const w = WAREHOUSES.find((k) => k.warehouseNo === x.warehouseNo && !k.archivedAt) ?? notFound("仓库", "Warehouse", x.warehouseNo);
+  minQty.set(`${w.warehouseNo}:${x.itemType}`, x.minQty);
+  return thresholdRow(w, x.itemType);
 }

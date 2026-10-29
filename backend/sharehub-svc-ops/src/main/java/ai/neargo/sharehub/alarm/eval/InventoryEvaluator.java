@@ -34,6 +34,8 @@ public class InventoryEvaluator implements StateEvaluator {
 
     public static final String INTAKE_OVERDUE = "INTAKE_OVERDUE";
     public static final String REMOVAL_RETURN_MISSING = "REMOVAL_RETURN_MISSING";
+    /** V204：仓 × 设备类型的可用量低于安全库存 → 仓管待办；补货到下限即恢复。 */
+    public static final String LOW_STOCK = "LOW_STOCK";
 
     private final InventoryStatePort inventory;
     private final WoMapper workOrders;
@@ -47,7 +49,7 @@ public class InventoryEvaluator implements StateEvaluator {
 
     @Override
     public Set<String> codes() {
-        return Set.of(INTAKE_OVERDUE, REMOVAL_RETURN_MISSING);
+        return Set.of(INTAKE_OVERDUE, REMOVAL_RETURN_MISSING, LOW_STOCK);
     }
 
     /** 按单据全局判定，不跟站点批次走。 */
@@ -67,6 +69,16 @@ public class InventoryEvaluator implements StateEvaluator {
                     List.of(new Finding.Evidence("INTAKE_OPEN", null, null, i.arrivedAt(),
                             "到达 " + age + " 天，仓 " + i.warehouseNo() + "，未处理 " + i.pending() + " 台")),
                     Map.of("warehouseNo", String.valueOf(i.warehouseNo()))));
+        }
+
+        for (InventoryStatePort.LowStock l : inventory.lowStock()) {
+            String label = "CABINET".equals(l.itemType()) ? "机柜" : "充电宝";
+            out.add(new Finding(LOW_STOCK, AlarmSubjectType.WAREHOUSE, l.warehouseNo() + ":" + l.itemType(), null, null, null, null,
+                    AlarmCause.NO_STOCK, ImpactScope.ENTITY, 0,
+                    List.of(new Finding.Evidence("BELOW_MIN", null, null, now,
+                            (l.warehouseName() == null ? l.warehouseNo() : l.warehouseName()) + " " + label + "可用 " + l.available()
+                                    + " 台，低于安全库存 " + l.minQty())),
+                    Map.of("warehouseNo", l.warehouseNo(), "itemType", l.itemType())));
         }
 
         int grace = Math.max(1, params.intOf("inv.removal.return_grace_minutes", 30));

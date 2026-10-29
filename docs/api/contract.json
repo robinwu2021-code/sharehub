@@ -17218,6 +17218,85 @@
   },
   {
    "verb": "GET",
+   "path": "/api/ops/inventory/stock-thresholds",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#stockThresholds",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.ThresholdDtos.StockThreshold>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.ThresholdDtos.StockThreshold>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/stock-thresholds",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#saveStockThreshold",
+   "summary": "",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.ThresholdDtos.StockThresholdReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.ThresholdDtos.StockThreshold",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.ThresholdDtos.StockThreshold",
+   "responseShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "warehouseName",
+     "type": "String"
+    },
+    {
+     "name": "itemType",
+     "type": "String"
+    },
+    {
+     "name": "minQty",
+     "type": "int"
+    },
+    {
+     "name": "available",
+     "type": "int"
+    },
+    {
+     "name": "low",
+     "type": "boolean"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "itemType",
+     "type": "String"
+    },
+    {
+     "name": "minQty",
+     "type": "Integer"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
    "path": "/api/ops/inventory/suppliers",
    "perm": "device:inventory:read",
    "perms": [
@@ -54089,7 +54168,8 @@
    "PAYEE",
    "AGENT",
    "WORK_ORDER",
-   "PAYMENT"
+   "PAYMENT",
+   "INTAKE"
   ],
   "AlarmStatus": [
    "OPEN",
@@ -54424,10 +54504,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 610,
-  "records": 582,
-  "withPerm": 528,
-  "withBody": 251,
-  "shapedResponses": 476
+  "endpoints": 612,
+  "records": 585,
+  "withPerm": 530,
+  "withBody": 252,
+  "shapedResponses": 477
  }
 }

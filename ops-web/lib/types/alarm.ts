@@ -243,7 +243,7 @@ export type AlarmDomain =
 /** 告警主体类型（与后端 `AlarmSubjectType` 同名同值）。 */
 export type AlarmSubjectType =
   | "SITE" | "CABINET" | "SLOT" | "POWERBANK" | "ORDER" | "USER"
-  | "AGENT" | "PAYEE" | "CONTRACT" | "PAYMENT" | "WORK_ORDER" | "INTAKE";
+  | "AGENT" | "PAYEE" | "CONTRACT" | "PAYMENT" | "WORK_ORDER" | "INTAKE" | "WAREHOUSE";
 
 /** 成因（与后端 `AlarmCause` 同名同值）。同一个域可由多种成因触发。 */
 export type AlarmCause =

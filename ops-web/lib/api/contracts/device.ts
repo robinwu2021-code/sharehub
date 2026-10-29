@@ -5,7 +5,7 @@ import type {
   InventoryTransfer, InventoryTransferDetail, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
   Checklist, TrialRent, Protection, ProtectionReq, SignalCode,
   InvTransferReq, QcReq, QcRecord, ReceiveResult, AssetDiff, AssetDiffStatus, PowerbankAction,
-  DeviceMovement, InventoryEngine, StockStage, StockPeriodRow, InventoryMigrationPlan, InventoryMigrationResult, StockLedgerRow, StockCount, StockCountDetail, IssueDevicesReq, ClaimDevicesReq, IssueRedirectReq, PoolReturnReq, IssuedSummary, Warehouse, WarehouseReq, Supplier, SupplierReq, Disposal, DisposalDetail, DisposalReq, DisposalKind, Intake, IntakeDetail, IntakeCreateReq, IntakeItemRef, IntakeDisposeReq, IntakeItemType, IntakeStatus, BindReq, BindBatchReq, BindResult,
+  DeviceMovement, InventoryEngine, StockStage, StockPeriodRow, InventoryMigrationPlan, InventoryMigrationResult, StockLedgerRow, StockCount, StockCountDetail, IssueDevicesReq, ClaimDevicesReq, IssueRedirectReq, PoolReturnReq, IssuedSummary, Warehouse, WarehouseReq, Supplier, SupplierReq, Disposal, DisposalDetail, DisposalReq, DisposalKind, StockThreshold, StockThresholdReq, Intake, IntakeDetail, IntakeCreateReq, IntakeItemRef, IntakeDisposeReq, IntakeItemType, IntakeStatus, BindReq, BindBatchReq, BindResult,
 } from "../../types";
 
 export interface DeviceApi {
@@ -173,6 +173,9 @@ export interface DeviceApi {
   updateWarehouse(warehouseNo: string, x: WarehouseReq): Promise<Warehouse>;
   archiveWarehouse(warehouseNo: string): Promise<Warehouse>;
   unarchiveWarehouse(warehouseNo: string): Promise<Warehouse>;
+  /** 安全库存（V204）：下限 0 = 不预警。 */
+  listStockThresholds(warehouseNo?: string): Promise<StockThreshold[]>;
+  saveStockThreshold(x: StockThresholdReq): Promise<StockThreshold>;
   /** 处置出库（V203）：报废 / 退供应商，建单即过账。 */
   listDisposals(q?: PageQ & { kind?: DisposalKind; warehouseNo?: string; supplierNo?: string }): Promise<PageResult<Disposal>>;
   getDisposal(disposalNo: string): Promise<DisposalDetail>;

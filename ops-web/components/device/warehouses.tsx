@@ -8,7 +8,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
 import { api } from "@/lib/api";
 import { UNPAGED_SIZE } from "@/lib/constants";
-import type { InventoryMigrationResult, MigrationCandidate, MigrationFailure, Warehouse, WarehouseReq } from "@/lib/types";
+import type { InventoryMigrationResult, MigrationCandidate, MigrationFailure, StockThreshold, Warehouse, WarehouseReq } from "@/lib/types";
+import { Input } from "@/components/ui/input";
 import { useCan } from "@/lib/hooks/use-can";
 import { notify } from "@/lib/notify";
 import { Drawer, Field } from "@/components/ui/drawer";
@@ -23,6 +24,8 @@ import { ShowArchivedToggle, archivedRowClass, ArchiveActions, archiveConfirm, u
 import { exportCsv } from "@/lib/export-csv";
 
 const DEFAULT_MARK: StatusMap<"DEFAULT"> = { DEFAULT: { label: "默认回仓", tone: "info" } };
+const LOW_MARK: StatusMap<"LOW"> = { LOW: { label: "低于安全库存", tone: "warning" } };
+const TYPE_LABEL = { CABINET: "机柜", POWERBANK: "充电宝" } as const;
 
 /** 选仓下拉只给启用中的仓（已归档的仓不能收货 / 退回 / 盘点）。 */
 export const activeWarehouses = (ws: Warehouse[] | undefined) => (ws ?? []).filter((w) => !w.archivedAt);
@@ -48,7 +51,10 @@ export function WarehousesTab() {
   const canSetDefault = allow("system:param:update");
   const canMigrate = canSetDefault;
   const [migrating, setMigrating] = useState(false);
+  const [thresholdOf, setThresholdOf] = useState<Warehouse | null>(null);
   const q = useQuery({ queryKey: ["warehouses"], queryFn: () => api.listWarehouses() });
+  const thQ = useQuery({ queryKey: ["stock-thresholds"], queryFn: () => api.listStockThresholds() });
+  const lowWh = new Set((thQ.data ?? []).filter((t) => t.low).map((t) => t.warehouseNo));
   const regionsQ = useQuery({ queryKey: ["regions", "all"], queryFn: () => api.listRegions({ page: 1, size: UNPAGED_SIZE }) });
   const regionName = useMemo(() => {
     const m = new Map((regionsQ.data?.list ?? []).map((r) => [r.regionId, r.name]));
@@ -78,7 +84,12 @@ export function WarehousesTab() {
     { header: "名称", cell: (w) => w.name },
     { header: "区域", cell: (w) => regionName(w.regionId) },
     { header: "地址", cell: (w) => w.address ?? <span className="text-muted-foreground">-</span> },
-    { header: "", className: "whitespace-nowrap", cell: (w) => (w.isDefault ? <StatusBadge map={DEFAULT_MARK} value="DEFAULT" /> : null) },
+    { header: "", className: "whitespace-nowrap", cell: (w) => (
+      <div className="flex gap-1">
+        {w.isDefault && <StatusBadge map={DEFAULT_MARK} value="DEFAULT" />}
+        {lowWh.has(w.warehouseNo) && <StatusBadge map={LOW_MARK} value="LOW" />}
+      </div>
+    ) },
     {
       header: "操作",
       cell: (w) => (
@@ -94,6 +105,7 @@ export function WarehousesTab() {
               <Button size="sm" variant="outline" onClick={() => setForm({ warehouseNo: w.warehouseNo, name: w.name, regionId: w.regionId, address: w.address })}>
                 <Pencil className="size-4" /> 编辑
               </Button>
+              <Button size="sm" variant="outline" onClick={() => setThresholdOf(w)}>安全库存</Button>
               {canSetDefault && !w.isDefault && (
                 <Button size="sm" variant="outline" disabled={setDefault.isPending} onClick={() => setDefault.mutate(w.warehouseNo)}>设为默认回仓</Button>
               )}
@@ -139,8 +151,44 @@ export function WarehousesTab() {
         submitting={save.isPending}
       />
       <MigrationDrawer open={migrating} onClose={() => setMigrating(false)} />
+      <ThresholdDrawer warehouse={thresholdOf} canWrite={canWrite} onClose={() => setThresholdOf(null)} />
       {dialog}
     </div>
+  );
+}
+
+/** 安全库存（V204）：本仓柜 / 宝各一个下限；低于下限由告警 LOW_STOCK 给仓管待办。0 = 不预警。 */
+function ThresholdDrawer({ warehouse, canWrite, onClose }: { warehouse: Warehouse | null; canWrite: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const q = useQuery({
+    queryKey: ["stock-thresholds", warehouse?.warehouseNo], enabled: !!warehouse,
+    queryFn: () => api.listStockThresholds(warehouse!.warehouseNo),
+  });
+  const save = useMutation({
+    mutationFn: (t: StockThreshold) => api.saveStockThreshold({ warehouseNo: t.warehouseNo, itemType: t.itemType,
+      minQty: Number(draft[t.itemType] ?? t.minQty) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["stock-thresholds"] }); notify.success("已保存"); },
+  });
+  const cols: Column<StockThreshold>[] = [
+    { header: "设备", className: "whitespace-nowrap", cell: (t) => TYPE_LABEL[t.itemType] },
+    { header: "可用", className: "text-right tabular-nums whitespace-nowrap", cell: (t) => t.available },
+    { header: "下限", className: "w-32", cell: (t) => (canWrite
+      ? <Input type="number" min={0} aria-label={`${TYPE_LABEL[t.itemType]}下限`} value={draft[t.itemType] ?? String(t.minQty)}
+          onChange={(e) => setDraft({ ...draft, [t.itemType]: e.target.value })} />
+      : <span className="tabular-nums">{t.minQty || "不预警"}</span>) },
+    { header: "", className: "whitespace-nowrap", cell: (t) => (t.low ? <StatusBadge map={LOW_MARK} value="LOW" /> : null) },
+    { header: "", className: "whitespace-nowrap", cell: (t) => (canWrite
+      ? <Button size="sm" variant="outline" disabled={save.isPending || (draft[t.itemType] ?? String(t.minQty)) === String(t.minQty)}
+          onClick={() => save.mutate(t)}>保存</Button>
+      : null) },
+  ];
+  return (
+    <Drawer open={!!warehouse} onOpenChange={(o) => { if (!o) { setDraft({}); onClose(); } }} title={`安全库存 · ${warehouse?.name ?? ""}`}>
+      <div className="mb-3 txt-caption text-muted-foreground">可用 = 在本仓在库、未绑点位、不在出库池。低于下限给仓管发待办，补到下限自动消除；0 = 不预警。</div>
+      <DataTable rowKey={(t: StockThreshold) => t.itemType} columns={cols} rows={q.data}
+        loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="无" />
+    </Drawer>
   );
 }
 

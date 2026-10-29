@@ -64,3 +64,15 @@ describe("处置出库（V203 mock）", () => {
     expect(dsp.listDisposals({ keyword: "CABDP1" }).total).toBe(1);
   });
 });
+
+describe("安全库存（V204 mock）", () => {
+  it("每仓柜 / 宝各一行；设下限后可用量不足即 low；负数被拒", () => {
+    const w = ia.createWarehouse({ name: "安全库存仓" });
+    expect(ia.listStockThresholds(w.warehouseNo)).toHaveLength(2);
+    expect(() => ia.saveStockThreshold({ warehouseNo: w.warehouseNo, itemType: "CABINET", minQty: -1 })).toThrow();
+    expect(ia.saveStockThreshold({ warehouseNo: w.warehouseNo, itemType: "CABINET", minQty: 2 }).low).toBe(true);
+    cabinets.push({ ...cabinets[0], cabinetNo: "CABSS1", sn: "CABSS1", status: "IN_STOCK", archivedAt: null, locationNo: null, issuedAgentNo: null, warehouseNo: w.warehouseNo });
+    cabinets.push({ ...cabinets[0], cabinetNo: "CABSS2", sn: "CABSS2", status: "IN_STOCK", archivedAt: null, locationNo: null, issuedAgentNo: null, warehouseNo: w.warehouseNo });
+    expect(ia.listStockThresholds(w.warehouseNo).find((t) => t.itemType === "CABINET")!.low).toBe(false);
+  });
+});

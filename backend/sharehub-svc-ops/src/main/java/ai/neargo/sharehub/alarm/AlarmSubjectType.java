@@ -6,7 +6,9 @@ import java.util.Arrays;
 public enum AlarmSubjectType {
     SITE, CABINET, SLOT, ORDER, USER, POWERBANK, CONTRACT, PAYEE, AGENT, WORK_ORDER, PAYMENT,
     /** 到仓待检单（V197）。 */
-    INTAKE;
+    INTAKE,
+    /** 仓库（V204 低库存：subject_no = 仓号:设备类型）。 */
+    WAREHOUSE;
 
     public static AlarmSubjectType of(String v) {
         return Arrays.stream(values()).filter(x -> x.name().equalsIgnoreCase(v == null ? "" : v.trim())).findFirst()

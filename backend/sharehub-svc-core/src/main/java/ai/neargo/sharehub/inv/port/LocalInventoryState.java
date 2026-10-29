@@ -28,7 +28,11 @@ public class LocalInventoryState implements InventoryStatePort {
     private final InvIntakeItemMapper items;
     private final InvTransferMapper transfers;
 
-    public LocalInventoryState(InvIntakeMapper intakes, InvIntakeItemMapper items, InvTransferMapper transfers) {
+    private final ai.neargo.sharehub.inv.service.StockThresholdService thresholds;
+
+    public LocalInventoryState(InvIntakeMapper intakes, InvIntakeItemMapper items, InvTransferMapper transfers,
+                               ai.neargo.sharehub.inv.service.StockThresholdService thresholds) {
+        this.thresholds = thresholds;
         this.intakes = intakes;
         this.items = items;
         this.transfers = transfers;
@@ -48,6 +52,12 @@ public class LocalInventoryState implements InventoryStatePort {
             return heads.stream().map(h -> new OpenIntake(h.getIntakeNo(), h.getKind(), h.getWarehouseNo(), h.getSourceRef(),
                     h.getArrivedAt(), pending.getOrDefault(h.getIntakeNo(), 0L).intValue())).toList();
         });
+    }
+
+    @Override
+    public List<LowStock> lowStock() {
+        return thresholds.lowRows().stream()
+                .map(t -> new LowStock(t.warehouseNo(), t.warehouseName(), t.itemType(), t.minQty(), t.available())).toList();
     }
 
     @Override

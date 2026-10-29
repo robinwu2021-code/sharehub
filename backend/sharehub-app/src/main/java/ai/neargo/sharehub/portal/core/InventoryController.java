@@ -33,6 +33,7 @@ public class InventoryController {
     private final ai.neargo.sharehub.inv.service.WarehouseAdminService warehouseAdmin;
     private final ai.neargo.sharehub.inv.service.SupplierService suppliers;
     private final ai.neargo.sharehub.inv.service.DisposalService disposals;
+    private final ai.neargo.sharehub.inv.service.StockThresholdService thresholds;
 
     public InventoryController(InventoryTransferService transferService,
                                CommandLogService commandLogService,
@@ -42,7 +43,9 @@ public class InventoryController {
                                ai.neargo.sharehub.inv.remote.InventoryMigration migration,
                                ai.neargo.sharehub.inv.service.WarehouseAdminService warehouseAdmin,
                                ai.neargo.sharehub.inv.service.SupplierService suppliers,
-                               ai.neargo.sharehub.inv.service.DisposalService disposals) {
+                               ai.neargo.sharehub.inv.service.DisposalService disposals,
+                               ai.neargo.sharehub.inv.service.StockThresholdService thresholds) {
+        this.thresholds = thresholds;
         this.disposals = disposals;
         this.warehouseAdmin = warehouseAdmin;
         this.suppliers = suppliers;
@@ -266,6 +269,20 @@ public class InventoryController {
     @PreAuthorize("@perm.can('device:inventory:transfer')")
     public ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalDetail createDisposal(@RequestBody ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalReq req) {
         return disposals.create(req);
+    }
+
+    // —— 安全库存（V204；仓库页「安全库存」）——
+
+    @GetMapping("/inventory/stock-thresholds")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public java.util.List<ai.neargo.sharehub.inv.dto.ThresholdDtos.StockThreshold> stockThresholds(@RequestParam(required = false) String warehouseNo) {
+        return thresholds.list(warehouseNo);
+    }
+
+    @PostMapping("/inventory/stock-thresholds")
+    @PreAuthorize("@perm.can('device:inventory:warehouse')")
+    public ai.neargo.sharehub.inv.dto.ThresholdDtos.StockThreshold saveStockThreshold(@RequestBody ai.neargo.sharehub.inv.dto.ThresholdDtos.StockThresholdReq req) {
+        return thresholds.save(req);
     }
 
     // —— 供应商（V201）——

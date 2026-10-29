@@ -132,6 +132,23 @@ export interface Supplier {
   note: string | null;
   archivedAt: string | null;
 }
+/**
+ * 安全库存（V204，GET /api/ops/inventory/stock-thresholds）：启用中的仓 × 柜 / 宝各一行，未设下限 minQty = 0。
+ * available = 在该仓在库、未绑点位、不在出库池（宝：不在柜内）；low = 低于下限（告警 LOW_STOCK 给仓管待办）。
+ */
+export interface StockThreshold {
+  warehouseNo: string;
+  warehouseName: string;
+  itemType: IntakeItemType;
+  minQty: number;
+  available: number;
+  low: boolean;
+}
+export interface StockThresholdReq {
+  warehouseNo: string;
+  itemType: IntakeItemType;
+  minQty: number;
+}
 /** 处置出库（V203，GET /api/ops/inventory/disposals）：在库设备报废 / 退供应商，建单即过账。 */
 export type DisposalKind = "SCRAP" | "RETURN_SUPPLIER";
 /** 报废原因码：BROKEN 损坏 / OBSOLETE 淘汰 / OTHER 其他（SCRAP 必填）。 */
