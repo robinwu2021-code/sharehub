@@ -85,11 +85,14 @@ export interface IssueDevicesReq {
   cabinetNos: string[];
   /** 物流（V205，可选）。 */
   carrier?: string | null;
+  /** 幂等键（对接明细 §9.3）：表单打开时生成，提交与重试带同一个。 */
+  requestKey?: string;
   trackingNo?: string | null;
 }
 /** 接收人签收（POST /api/ops/devices/claim）：只能签给自己的。 */
 export interface ClaimDevicesReq {
   cabinetNos: string[];
+  requestKey?: string;
 }
 /** 出库调整（POST /api/ops/devices/issue-redirect）：只收未绑定的；原因必填；换接收人须重新签收。 */
 export interface IssueRedirectReq {
@@ -98,12 +101,17 @@ export interface IssueRedirectReq {
   siteNo?: string;
   receiverNo?: string;
   reason: string;
+  requestKey?: string;
 }
-/** 出库退回仓库（POST /api/ops/devices/pool-return）。只收未绑定的设备；原因必填。 */
+/**
+ * 出库撤销（POST /api/ops/devices/pool-return，对接明细 C13）。只收未绑定的设备；原因必填。
+ * 回原出库仓：warehouseNo 可空，填了须是原出库仓；实物退到别的仓走退仓。
+ */
 export interface PoolReturnReq {
   cabinetNos: string[];
   warehouseNo?: string;
   reason: string;
+  requestKey?: string;
 }
 /**
  * 仓库（GET /api/ops/inventory/warehouses）。V182 种入、V201 起可新建 / 编辑 / 归档。

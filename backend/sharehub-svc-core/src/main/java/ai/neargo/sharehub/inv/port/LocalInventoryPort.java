@@ -61,17 +61,17 @@ public class LocalInventoryPort implements InventoryPort {
     }
 
     @Override
-    public List<Cabinet> dispatch(String agentNo, String siteNo, String receiverNo, List<String> cabinetNos) {
+    public List<Cabinet> dispatch(String agentNo, String siteNo, String receiverNo, List<String> cabinetNos, String requestKey) {
         return pool.issue(agentNo, siteNo, receiverNo, cabinetNos);
     }
 
     @Override
-    public List<Cabinet> claim(List<String> cabinetNos) {
+    public List<Cabinet> claim(List<String> cabinetNos, String requestKey) {
         return pool.claim(cabinetNos);
     }
 
     @Override
-    public List<Cabinet> redirect(List<String> cabinetNos, String agentNo, String siteNo, String receiverNo, String reason) {
+    public List<Cabinet> redirect(List<String> cabinetNos, String agentNo, String siteNo, String receiverNo, String reason, String requestKey) {
         return pool.redirect(cabinetNos, agentNo, siteNo, receiverNo, reason);
     }
 
@@ -85,7 +85,7 @@ public class LocalInventoryPort implements InventoryPort {
     }
 
     @Override
-    public List<Cabinet> returnToWarehouse(List<String> cabinetNos, String warehouseNo, String reason) {
+    public List<Cabinet> returnToWarehouse(List<String> cabinetNos, String warehouseNo, String reason, String requestKey) {
         return pool.returnToWarehouse(cabinetNos, warehouseNo, reason);
     }
 }

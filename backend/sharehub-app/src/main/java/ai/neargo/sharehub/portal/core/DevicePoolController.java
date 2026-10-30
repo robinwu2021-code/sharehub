@@ -73,7 +73,7 @@ public class DevicePoolController {
         if (req == null) throw ai.neargo.sharehub.common.BizException.badRequest("error.common.missing_parameter", "body");
         ai.neargo.sharehub.inv.dto.ShipmentDtos.ShipInfo ship = new ai.neargo.sharehub.inv.dto.ShipmentDtos.ShipInfo(req.carrier(), req.trackingNo(), null, null);
         shipments.validate(ship);
-        List<Cabinet> out = inventory.dispatch(req.agentNo(), req.siteNo(), req.receiverNo(), req.cabinetNos());
+        List<Cabinet> out = inventory.dispatch(req.agentNo(), req.siteNo(), req.receiverNo(), req.cabinetNos(), req.requestKey());
         shipments.record(ai.neargo.sharehub.inv.ShipmentDocType.ISSUE, req.agentNo(),
                 java.util.Map.of("CABINET", req.cabinetNos() == null ? List.of() : req.cabinetNos()), ship);
         return out;
@@ -83,7 +83,7 @@ public class DevicePoolController {
     @PostMapping("/api/ops/devices/claim")
     @PreAuthorize("@perm.can('device:cabinet:update')")
     public List<Cabinet> claim(@RequestBody ai.neargo.sharehub.dev.dto.PoolDtos.ClaimReq req) {
-        return inventory.claim(req == null ? null : req.cabinetNos());
+        return inventory.claim(req == null ? null : req.cabinetNos(), req == null ? null : req.requestKey());
     }
 
     /** 出库调整（V195）：改商家 / 站点 / 接收人，只收未绑定的。 */
@@ -91,14 +91,14 @@ public class DevicePoolController {
     @PreAuthorize("@perm.can('device:inventory:transfer')")
     public List<Cabinet> redirect(@RequestBody ai.neargo.sharehub.dev.dto.PoolDtos.RedirectReq req) {
         if (req == null) throw ai.neargo.sharehub.common.BizException.badRequest("error.common.missing_parameter", "body");
-        return inventory.redirect(req.cabinetNos(), req.agentNo(), req.siteNo(), req.receiverNo(), req.reason());
+        return inventory.redirect(req.cabinetNos(), req.agentNo(), req.siteNo(), req.receiverNo(), req.reason(), req.requestKey());
     }
 
     @PostMapping("/api/ops/devices/pool-return")
     @PreAuthorize("@perm.can('device:inventory:transfer')")
     public List<Cabinet> poolReturn(@RequestBody PoolReturnReq req) {
         return inventory.returnToWarehouse(req == null ? null : req.cabinetNos(),
-                req == null ? null : req.warehouseNo(), req == null ? null : req.reason());
+                req == null ? null : req.warehouseNo(), req == null ? null : req.reason(), req == null ? null : req.requestKey());
     }
 
     /** 出库池页左侧的商家汇总。商家身份调同一端点，数据范围只给自己的。 */

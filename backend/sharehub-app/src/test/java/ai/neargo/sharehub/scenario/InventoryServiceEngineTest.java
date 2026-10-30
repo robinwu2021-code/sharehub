@@ -7,6 +7,7 @@ import ai.neargo.sharehub.inv.remote.RemoteInventoryPort;
 import ai.neargo.sharehub.support.ApiTestSupport;
 import ai.neargo.sharehub.support.InventoryFake;
 import com.fasterxml.jackson.databind.JsonNode;
+import ai.neargo.sharehub.inv.remote.InventoryApi;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -241,6 +242,78 @@ class InventoryServiceEngineTest extends ApiTestSupport {
         remote.useApi(fake);
     }
 
+    private String topStatus(String c) {
+        return fake.dispatchPool(InventoryApi.DispatchFilter.bySerial(c)).stream().filter(v -> v.parentDispatchId() == null)
+                .reduce((x, y) -> y).map(InventoryApi.DispatchView::status).orElse(null);
+    }
+
+    private long outboundsOf(String c) {
+        return fake.docs.values().stream().filter(d -> "OUT".equals(d.kind()) && d.serials().contains(c)).count();
+    }
+
+    @Test
+    @DisplayName("★★ C02 出库过账后响应丢失：本地回滚；原样重试（同 requestKey）续做，库存服务只有一张出库单")
+    void issueLostResponseResumes() {
+        String c = stocked();
+        String[] m = merchant();
+        String admin = login("ADMIN");
+        Map<String, Object> body = Map.of("agentNo", m[0], "cabinetNos", List.of(c), "requestKey", "RK-ISSUE-" + tag);
+        fake.loseNextOutboundPostResponse = true;
+        assertThat(post("/api/ops/devices/issue", body, admin).status).isEqualTo(409);
+        assertThat(jdbc.queryForObject("SELECT issued_agent_no FROM dev_cabinet WHERE cabinet_no=?", String.class, c)).isNull();
+        post("/api/ops/devices/issue", body, admin).okData();
+        assertThat(outboundsOf(c)).isEqualTo(1);
+        assertThat(topStatus(c)).isEqualTo("CLAIMED");
+        assertThat(jdbc.queryForObject("SELECT issued_agent_no FROM dev_cabinet WHERE cabinet_no=?", String.class, c)).isEqualTo(m[0]);
+    }
+
+    @Test
+    @DisplayName("★★ C04 领取后响应丢失：重试按原请求号查回领取，不重复领取、不漏记领取号")
+    void claimLostResponseResumes() {
+        String c = stocked();
+        String[] m = merchant();
+        String admin = login("ADMIN");
+        Map<String, Object> body = Map.of("agentNo", m[0], "cabinetNos", List.of(c), "requestKey", "RK-CLAIM-" + tag);
+        fake.loseNextClaimResponse = true;
+        assertThat(post("/api/ops/devices/issue", body, admin).status).isEqualTo(409);
+        assertThat(topStatus(c)).as("库存服务其实已领取").isEqualTo("CLAIMED");
+        post("/api/ops/devices/issue", body, admin).okData();
+        assertThat(fake.claims).as("只领了一次").hasSize(1);
+        assertThat(jdbc.queryForObject("SELECT v FROM inventory_sync_state WHERE k=?", String.class, "claim:" + c))
+                .isEqualTo(fake.claims.keySet().iterator().next());
+    }
+
+    @Test
+    @DisplayName("★ C12 同一领取单两台里调整一台：另一台在库存服务里仍是已领取（释放整单后补领）")
+    void redirectKeepsSameClaimPeersClaimed() {
+        String a = stocked(), b = stocked();
+        String[] m1 = merchant(), m2 = merchant();
+        String admin = login("ADMIN");
+        post("/api/ops/devices/issue", Map.of("agentNo", m1[0], "cabinetNos", List.of(a, b)), admin).okData();
+        assertThat(topStatus(a)).isEqualTo("CLAIMED");
+        post("/api/ops/devices/issue-redirect", Map.of("cabinetNos", List.of(a), "agentNo", m2[0], "reason", "发错商家"), admin).okData();
+        assertThat(topStatus(b)).as("没有被整单释放").isEqualTo("CLAIMED");
+        assertThat(fake.dispatchPool(InventoryApi.DispatchFilter.bySerial(a)).stream().filter(v -> v.parentDispatchId() == null)
+                .reduce((x, y) -> y).orElseThrow().rootTargetRef()).isEqualTo(m2[0]);
+    }
+
+    @Test
+    @DisplayName("★ C13 出库撤销只回原出库仓：选别的仓拒绝；撤销一台不影响同单另一台的领取")
+    void revokeOnlyToOriginWarehouse() {
+        String a = stocked(), b = stocked();
+        String[] m = merchant();
+        String admin = login("ADMIN");
+        post("/api/ops/devices/issue", Map.of("agentNo", m[0], "cabinetNos", List.of(a, b)), admin).okData();
+        Resp other = post("/api/ops/devices/pool-return", Map.of("cabinetNos", List.of(a), "warehouseNo", "WH003", "reason", "多发了"), admin);
+        assertThat(other.status).isEqualTo(409);
+        assertThat(other.body.toString()).contains("WH002");
+        post("/api/ops/devices/pool-return", Map.of("cabinetNos", List.of(a), "reason", "多发了"), admin).okData();
+        assertThat(jdbc.queryForObject("SELECT warehouse_no FROM dev_cabinet WHERE cabinet_no=?", String.class, a)).isEqualTo("WH002");
+        assertThat(topStatus(a)).isEqualTo("REVOKED");
+        assertThat(fake.stock).containsKey(a);
+        assertThat(topStatus(b)).as("同单另一台仍已领取").isEqualTo("CLAIMED");
+    }
+
     private static JsonNode stageRow(JsonNode rows, String stage) {
         for (JsonNode r : rows) if (stage.equals(r.path("stage").asText())) return r;
         throw new AssertionError("no stage " + stage);
@@ -288,6 +361,8 @@ class InventoryServiceEngineTest extends ApiTestSupport {
         assertThat(r.body.toString()).contains("inventory.stock.short");
         assertThat(jdbc.queryForMap("SELECT issued_agent_no, warehouse_no FROM dev_cabinet WHERE cabinet_no=?", c))
                 .containsEntry("issued_agent_no", null).containsEntry("warehouse_no", "WH002");
+        assertThat(jdbc.queryForObject("SELECT phase FROM inv_operation WHERE kind='DEVICE_ISSUE' ORDER BY id DESC LIMIT 1", String.class))
+                .as("库存服务明确拒绝 = 没执行，不算待查回").isEqualTo("REJECTED");
     }
 
     private String transfer(String admin, List<String> cabs) {

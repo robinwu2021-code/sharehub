@@ -10,11 +10,10 @@
 //
 // 后端分步上线（lib/backend-ready.ts）：devices.pool（出库 / 退回 / 汇总，已上线）、
 // devices.bind（绑定 / 解绑，待上线）—— 未上线的动作按钮不渲染，并写明原因。
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { activeWarehouses } from "@/components/inventory/warehouses";
 import { UNPAGED_SIZE } from "@/lib/constants";
 import { featureReady } from "@/lib/backend-ready";
 import { usePaging } from "@/lib/hooks/use-paging";
@@ -87,9 +86,13 @@ export function IssuedPoolTab() {
   const selAgents = [...new Set(selectedRows.map((c) => c.issuedAgentNo))];
   const selUnbound = selectedRows.length > 0 && selectedRows.every((c) => !c.locationNo);
   const selMine = selectedRows.length > 0 && selectedRows.every((c) => poolStateOf(c) === "UNCLAIMED" && c.issueReceiverNo === me);
+  // 幂等键：同一组设备的签收重试带同一个；选中的设备变了或签收成功就换新
+  const [claimKey, setClaimKey] = useState(() => crypto.randomUUID());
+  const selectedKey = selected.join(",");
+  useEffect(() => setClaimKey(crypto.randomUUID()), [selectedKey]);
   const claimM = useMutation({
-    mutationFn: (cabinetNos: string[]) => api.claimDevices({ cabinetNos }),
-    onSuccess: (r) => { notify.success(`已签收 ${r.length} 台`); refresh(); },
+    mutationFn: (cabinetNos: string[]) => api.claimDevices({ cabinetNos, requestKey: claimKey }),
+    onSuccess: (r) => { notify.success(`已签收 ${r.length} 台`); setClaimKey(crypto.randomUUID()); refresh(); },
   });
 
   const summaryCols: Column<IssuedSummary>[] = [
@@ -230,11 +233,14 @@ function IssueDrawer({ open, onClose, defaultAgent, onDone }: {
   const chosen = issuable.find((a) => a.agentNo === (agentNo || defaultAgent));
   const notReady = chosen && (!agentCoreComplete(chosen) || !chosen.defaultSiteNo);
   const [ship, setShip] = useState<ShipInfo>({});
+  // 幂等键（对接明细 C02）：本次出库的提交与重试带同一个；成功后换新
+  const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
   const m = useMutation({
-    mutationFn: () => api.issueDevices({ agentNo: chosen!.agentNo, cabinetNos: picked, carrier: ship.carrier || null, trackingNo: ship.trackingNo || null }),
+    mutationFn: () => api.issueDevices({ agentNo: chosen!.agentNo, cabinetNos: picked, carrier: ship.carrier || null,
+      trackingNo: ship.trackingNo || null, requestKey }),
     onSuccess: (r) => {
       notify.success(`已出库 ${r.length} 台给 ${chosen!.name}`);
-      setPicked([]); setAgentNo(""); setShip({}); onClose(); onDone();
+      setPicked([]); setAgentNo(""); setShip({}); setRequestKey(crypto.randomUUID()); onClose(); onDone();
     },
   });
   return (
@@ -330,34 +336,30 @@ function ReasonDrawer({ target, onClose, onDone }: {
   target: { kind: "unbind" | "return"; cabinetNos: string[] } | null; onClose: () => void; onDone: () => void;
 }) {
   const [reason, setReason] = useState("");
-  const [warehouseNo, setWarehouseNo] = useState("");
   const isReturn = target?.kind === "return";
-  const whQ = useQuery({ queryKey: ["warehouses"], queryFn: () => api.listWarehouses(), enabled: isReturn });
-  const defaultWh = whQ.data?.find((w) => w.isDefault);
+  const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
+  // 退回 = 出库撤销（对接明细 C13）：库存服务按原出库单冲回原仓，所以只回原出库仓，不再选仓
   const m = useMutation({
     mutationFn: async () => isReturn
-      ? api.returnPoolDevices({ cabinetNos: target!.cabinetNos, reason, warehouseNo: warehouseNo || undefined })
+      ? api.returnPoolDevices({ cabinetNos: target!.cabinetNos, reason, requestKey })
       : Promise.all(target!.cabinetNos.map((no) => api.unbindDevice(no, reason))),
     onSuccess: (r) => {
-      notify.success(isReturn ? `已退回仓库 ${r.length} 台` : `已解绑 ${r.length} 台，待重新安装`);
-      setReason(""); setWarehouseNo(""); onClose(); onDone();
+      notify.success(isReturn ? `已撤销出库、回原仓 ${r.length} 台` : `已解绑 ${r.length} 台，待重新安装`);
+      setReason(""); setRequestKey(crypto.randomUUID()); onClose(); onDone();
     },
   });
   return (
     <Drawer open={!!target} onOpenChange={(o) => !o && onClose()}
       title={isReturn ? `退回仓库 ${target?.cabinetNos.length ?? 0} 台` : `解绑 ${target?.cabinetNos.length ?? 0} 台`}
-      desc={isReturn ? "设备离开商家名下（已出库待绑定），回到仓里；只收未绑定的设备" : "解除点位绑定，设备回到同一商家名下（已出库待绑定）；已上线的要走撤机工单"}
+      desc={isReturn ? "撤销出库：设备离开商家名下，回到原出库仓；只收未绑定的设备" : "解除点位绑定，设备回到同一商家名下（已出库待绑定）；已上线的要走撤机工单"}
       footer={<Button disabled={!reason.trim() || m.isPending} onClick={() => m.mutate()}>{isReturn ? "确认退回" : "确认解绑"}</Button>}>
       <Field label="原因（必填）">
         <Textarea value={reason} onChange={setReason} placeholder={isReturn ? "如：多发了 / 商家暂不需要" : "如：换点位"} />
       </Field>
       {isReturn && (
-        <Field label="退回到仓">
-          <Select aria-label="退回到仓" value={warehouseNo} onChange={(e) => setWarehouseNo(e.target.value)}>
-            <option value="">默认回仓仓{defaultWh ? `（${defaultWh.name}）` : ""}</option>
-            {activeWarehouses(whQ.data).map((w) => <option key={w.warehouseNo} value={w.warehouseNo}>{w.name} · {w.warehouseNo}</option>)}
-          </Select>
-        </Field>
+        <div className="txt-caption text-muted-foreground">
+          回到原出库仓（库存服务按原出库单冲回）。实物要送到别的仓，请走退仓。
+        </div>
       )}
       <div className="txt-caption text-muted-foreground">设备：{target?.cabinetNos.join("、")}</div>
     </Drawer>
@@ -375,10 +377,11 @@ function RedirectDrawer({ rows, onClose, onDone }: { rows: Cabinet[] | null; onC
   const site = siteNo ?? first?.issuedSiteNo ?? "";
   // 接收人不在界面上改（A5），保持原值，避免改商家时把已签收的打回待签收
   const receiver = first?.issueReceiverNo ?? "";
-  const reset = () => { setAgentNo(null); setSiteNo(null); setReason(""); };
+  const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
+  const reset = () => { setAgentNo(null); setSiteNo(null); setReason(""); setRequestKey(crypto.randomUUID()); };
   const m = useMutation({
     mutationFn: () => api.redirectIssue({ cabinetNos: rows!.map((c) => c.cabinetNo), agentNo: agent, siteNo: site || undefined,
-      receiverNo: receiver || undefined, reason }),
+      receiverNo: receiver || undefined, reason, requestKey }),
     onSuccess: (r) => { notify.success(`已调整 ${r.length} 台`); reset(); onClose(); onDone(); },
   });
   return (

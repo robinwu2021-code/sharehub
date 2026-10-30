@@ -54,23 +54,23 @@ public class InventoryEngineRouter implements InventoryPort {
     }
 
     @Override
-    public List<Cabinet> dispatch(String agentNo, String siteNo, String receiverNo, List<String> cabinetNos) {
-        return current().dispatch(agentNo, siteNo, receiverNo, cabinetNos);
+    public List<Cabinet> dispatch(String agentNo, String siteNo, String receiverNo, List<String> cabinetNos, String requestKey) {
+        return current().dispatch(agentNo, siteNo, receiverNo, cabinetNos, requestKey);
     }
 
     @Override
-    public List<Cabinet> claim(List<String> cabinetNos) {
-        return current().claim(cabinetNos);
+    public List<Cabinet> claim(List<String> cabinetNos, String requestKey) {
+        return current().claim(cabinetNos, requestKey);
     }
 
     @Override
-    public List<Cabinet> redirect(List<String> cabinetNos, String agentNo, String siteNo, String receiverNo, String reason) {
-        return current().redirect(cabinetNos, agentNo, siteNo, receiverNo, reason);
+    public List<Cabinet> redirect(List<String> cabinetNos, String agentNo, String siteNo, String receiverNo, String reason, String requestKey) {
+        return current().redirect(cabinetNos, agentNo, siteNo, receiverNo, reason, requestKey);
     }
 
     @Override
-    public List<Cabinet> returnToWarehouse(List<String> cabinetNos, String warehouseNo, String reason) {
-        return current().returnToWarehouse(cabinetNos, warehouseNo, reason);
+    public List<Cabinet> returnToWarehouse(List<String> cabinetNos, String warehouseNo, String reason, String requestKey) {
+        return current().returnToWarehouse(cabinetNos, warehouseNo, reason, requestKey);
     }
 
     @Override

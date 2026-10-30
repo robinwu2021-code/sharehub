@@ -117,22 +117,35 @@ public class RemoteInventoryPort implements InventoryPort {
 
     @Override
     @Transactional
-    public List<Cabinet> dispatch(String agentNo, String siteNo, String receiverNo, List<String> cabinetNos) {
+    public List<Cabinet> dispatch(String agentNo, String siteNo, String receiverNo, List<String> cabinetNos, String requestKey) {
         Map<String, String> fromWh = warehousesOf(cabinetNos);
-        List<Cabinet> out = local.dispatch(agentNo, siteNo, receiverNo, cabinetNos);
+        List<Cabinet> out = local.dispatch(agentNo, siteNo, receiverNo, cabinetNos, requestKey);
         String person = receiverNo != null && !receiverNo.isBlank() ? receiverNo.trim() : operator();
+        String site = siteNo == null || siteNo.isBlank() ? null : siteNo.trim();
         remote(() -> {
-            Map<String, String> targets = links.targets(api, agentNo, siteNo == null || siteNo.isBlank() ? null : siteNo.trim(), person);
-            Map<String, List<String>> byWh = new LinkedHashMap<>();
-            fromWh.forEach((no, wh) -> byWh.computeIfAbsent(wh, x -> new ArrayList<>()).add(no));
+            // 恢复日志（对接明细 C02）：按源仓一张 ISSUE 出库单，步骤键稳定；丢响应后原样重试续做，不会重复出库
+            var op = op("DEVICE_ISSUE", requestKey, new DispatchIntent(agentNo, site, receiverNo, cabinetNos), "DI");
+            if (COMPLETED.equals(op.phase())) return null;
+            Map<String, String> targets = journal.reference(() -> links.targets(api, agentNo, site, person));
+            Map<String, List<String>> byWh = new java.util.TreeMap<>();
+            fromWh.forEach((no, wh) -> {
+                if (wh == null) throw BizException.conflict("error.inventory.not_in_warehouse", no);
+                byWh.computeIfAbsent(wh, x -> new ArrayList<>()).add(no);
+            });
+            int i = 0;
             for (var e : byWh.entrySet()) {
-                if (e.getKey() == null) throw BizException.conflict("error.inventory.not_in_warehouse", String.join("、", e.getValue()));
-                String doc = api.createOutbound(links.locationId(api, e.getKey()), "ISSUE", targets, "出库给 " + agentNo,
-                        e.getValue(), key("out", agentNo));
-                api.postOutbound(doc, key("out-post", doc));
+                String code = "OUT_" + (i++);
+                String loc = journal.reference(() -> links.locationId(api, e.getKey()));
+                String doc = journal.step(op, code, () -> api.createOutbound(loc, "ISSUE", targets, "出库给 " + agentNo, e.getValue(),
+                        journal.stepKey(op, code)));
+                journal.step(op, code + "_POST", () -> {
+                    api.postOutbound(doc, journal.stepKey(op, code + "_POST"));
+                    return doc;
+                });
             }
             // 不指定接收人 = 经办人当面交付，当场领取（与本地「出库即签收」一致）
-            if (receiverNo == null || receiverNo.isBlank()) claimRemote(cabinetNos);
+            if (receiverNo == null || receiverNo.isBlank()) claimStep(op, "CLAIM", cabinetNos);
+            journal.complete(op);
             return null;
         });
         return out;
@@ -140,10 +153,13 @@ public class RemoteInventoryPort implements InventoryPort {
 
     @Override
     @Transactional
-    public List<Cabinet> claim(List<String> cabinetNos) {
-        List<Cabinet> out = local.claim(cabinetNos);
+    public List<Cabinet> claim(List<String> cabinetNos, String requestKey) {
+        List<Cabinet> out = local.claim(cabinetNos, requestKey);
         remote(() -> {
-            claimRemote(cabinetNos);
+            var op = op("DEVICE_CLAIM", requestKey, new ClaimIntent(cabinetNos), "DC");
+            if (COMPLETED.equals(op.phase())) return null;
+            claimStep(op, "CLAIM", cabinetNos);
+            journal.complete(op);
             return null;
         });
         return out;
@@ -151,40 +167,66 @@ public class RemoteInventoryPort implements InventoryPort {
 
     @Override
     @Transactional
-    public List<Cabinet> redirect(List<String> cabinetNos, String agentNo, String siteNo, String receiverNo, String reason) {
-        Map<String, Boolean> wasClaimed = new LinkedHashMap<>();
-        cabinetNos.forEach(no -> wasClaimed.put(no, links.get("claim:" + no) != null));
-        List<Cabinet> out = local.redirect(cabinetNos, agentNo, siteNo, receiverNo, reason);
+    public List<Cabinet> redirect(List<String> cabinetNos, String agentNo, String siteNo, String receiverNo, String reason, String requestKey) {
+        List<Cabinet> out = local.redirect(cabinetNos, agentNo, siteNo, receiverNo, reason, requestKey);
         String person = receiverNo != null && !receiverNo.isBlank() ? receiverNo.trim() : operator();
+        String site = siteNo == null || siteNo.isBlank() ? null : siteNo.trim();
         remote(() -> {
-            Map<String, String> targets = links.targets(api, agentNo, siteNo == null || siteNo.isBlank() ? null : siteNo.trim(), person);
-            for (Cabinet c : out) {
+            var op = op("DEVICE_REDIRECT", requestKey, new RedirectIntent(cabinetNos, agentNo, site, receiverNo, reason), "DR");
+            if (COMPLETED.equals(op.phase())) return null;
+            Map<String, String> targets = journal.reference(() -> links.targets(api, agentNo, site, person));
+            for (int i = 0; i < out.size(); i++) {
+                Cabinet c = out.get(i);
+                String n = String.valueOf(i);
+                // 只能改「待领取」的：已领取的先释放（同单其余设备补领回来），改完按本地签收状态再领取
+                if (CLAIMED.equals(head(c.cabinetNo()).status())) releaseOne(op, n, c.cabinetNo());
                 InventoryApi.DispatchView d = head(c.cabinetNo());
-                // 只能改「待领取」的：已领取的先释放，改完按本地签收状态再领取
-                if (CLAIMED.equals(d.status())) release(c.cabinetNo());
-                api.redirect(d.dispatchId(), targets, reason, key("redirect", d.dispatchId()));
-                if (c.issueClaimedAt() != null) claimRemote(List.of(c.cabinetNo()));
+                journal.step(op, "REDIRECT_" + n, () -> {
+                    api.redirect(d.dispatchId(), targets, reason, journal.stepKey(op, "REDIRECT_" + n));
+                    return d.dispatchId();
+                });
+                if (c.issueClaimedAt() != null) claimStep(op, "CLAIM_" + n, List.of(c.cabinetNo()));
             }
+            journal.complete(op);
             return null;
         });
         return out;
     }
 
+    /**
+     * 出库撤销（对接明细 C13）：库存服务撤回只会冲回原出库仓，所以本地也只回原出库仓 ——
+     * 选了别的仓直接拒绝（原先本地回所选仓、库存服务回原仓，只记一条 WARN，两边从此对不上）。实物退到别的仓走退仓。
+     */
     @Override
     @Transactional
-    public List<Cabinet> returnToWarehouse(List<String> cabinetNos, String warehouseNo, String reason) {
-        List<Cabinet> out = local.returnToWarehouse(cabinetNos, warehouseNo, reason);
+    public List<Cabinet> returnToWarehouse(List<String> cabinetNos, String warehouseNo, String reason, String requestKey) {
+        if (cabinetNos == null || cabinetNos.isEmpty()) return local.returnToWarehouse(cabinetNos, warehouseNo, reason, requestKey);
+        // 原出库仓 = 库存服务出库池记录的库位；按原仓分组交给本地（本地状态校验仍由它做）
+        Map<String, List<String>> byOrigin = new java.util.TreeMap<>();
+        for (String raw : cabinetNos) {
+            if (raw == null || raw.isBlank()) continue;
+            String no = raw.trim();
+            String origin = remote(() -> links.warehouseNoOf(head(no).locationId()));
+            if (warehouseNo != null && !warehouseNo.isBlank() && !warehouseNo.trim().equals(origin))
+                throw BizException.conflict("error.inventory.revoke_other_warehouse", no, origin);
+            byOrigin.computeIfAbsent(origin, x -> new ArrayList<>()).add(no);
+        }
+        List<Cabinet> out = new ArrayList<>();
+        byOrigin.forEach((wh, nos) -> out.addAll(local.returnToWarehouse(nos, wh, reason, requestKey)));
         remote(() -> {
-            for (Cabinet c : out) {
+            var op = op("DEVICE_REVOKE", requestKey, new RevokeIntent(cabinetNos, reason), "DV");
+            if (COMPLETED.equals(op.phase())) return null;
+            for (int i = 0; i < out.size(); i++) {
+                Cabinet c = out.get(i);
+                String n = String.valueOf(i);
+                if (CLAIMED.equals(head(c.cabinetNo()).status())) releaseOne(op, n, c.cabinetNo());
                 InventoryApi.DispatchView d = head(c.cabinetNo());
-                if (CLAIMED.equals(d.status())) release(c.cabinetNo());
-                // 撤回由库存服务冲回原出库仓；与本地所选回仓仓不同时，以盘点 / 调拨纠正
-                api.revoke(d.dispatchId(), reason, key("revoke", d.dispatchId()));
-                if (!java.util.Objects.equals(links.locationId(api, c.warehouseNo()), d.locationId())) {
-                    log.warn("出库池退回仓与原出库仓不同 cabinetNo={} 本地回仓={} 库存服务冲回={}：请在库存服务做调拨纠正",
-                            c.cabinetNo(), c.warehouseNo(), d.locationId());
-                }
+                journal.step(op, "REVOKE_" + n, () -> {
+                    api.revoke(d.dispatchId(), reason, journal.stepKey(op, "REVOKE_" + n));
+                    return d.dispatchId();
+                });
             }
+            journal.complete(op);
             return null;
         });
         return out;
@@ -234,22 +276,65 @@ public class RemoteInventoryPort implements InventoryPort {
         return "PURCHASE";
     }
 
-    private void claimRemote(List<String> cabinetNos) {
-        List<String> ids = new ArrayList<>();
-        for (String no : cabinetNos) {
-            InventoryApi.DispatchView d = head(no);
-            if (AVAILABLE.equals(d.status())) ids.add(d.dispatchId());
-        }
-        if (ids.isEmpty()) return;
-        InventoryApi.Claim claim = api.claim(ids, String.join(",", cabinetNos), key("claim", String.join(",", ids)));
-        for (String no : cabinetNos) links.put("claim:" + no, claim.claimNo());
+    private static final String COMPLETED = "COMPLETED";
+
+    /** 出库池动作的意图（record：日志按内容哈希判「原样重试」，字段顺序须稳定）。 */
+    record DispatchIntent(String agentNo, String siteNo, String receiverNo, List<String> cabinetNos) {
     }
 
-    private void release(String cabinetNo) {
+    record ClaimIntent(List<String> cabinetNos) {
+    }
+
+    record RedirectIntent(List<String> cabinetNos, String agentNo, String siteNo, String receiverNo, String reason) {
+    }
+
+    record RevokeIntent(List<String> cabinetNos, String reason) {
+    }
+
+    /** 登记一次库存写操作。requestKey 空 = 生成一次性的：同一请求内的步骤仍记录，但跨请求不能续做。 */
+    private ai.neargo.sharehub.inv.service.InventoryOperationJournal.Operation op(String kind, String requestKey, Object intent, String bizPrefix) {
+        String key = requestKey == null || requestKey.isBlank() ? kind + "-" + UUID.randomUUID() : requestKey.trim();
+        if (key.length() > 128) throw BizException.badRequest("error.common.invalid_value", "requestKey");
+        return journal.lock(kind, key, journal.payload(intent), "SERVICE", bizPrefix);
+    }
+
+    /**
+     * 领取一步：这些设备里还「待领取」的，一次领取。步骤之前发过（结果不明）就先按原请求号查回 ——
+     * 库存服务可能已经领走了，此时按当前状态重算待领取清单会是空的，等于把这次领取丢了。
+     */
+    private void claimStep(ai.neargo.sharehub.inv.service.InventoryOperationJournal.Operation op, String code, List<String> cabinetNos) {
+        boolean sentBefore = journal.attempted(op, code);
+        String key = journal.stepKey(op, code);
+        String claimNo = journal.step(op, code, () -> {
+            if (sentBefore) {
+                Optional<InventoryApi.Claim> found = api.claimByRequest(key);
+                if (found.isPresent()) return found.get().claimNo();
+            }
+            List<String> ids = new ArrayList<>();
+            for (String no : cabinetNos) {
+                InventoryApi.DispatchView d = head(no);
+                if (AVAILABLE.equals(d.status())) ids.add(d.dispatchId());
+            }
+            return ids.isEmpty() ? "" : api.claim(ids, String.join(",", cabinetNos), key).claimNo();
+        });
+        if (claimNo != null && !claimNo.isEmpty()) for (String no : cabinetNos) links.put("claim:" + no, claimNo);
+    }
+
+    /**
+     * 释放一台的领取。库存服务的释放是整单的（部分释放已列入宿主接口需求 #6）：
+     * 同一领取单里的其余设备释放后立刻补领回来，不然它们在库存服务里变回「待领取」，本地却仍是已签收。
+     */
+    private void releaseOne(ai.neargo.sharehub.inv.service.InventoryOperationJournal.Operation op, String n, String cabinetNo) {
         String claimNo = links.get("claim:" + cabinetNo);
-        if (claimNo == null) throw BizException.conflict("error.inventory.claim_unknown", cabinetNo);
-        api.releaseClaim(claimNo, key("release", claimNo + ":" + cabinetNo));
+        if (claimNo == null || claimNo.isEmpty()) throw BizException.conflict("error.inventory.claim_unknown", cabinetNo);
+        List<String> others = links.listByPrefix("claim:").stream().filter(x -> claimNo.equals(x.getV()))
+                .map(x -> x.getK().substring("claim:".length())).filter(x -> !x.equals(cabinetNo)).sorted().toList();
+        journal.step(op, "REL_" + n, () -> {
+            api.releaseClaim(claimNo, journal.stepKey(op, "REL_" + n));
+            return claimNo;
+        });
         links.put("claim:" + cabinetNo, "");
+        if (!others.isEmpty()) claimStep(op, "RECLAIM_" + n, others);
     }
 
     /** 该设备当前在出库池里的顶层记录（待领取或已领取）。 */

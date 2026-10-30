@@ -45,6 +45,10 @@ public class InventoryFake implements InventoryApi {
     public String failInboundPurpose;
     public boolean loseNextInboundPostResponse;
     public boolean loseNextOutboundPostResponse;
+    /** 领取已生效但响应丢失（查回用 claimByRequest）。 */
+    public boolean loseNextClaimResponse;
+    /** 同真实服务：同一幂等键的写命令重放返回原结果，不再执行（释放、调整、撤回用）。 */
+    private final java.util.Set<String> replayed = new java.util.HashSet<>();
     private final Map<String, String> documentRequests = new HashMap<>();
     /** 幂等键 → 库存服务记下的写命令（查回用，同远端 GET /commands/{requestId}）。 */
     public final Map<String, StoredCommand> commands = new HashMap<>();
@@ -229,6 +233,10 @@ public class InventoryFake implements InventoryApi {
             emit("DispatchCreated", id, payload(pool.get(id)));
         }
         d.posted()[0] = true;
+        if (loseNextOutboundPostResponse) {
+            loseNextOutboundPostResponse = false;
+            throw err(503, "inventory.unreachable");
+        }
     }
 
     @Override
@@ -287,11 +295,16 @@ public class InventoryFake implements InventoryApi {
         if (idempotencyKey != null) claimRequests.put(idempotencyKey, c);
         remember(idempotencyKey, "dispatch.claim", "{\"claimNo\":\"" + c.claimNo() + "\"}");
         dispatchIds.forEach(id -> emit("DispatchClaimed", id, payload(pool.get(id))));
+        if (loseNextClaimResponse) {
+            loseNextClaimResponse = false;
+            throw err(503, "inventory.unreachable");
+        }
         return c;
     }
 
     @Override
     public void releaseClaim(String claimNo, String idempotencyKey) {
+        if (idempotencyKey != null && !replayed.add("release:" + idempotencyKey)) return;
         Claim c = claims.remove(claimNo);
         if (c == null) throw err(404, "inventory.not_found", claimNo);
         c.dispatchIds().forEach(id -> {
@@ -301,6 +314,7 @@ public class InventoryFake implements InventoryApi {
 
     @Override
     public void redirect(String dispatchId, Map<String, String> t, String reason, String idempotencyKey) {
+        if (idempotencyKey != null && !replayed.add("redirect:" + idempotencyKey)) return;
         DispatchView v = pool.get(dispatchId);
         if (!"AVAILABLE".equals(v.status())) throw err(409, "inventory.dispatch.not_available", dispatchId);
         pool.put(dispatchId, new DispatchView(v.dispatchId(), v.outboundNo(), v.itemId(), v.serialNo(), v.qty(), v.locationId(), v.status(),
@@ -310,6 +324,7 @@ public class InventoryFake implements InventoryApi {
 
     @Override
     public void revoke(String dispatchId, String reason, String idempotencyKey) {
+        if (idempotencyKey != null && !replayed.add("revoke:" + idempotencyKey)) return;
         DispatchView v = pool.get(dispatchId);
         if (!"AVAILABLE".equals(v.status())) throw err(409, "inventory.dispatch.not_available", dispatchId);
         pool.put(dispatchId, with(v, "REVOKED"));

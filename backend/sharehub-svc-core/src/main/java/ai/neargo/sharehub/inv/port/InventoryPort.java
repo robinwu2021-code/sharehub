@@ -21,17 +21,22 @@ public interface InventoryPort {
     /** 质检合格入库（待检单驱动）：带质检记录号作为放行凭证。 */
     void inbound(String itemType, String itemNo, String warehouseNo, String qcNo, String intakeNo);
 
+    /*
+     * 以下出库池动作的 requestKey：页面每次打开表单生成、提交与重试都带同一个（对接明细 §9.3），
+     * 库存服务已执行但响应丢了时原样重试按同一键续做。可空 = 只在本次请求内可恢复。
+     */
+
     /** 出库到商家（可到站点），可指定内部接收人。 */
-    List<Cabinet> dispatch(String agentNo, String siteNo, String receiverNo, List<String> cabinetNos);
+    List<Cabinet> dispatch(String agentNo, String siteNo, String receiverNo, List<String> cabinetNos, String requestKey);
 
     /** 接收人签收。 */
-    List<Cabinet> claim(List<String> cabinetNos);
+    List<Cabinet> claim(List<String> cabinetNos, String requestKey);
 
     /** 出库调整：改商家 / 站点 / 接收人。 */
-    List<Cabinet> redirect(List<String> cabinetNos, String agentNo, String siteNo, String receiverNo, String reason);
+    List<Cabinet> redirect(List<String> cabinetNos, String agentNo, String siteNo, String receiverNo, String reason, String requestKey);
 
-    /** 出库池退回仓库。 */
-    List<Cabinet> returnToWarehouse(List<String> cabinetNos, String warehouseNo, String reason);
+    /** 出库撤销：回原出库仓（对接明细 C13；实物退到别的仓走退仓）。 */
+    List<Cabinet> returnToWarehouse(List<String> cabinetNos, String warehouseNo, String reason, String requestKey);
 
     /**
      * 调拨发货：从仓调出（调出方不是仓 = 不在库存账上，不记）。本地投影由调拨作业自己写，这里只记账。

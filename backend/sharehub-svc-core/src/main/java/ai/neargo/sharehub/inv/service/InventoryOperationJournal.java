@@ -101,8 +101,9 @@ public class InventoryOperationJournal {
                     // 一步远端都没登记（步骤在发请求前先落 UNKNOWN）= 发请求前就被拒，没有可查回的，记终态 REJECTED；
                     // 发出过才是 NEEDS_REVIEW。两种都可以用同键原样重提
                     durable.executeWithoutResult(tx -> {
-                        boolean sent = jdbc.queryForObject("SELECT COUNT(*) FROM inv_operation_step WHERE operation_no=?", Integer.class,
-                                op.operationNo()) > 0;
+                        // 只有「结果不明」或「已完成」的步骤才需要查回；库存服务明确拒绝的（FAILED）等于没执行
+                        boolean sent = jdbc.queryForObject("SELECT COUNT(*) FROM inv_operation_step WHERE operation_no=? AND status IN ('UNKNOWN','COMPLETED')",
+                                Integer.class, op.operationNo()) > 0;
                         jdbc.update("UPDATE inv_operation SET phase=?,attempts=attempts+1,last_error=? WHERE operation_no=? AND phase<>'COMPLETED'",
                                 sent ? "NEEDS_REVIEW" : "REJECTED",
                                 sent ? "Business transaction rolled back; retry the original request key and payload"
@@ -136,7 +137,18 @@ public class InventoryOperationJournal {
         if (result != null && !result.isEmpty()) return result.getFirst();
         durable.executeWithoutResult(tx -> jdbc.update("INSERT INTO inv_operation_step (operation_no,step_code,request_key,status) VALUES (?,?,?,'UNKNOWN') ON DUPLICATE KEY UPDATE status='UNKNOWN'",
                 op.operationNo(), code, key));
-        String remoteRef = action.get();
+        String remoteRef;
+        try {
+            remoteRef = action.get();
+        } catch (ai.neargo.sharehub.inv.remote.InventoryRemoteException e) {
+            // 4xx = 库存服务明确拒绝、没有执行 → FAILED；5xx / 不可达仍是 UNKNOWN（不能据此猜没执行）
+            if (e.status >= 400 && e.status < 500) {
+                String why = e.code == null ? "rejected" : e.code.length() > 200 ? e.code.substring(0, 200) : e.code;
+                durable.executeWithoutResult(tx -> jdbc.update("UPDATE inv_operation_step SET status='FAILED',last_error=? WHERE operation_no=? AND step_code=?",
+                        why, op.operationNo(), code));
+            }
+            throw e;
+        }
         durable.executeWithoutResult(tx -> jdbc.update("UPDATE inv_operation_step SET status='COMPLETED',remote_ref=?,last_error=NULL WHERE operation_no=? AND step_code=?",
                 remoteRef, op.operationNo(), code));
         return remoteRef;
