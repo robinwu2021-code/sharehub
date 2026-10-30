@@ -25,6 +25,13 @@
   <packaging>jar</packaging>
 
   <dependencies>
+    <!-- 独立进销存的统一客户端（ai-shop backend/inventory/inventory-client，调用文档《进销存独立服务-客户端调用文档》）。
+         尚未发布到 Nexus（ai-shop 评审 U13）：构建前须在 ai-shop/backend 执行 mvn -pl inventory/inventory-client -am install -->
+    <dependency>
+      <groupId>ai.neargo.inventory</groupId>
+      <artifactId>inventory-client</artifactId>
+      <version>1.0.0-SNAPSHOT</version>
+    </dependency>
     <dependency>
       <groupId>ai.neargo.sharehub</groupId>
       <artifactId>sharehub-common</artifactId>

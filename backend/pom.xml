@@ -67,6 +67,11 @@
                                              届时把它们加进 includes；在那之前一个都不许进来。 -->
                                         <exclude>ai.neargo.shop:*</exclude>
                                     </excludes>
+                                    <includes>
+                                        <!-- 2026-10-30 放行（ADR-024 补充）：库存服务客户端 inventory-client 的 HTTP 传输库，
+                                             只依赖 spring-web / slf4j，不带 ai-shop 业务代码 -->
+                                        <include>ai.neargo.shop:svc-client</include>
+                                    </includes>
                                 </bannedDependencies>
                             </rules>
                             <fail>true</fail>

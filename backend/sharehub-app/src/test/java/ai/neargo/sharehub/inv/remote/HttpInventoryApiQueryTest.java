@@ -27,6 +27,8 @@ class HttpInventoryApiQueryTest {
     /** 「方法 路径?查询」→ 请求体；同时记下幂等键。 */
     static final Map<String, String> seen = new ConcurrentHashMap<>();
     static final Map<String, String> keys = new ConcurrentHashMap<>();
+    /** 「方法 路径」→ 请求头（统一客户端那条路要核的头）。 */
+    static final Map<String, com.sun.net.httpserver.Headers> headers = new ConcurrentHashMap<>();
 
     static final Map<String, String[]> replies = Map.ofEntries(
             Map.entry("GET /api/inventory/v1/commands/REQ-1", new String[]{"200",
@@ -57,6 +59,10 @@ class HttpInventoryApiQueryTest {
             Map.entry("GET /api/inventory/v1/counts/CNT-VOIDED", new String[]{"200", countJson("CNT-VOIDED", "VOIDED")}),
             Map.entry("GET /api/inventory/v1/counts/CNT-SUBMITTED", new String[]{"200", countJson("CNT-SUBMITTED", "SUBMITTED")}),
             Map.entry("PATCH /api/inventory/v1/warehouses/LOC1", new String[]{"200", "{\"locationId\":\"LOC1\"}"}),
+            Map.entry("POST /api/inventory/v1/outbounds", new String[]{"200", "{\"docNo\":\"OUT9\"}"}),
+            Map.entry("POST /api/inventory/v1/outbounds/OUT-REJ/post", new String[]{"409",
+                    "{\"code\":\"inventory.serial.conflict\",\"data\":{\"args\":[\"CAB1:not_in_stock\"]}}"}),
+            Map.entry("POST /api/inventory/v1/outbounds/OUT-ODD/post", new String[]{"409", "{\"code\":\"inventory.something_new\"}"}),
             Map.entry("POST /api/inventory/v1/warehouses/LOC1/disable", new String[]{"200", "{\"locationId\":\"LOC1\"}"}));
 
     static String countJson(String no, String status) {
@@ -75,6 +81,7 @@ class HttpInventoryApiQueryTest {
             seen.put(key + (query == null ? "" : "?" + query), body);
             String idem = ex.getRequestHeaders().getFirst("Idempotency-Key");
             if (idem != null) keys.put(key, idem);
+            headers.put(key, ex.getRequestHeaders());
             String[] r = replies.getOrDefault(key, new String[]{"404", "{\"status\":404,\"error\":\"Not Found\"}"});
             byte[] out = r[1].getBytes(StandardCharsets.UTF_8);
             ex.getResponseHeaders().add("Content-Type", "application/json");
@@ -151,6 +158,40 @@ class HttpInventoryApiQueryTest {
         api.countLine("CNT1", "ITM1", 5, "count-line-1");
         assertThat(seen.get("PUT /api/inventory/v1/counts/CNT1/lines/ITM1")).contains("\"countedQty\":5");
         assertThat(keys.get("PUT /api/inventory/v1/counts/CNT1/lines/ITM1")).isEqualTo("count-line-1");
+    }
+
+    @Test
+    void writesThroughInventoryClientCarryKeyActorTraceAndCredential() {
+        org.slf4j.MDC.put(ai.neargo.sharehub.trace.TraceContext.MDC_KEY, "TRACE-1");
+        try {
+            String no = api.createOutbound("LOC1", "ISSUE", null, Map.of("MERCHANT", "AG010"), null, List.of(), List.of("CAB1"), "issue-SH1");
+            assertThat(no).isEqualTo("OUT9");
+        } finally {
+            org.slf4j.MDC.remove(ai.neargo.sharehub.trace.TraceContext.MDC_KEY);
+        }
+        assertThat(seen.get("POST /api/inventory/v1/outbounds")).contains("\"locationId\":\"LOC1\"").contains("\"serialNos\":[\"CAB1\"]")
+                .contains("\"MERCHANT\":\"AG010\"");
+        com.sun.net.httpserver.Headers h = headers.get("POST /api/inventory/v1/outbounds");
+        assertThat(h.getFirst("Idempotency-Key")).isEqualTo("issue-SH1");
+        assertThat(h.getFirst("X-Inventory-Actor")).isEqualTo("SYSTEM");
+        assertThat(h.getFirst("X-Trace-Id")).isEqualTo("TRACE-1");
+        assertThat(h.getFirst("Authorization")).isEqualTo("Bearer k:s");
+        assertThat(h.getFirst("X-Inventory-Owner-Ref")).as("账本凭证：不带账本头").isNull();
+    }
+
+    @Test
+    void clientErrorsKeepStatusForKnownCodesAndAreUnknownOtherwise() {
+        assertThatThrownBy(() -> api.postOutbound("OUT-REJ", "post-REJ")).isInstanceOf(InventoryRemoteException.class).satisfies(e -> {
+            InventoryRemoteException r = (InventoryRemoteException) e;
+            assertThat(r.status).as("明确拒绝：恢复日志记 FAILED").isEqualTo(409);
+            assertThat(r.code).isEqualTo("inventory.serial.conflict");
+            assertThat(r.args).containsExactly("CAB1:not_in_stock");
+        });
+        assertThatThrownBy(() -> api.postOutbound("OUT-ODD", "post-ODD")).isInstanceOf(InventoryRemoteException.class).satisfies(e -> {
+            InventoryRemoteException r = (InventoryRemoteException) e;
+            assertThat(r.status).as("客户端认不出的错误码：结果不明，留给查回").isEqualTo(503);
+            assertThat(r.code).isEqualTo("inventory.unreachable");
+        });
     }
 
     @Test

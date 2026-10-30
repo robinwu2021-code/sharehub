@@ -41,6 +41,7 @@
 ## 后果
 
 - **本项目依赖 ai-shop 发布的少量构件**：只许依赖服务的客户端与契约 —— `pay-client`、`shop-job-api`、`shop-job-target`；其余 `ai.neargo.shop:*` 一律禁止（enforcer 白名单，[v4/12 §5.6](../v4/12-代码库与工程结构.md)）。
+  - **补充（2026-10-30，用户定）**：库存服务客户端 `ai.neargo.inventory:inventory-client`（独立进销存，`ai.neargo.inventory` 坐标不在禁止范围）传递依赖的 HTTP 传输库 `ai.neargo.shop:svc-client` 一并放行。它只依赖 spring-web 与 slf4j，不带 ai-shop 业务代码；enforcer 的 includes 只加这一个，其余 `ai.neargo.shop:*` 仍禁止。两者尚未发布到 Nexus，构建机须先在 ai-shop 本地安装。
 - **需要 ai-shop 做的改动**（本项目提需求、ai-shop 排期）：
 
   | # | 改动 | 本项目为什么需要 |
