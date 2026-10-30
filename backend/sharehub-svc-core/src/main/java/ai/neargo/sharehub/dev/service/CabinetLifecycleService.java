@@ -21,6 +21,9 @@ public interface CabinetLifecycleService {
     /** 撤机回仓：DEPLOYED / FAULT → IN_STOCK，解绑点位（站点关闭门禁据此放行）。 */
     Cabinet undeploy(String cabinetNo, String reason);
 
+    /** 内部完工路径绑定撤机工单，供后续回仓验证当前流转。 */
+    Cabinet undeploy(String cabinetNo, String reason, String sourceRef);
+
     /** 调拨发货（C4）：IN_STOCK → IN_TRANSIT。质检未过（PENDING / FAILED）不能发。由调拨单驱动。 */
     void ship(String cabinetNo, String transferNo);
 

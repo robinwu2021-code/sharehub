@@ -20,7 +20,7 @@ inventory›仓库
 inventory›供应商
 inventory›入库单
 inventory›物料单据
-inventory›出库单
+inventory›出库管理
 inventory›处置出库
 inventory›库存调拨
 inventory›盘点
@@ -241,7 +241,7 @@ inventory›仓库
 inventory›供应商
 inventory›入库单
 inventory›物料单据
-inventory›出库单
+inventory›出库管理
 inventory›处置出库
 inventory›库存调拨
 inventory›盘点
@@ -320,7 +320,7 @@ inventory›仓库
 inventory›供应商
 inventory›入库单
 inventory›物料单据
-inventory›出库单
+inventory›出库管理
 inventory›处置出库
 inventory›库存调拨
 inventory›盘点
@@ -382,7 +382,7 @@ inventory›仓库
 inventory›供应商
 inventory›入库单
 inventory›物料单据
-inventory›出库单
+inventory›出库管理
 inventory›处置出库
 inventory›库存调拨
 inventory›盘点
@@ -437,7 +437,7 @@ inventory›仓库
 inventory›供应商
 inventory›入库单
 inventory›物料单据
-inventory›出库单
+inventory›出库管理
 inventory›处置出库
 inventory›库存调拨
 inventory›盘点

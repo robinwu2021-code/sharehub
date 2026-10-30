@@ -122,6 +122,11 @@ public class IntakeServiceImpl implements IntakeService {
     @Override
     public PageResult<Intake> page(Integer page, Integer size, String keyword, String status, String warehouseNo) {
         LambdaQueryWrapper<InvIntake> w = new LambdaQueryWrapper<InvIntake>().orderByDesc(InvIntake::getId);
+        List<String> visible = warehouses.visibleWarehouseNos();
+        if (visible != null) {
+            if (visible.isEmpty()) return new PageResult<>(List.of(), 0);
+            w.in(InvIntake::getWarehouseNo, visible);
+        }
         if (notBlank(status)) w.eq(InvIntake::getStatus, status.trim());
         if (notBlank(warehouseNo)) w.eq(InvIntake::getWarehouseNo, warehouseNo.trim());
         if (notBlank(keyword)) {
@@ -168,6 +173,7 @@ public class IntakeServiceImpl implements IntakeService {
     @Transactional
     public IntakeDetail create(CreateReq r) {
         if (r == null || !notBlank(r.warehouseNo())) throw BizException.badRequest("error.common.missing_parameter", "warehouseNo");
+        warehouses.requireVisible(r.warehouseNo().trim());
         String kind = notBlank(r.kind()) ? r.kind().trim() : ARRIVAL;
         if (!ARRIVAL.equals(kind) && !OPENING.equals(kind)) throw BizException.badRequest("error.common.invalid_value", "kind");
         Map<String, java.math.BigDecimal> costs = r.unitCosts() == null ? Map.of() : r.unitCosts();
@@ -408,6 +414,7 @@ public class IntakeServiceImpl implements IntakeService {
     private InvIntake require(String intakeNo) {
         InvIntake h = intakes.selectOne(new LambdaQueryWrapper<InvIntake>().eq(InvIntake::getIntakeNo, intakeNo).last("limit 1"));
         if (h == null) throw BizException.notFound(intakeNo);
+        warehouses.requireVisible(h.getWarehouseNo());
         return h;
     }
 

@@ -40,12 +40,35 @@ public class WarehouseDirectory implements WarehouseLookup {
                 .toList();
     }
 
+    /** null表示ALL或后台上下文；空集合表示收窄主体没有任何可见仓库。 */
+    public List<String> visibleWarehouseNos() {
+        var scope = ai.neargo.sharehub.auth.StaffContext.dataScope();
+        if (scope == null || scope.all()) return null;
+        return warehouses.selectList(new LambdaQueryWrapper<InvWarehouse>()).stream().map(InvWarehouse::getWarehouseNo).toList();
+    }
+
+    @Override
+    public void requireVisible(String warehouseNo) {
+        List<String> visible = visibleWarehouseNos();
+        if (visible != null && !visible.contains(warehouseNo))
+            throw new org.springframework.security.access.AccessDeniedException("inventory warehouse scope");
+    }
+
+    /** 收发任一方的授权仓管可查看调拨凭证；实际写作业仍逐仓校验。 */
+    public void requireAnyVisible(String source, String target) {
+        List<String> visible = visibleWarehouseNos();
+        if (visible != null && !visible.contains(source) && !visible.contains(target))
+            throw new org.springframework.security.access.AccessDeniedException("inventory warehouse scope");
+    }
+
     /** 默认回仓的仓库行；一个仓都没有返回 null。 */
     public InvWarehouse defaultReturn() {
         String configured = params.textOf(RETURN_PARAM, null);
         if (configured != null) {
             InvWarehouse w = byNo(configured);
             if (w != null && w.getArchivedAt() == null) return w;
+            // 默认仓不可见时不能悄悄换成另一个仓，写入方须显式选择授权仓库。
+            if (visibleWarehouseNos() != null) return null;
         }
         // 没配或配的仓不存在：取第一个仓 —— 单仓运营时不必额外配置
         return warehouses.selectOne(new LambdaQueryWrapper<InvWarehouse>().isNull(InvWarehouse::getArchivedAt)

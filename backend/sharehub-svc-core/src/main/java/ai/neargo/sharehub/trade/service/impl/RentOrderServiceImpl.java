@@ -440,6 +440,7 @@ public class RentOrderServiceImpl implements RentOrderService {
         e.setAgentNo(cab == null ? null : cab.getAgentNo());
 
         PriceQuery pq = DataScopeContext.executeWithoutScope(() -> queryOf(cab, e.getStartedAt()));
+        e.setRegionId(pq.regionId()); // 下单区域快照，不随后续站点／设备划拨改写。
         PriceResolver.Resolved priced = priceResolver.resolve(pq);
         // 时段倍率按**下单时刻**解析一次并随快照定格（ADR-028 §四：跨时段长单不分段）。
         priced = priced.withMultiplier(multipliers.resolve(pq.regionId(), pq.at()));

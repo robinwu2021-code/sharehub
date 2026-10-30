@@ -1,0 +1,116 @@
+{
+  "code": "inventory_count_audit",
+  "name": {
+    "zh": "盘点差异复核",
+    "en": "Inventory count review",
+    "ar": "مراجعة الجرد"
+  },
+  "initialStatus": "reviewing",
+  "statuses": [
+    {
+      "code": "reviewing",
+      "name": {
+        "zh": "审核中",
+        "en": "In review",
+        "ar": "قيد المراجعة"
+      },
+      "category": "IN_PROGRESS",
+      "gate": {
+        "type": "APPROVAL",
+        "steps": [
+          {
+            "code": "inventory",
+            "name": {
+              "zh": "库存复核",
+              "en": "Inventory review",
+              "ar": "مراجعة المخزون"
+            },
+            "approvers": {
+              "kind": "PERM",
+              "values": [
+                "device:inventory:audit"
+              ]
+            },
+            "mode": "ANY"
+          }
+        ],
+        "rules": {
+          "selfApproval": false,
+          "crossStepExclusive": true
+        },
+        "onApproved": "approved",
+        "onRejected": "rejected",
+        "onWithdrawn": "withdrawn"
+      }
+    },
+    {
+      "code": "approved",
+      "name": {
+        "zh": "已通过",
+        "en": "Approved",
+        "ar": "معتمد"
+      },
+      "category": "DONE"
+    },
+    {
+      "code": "rejected",
+      "name": {
+        "zh": "已驳回",
+        "en": "Rejected",
+        "ar": "مرفوض"
+      },
+      "category": "CANCELLED"
+    },
+    {
+      "code": "withdrawn",
+      "name": {
+        "zh": "已撤回",
+        "en": "Withdrawn",
+        "ar": "مسحوب"
+      },
+      "category": "CANCELLED"
+    }
+  ],
+  "transitions": [
+    {
+      "code": "approved",
+      "name": {
+        "zh": "通过",
+        "en": "Approve",
+        "ar": "اعتماد"
+      },
+      "from": [
+        "reviewing"
+      ],
+      "to": "approved",
+      "system": true
+    },
+    {
+      "code": "rejected",
+      "name": {
+        "zh": "驳回",
+        "en": "Reject",
+        "ar": "رفض"
+      },
+      "from": [
+        "reviewing"
+      ],
+      "to": "rejected",
+      "system": true
+    },
+    {
+      "code": "withdrawn",
+      "name": {
+        "zh": "撤回",
+        "en": "Withdraw",
+        "ar": "سحب"
+      },
+      "from": [
+        "reviewing"
+      ],
+      "to": "withdrawn",
+      "system": true
+    }
+  ],
+  "participantRoles": []
+}

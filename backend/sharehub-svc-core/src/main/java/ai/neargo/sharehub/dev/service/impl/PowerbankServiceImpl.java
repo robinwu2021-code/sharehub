@@ -37,10 +37,15 @@ public class PowerbankServiceImpl implements PowerbankService {
 
     private final PowerbankMapper mapper;
     private final PowerbankStateMachine stateMachine;
+    private final ai.neargo.sharehub.dev.mapper.CabinetMapper cabinets;
+    private final ai.neargo.sharehub.dev.movement.MovementRecorder movements;
+    private final ai.neargo.sharehub.dev.port.WarehouseLookup warehouses;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     public PowerbankServiceImpl(PowerbankMapper mapper, PowerbankStateMachine stateMachine,
-                                org.springframework.jdbc.core.JdbcTemplate jdbc) {
+                                org.springframework.jdbc.core.JdbcTemplate jdbc, ai.neargo.sharehub.dev.mapper.CabinetMapper cabinets,
+                                ai.neargo.sharehub.dev.movement.MovementRecorder movements, ai.neargo.sharehub.dev.port.WarehouseLookup warehouses) {
+        this.cabinets=cabinets;this.movements=movements;this.warehouses=warehouses;
         this.jdbc = jdbc;
         this.mapper = mapper;
         this.stateMachine = stateMachine;
@@ -92,8 +97,9 @@ public class PowerbankServiceImpl implements PowerbankService {
     }
 
     @Override
+    @Transactional
     public PowerbankRow update(String powerbankNo, PowerbankCmd cmd) {
-        DevPowerbank e = selectByNo(powerbankNo);
+        DevPowerbank e = mapper.selectOne(new LambdaQueryWrapper<DevPowerbank>().eq(DevPowerbank::getPowerbankNo,powerbankNo).last("limit 1 for update"));
         if (e == null) throw BizException.notFound(powerbankNo);
 
         // —— 状态变更：event 优先，其次按目标 status 反查事件；两者都空表示只改属性 ——
@@ -104,6 +110,21 @@ public class PowerbankServiceImpl implements PowerbankService {
         }
         if (event != null && !event.isBlank()) {
             String to = stateMachine.next(e.getStatus(), event);
+            if (ai.neargo.sharehub.dev.PowerbankStatus.SCRAP.name().equals(to)) {
+                ai.neargo.sharehub.dev.entity.DevCabinet source=e.getCabinetNo()==null?null:cabinets.selectOne(
+                        new LambdaQueryWrapper<ai.neargo.sharehub.dev.entity.DevCabinet>()
+                                .eq(ai.neargo.sharehub.dev.entity.DevCabinet::getCabinetNo,e.getCabinetNo()).last("limit 1 for update"));
+                if(e.getCabinetNo()!=null && source==null) throw new org.springframework.security.access.AccessDeniedException("powerbank retirement source scope");
+                String warehouse=source==null?e.getWarehouseNo():source.getWarehouseNo();
+                if(warehouse!=null) warehouses.requireVisible(warehouse);
+                movements.recordRetirement(new ai.neargo.sharehub.dev.movement.MovementRecorder.Move(
+                        ai.neargo.sharehub.dev.movement.MovementRecorder.POWERBANK,powerbankNo,
+                        ai.neargo.sharehub.dev.movement.MovementEvent.RETIRE,warehouse!=null?
+                        ai.neargo.sharehub.dev.movement.MovementRecorder.wh(warehouse):source==null?null:"CAB:"+source.getCabinetNo(),
+                        ai.neargo.sharehub.dev.movement.MovementRecorder.OUT,source==null?null:source.getAgentNo(),null,null,null),
+                        source==null || warehouse!=null?null:source.getRegionId(),source==null || warehouse!=null?null:source.getSiteNo(),source==null || warehouse!=null?null:source.getAgentNo());
+                if(source!=null) e.setWarehouseNo(null);
+            }
             e.setStatus(to);
             applyLocation(e, to, cmd);
         } else if (cmd.cabinetNo() != null) {

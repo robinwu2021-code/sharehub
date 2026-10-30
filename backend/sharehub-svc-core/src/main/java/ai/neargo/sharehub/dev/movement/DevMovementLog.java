@@ -25,6 +25,9 @@ public class DevMovementLog {
     private String agentAfter;
     private String reason;
     private String sourceRef;
+    private String scopeRegionId;
+    private String scopeSiteNo;
+    private String scopeAgentNo;
     private String operatorNo;
     private LocalDateTime occurredAt;
     private LocalDateTime createdAt;

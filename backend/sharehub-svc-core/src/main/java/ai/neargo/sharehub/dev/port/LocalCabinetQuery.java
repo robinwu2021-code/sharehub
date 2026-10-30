@@ -2,6 +2,8 @@ package ai.neargo.sharehub.dev.port;
 
 import ai.neargo.sharehub.api.core.dto.CabinetBrief;
 import ai.neargo.sharehub.api.core.port.CabinetQueryPort;
+import ai.neargo.sharehub.dev.CabinetStatus;
+import ai.neargo.sharehub.dev.QcStatus;
 import ai.neargo.sharehub.dev.entity.DevCabinet;
 import ai.neargo.sharehub.dev.mapper.CabinetMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -55,6 +57,23 @@ public class LocalCabinetQuery implements CabinetQueryPort {
         return cabinets.selectList(new LambdaQueryWrapper<DevCabinet>()
                         .in(DevCabinet::getCabinetNo, cabinetNos))
                 .stream().map(LocalCabinetQuery::toBrief).toList();
+    }
+
+    @Override
+    public CabinetBrief installationCandidate(String cabinetNo, String agentNo) {
+        if (cabinetNo == null || cabinetNo.isBlank()) return null;
+        DevCabinet c = cabinets.selectOne(new LambdaQueryWrapper<DevCabinet>()
+                .eq(DevCabinet::getCabinetNo, cabinetNo).eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name())
+                .isNull(DevCabinet::getArchivedAt).isNull(DevCabinet::getWarehouseNo)
+                .and(q -> q.eq(DevCabinet::getQcStatus, QcStatus.PASSED.name()).or().isNull(DevCabinet::getQcStatus)));
+        if (c == null) return null;
+        if (agentNo == null || agentNo.isBlank()) {
+            // 保留直营点位绑定路径，不能借此从仓库直接创建商家安装单。
+            return c.getAgentNo() == null && c.getIssuedAgentNo() == null && c.getLocationNo() != null ? toBrief(c) : null;
+        }
+        if (!agentNo.equals(c.getIssuedAgentNo()) || c.getIssueClaimedAt() == null) return null;
+        if (c.getLocationNo() != null && !agentNo.equals(c.getAgentNo())) return null;
+        return new CabinetBrief(c.getCabinetNo(), toBrief(c).name(), c.getIssuedAgentNo(), c.getSiteNo(), c.getLocationNo());
     }
 
     private static CabinetBrief toBrief(DevCabinet c) {

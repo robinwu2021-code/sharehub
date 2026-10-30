@@ -70,4 +70,26 @@ class ConsumerRentFlowTest extends ApiTestSupport {
         assertThat(post("/internal/trade/orders/" + orderNo + "/return",
                 Map.of("returnCabinetNo", "CAB1006"), admin).status).isEqualTo(400);
     }
+    @Test void actualRentPersistsRegionSnapshotAndKeepsRentedAssetVisible() {
+        String admin=login("ADMIN"),who="RENT-SCOPE-"+Long.toUnsignedString(System.nanoTime(),36);
+        String site=rentJdbc.queryForObject("SELECT site_no FROM dev_cabinet WHERE cabinet_no=?",String.class,CABINET);
+        String before=rentJdbc.queryForObject("SELECT region_id FROM loc_site WHERE site_no=?",String.class,site),region="RENT-SCOPE";
+        String order=null;
+        try {
+            rentJdbc.update("UPDATE loc_site SET region_id=? WHERE site_no=?",region,site);
+            String consumer=consumerToken("+971500009003");
+            var rented=post("/mp/trade/orders/rent",Map.of("cabinetNo",CABINET),consumer).okData();
+            order=rented.path("orderNo").asText();
+            assertThat(rentJdbc.queryForObject("SELECT region_id FROM ord_order WHERE order_no=?",String.class,order)).isEqualTo(region);
+            String staff=login("WAREHOUSE",who,null);
+            put("/api/platform/data-scopes/EMPLOYEE/"+who,Map.of("scopeType","REGION","scopeRefs",region),admin).okData();
+            assertThat(get("/api/ops/inventory/stage-items?stage=RENTED&itemType=POWERBANK",staff).okData().path("items").findValuesAsText("itemNo"))
+                    .contains(rented.path("powerbankNo").asText());
+        } finally {
+            if(order!=null) post("/internal/trade/orders/"+order+"/return",Map.of("returnCabinetNo","CAB1006"),admin);
+            rentJdbc.update("UPDATE loc_site SET region_id=? WHERE site_no=?",before,site);
+            put("/api/platform/data-scopes/EMPLOYEE/"+who,Map.of("scopeType","ALL","scopeRefs",""),admin).okData();
+        }
+    }
+
 }

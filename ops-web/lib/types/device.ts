@@ -1000,11 +1000,25 @@ export interface StockCountScan {
   verdict: string;
 }
 
+export type CountReviewState = "DRAFT" | "PREPARING" | "SUBMITTING" | "IN_REVIEW" | "SUBMIT_FAILED" | "DECIDED" | "APPLY_FAILED" | "APPLIED";
+export type CountReviewDecision = "APPROVED" | "REJECTED" | "WITHDRAWN";
+export interface StockCountReview {
+  state: CountReviewState;
+  approvalNo: string | null;
+  round: number;
+  submitterNo: string | null;
+  decision: CountReviewDecision | null;
+  deciderName: string | null;
+  lastError: string | null;
+  configured: boolean;
+}
+
 export interface StockCountDetail {
   count: StockCount;
   lines: StockCountLine[];
   exceptions: StockCountScan[];
   missingSerials: string[];
+  review?: StockCountReview | null;
 }
 
 /** 设备履历事件（与后端 `MovementEvent` 同名同值，V196）。 */

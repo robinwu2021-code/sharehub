@@ -38,4 +38,24 @@ class GlobalExceptionHandlerTest {
         assertThat(GlobalExceptionHandler.statusOf(204)).isEqualTo(HttpStatus.OK);
         assertThat(GlobalExceptionHandler.statusOf(302)).isEqualTo(HttpStatus.OK);
     }
+    @Test void recordChangedDuringLockWaitIsAConflict() {
+        var sql=new java.sql.SQLException("Record has changed since last read","HY000",1020);
+        var error=new org.springframework.jdbc.UncategorizedSQLException("lock","select for update",sql);
+        var request=new org.springframework.mock.web.MockHttpServletRequest();
+        assertThat(new GlobalExceptionHandler().onDataAccess(error,request).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test void springConcurrencyFailureIsAConflict() {
+        var request=new org.springframework.mock.web.MockHttpServletRequest();
+        assertThat(new GlobalExceptionHandler().onDataAccess(new org.springframework.dao.CannotAcquireLockException("lock failed"),request).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test void unrelatedDatabaseErrorsRemainServerErrors() {
+        var sql=new java.sql.SQLException("unrelated failure","HY000",1021);
+        var error=new org.springframework.jdbc.UncategorizedSQLException("query","select",sql);
+        var request=new org.springframework.mock.web.MockHttpServletRequest();
+        assertThat(new GlobalExceptionHandler().onDataAccess(error,request).getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
 }

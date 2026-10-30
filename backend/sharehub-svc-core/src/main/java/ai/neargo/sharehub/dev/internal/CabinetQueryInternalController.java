@@ -38,4 +38,9 @@ public class CabinetQueryInternalController {
     public List<CabinetBrief> briefs(@RequestBody List<String> cabinetNos) {
         return query.briefsByNos(cabinetNos);
     }
+
+    @GetMapping("/internal/dev/cabinets/installation-candidate")
+    public CabinetBrief installationCandidate(@RequestParam String cabinetNo, @RequestParam(required = false) String agentNo) {
+        return query.installationCandidate(cabinetNo, agentNo);
+    }
 }

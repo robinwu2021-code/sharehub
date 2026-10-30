@@ -14934,6 +14934,44 @@
     {
      "name": "missingSerials",
      "type": "List<String>"
+    },
+    {
+     "name": "review",
+     "type": "CountReview",
+     "fields": [
+      {
+       "name": "state",
+       "type": "String"
+      },
+      {
+       "name": "approvalNo",
+       "type": "String"
+      },
+      {
+       "name": "round",
+       "type": "int"
+      },
+      {
+       "name": "submitterNo",
+       "type": "String"
+      },
+      {
+       "name": "decision",
+       "type": "String"
+      },
+      {
+       "name": "deciderName",
+       "type": "String"
+      },
+      {
+       "name": "lastError",
+       "type": "String"
+      },
+      {
+       "name": "configured",
+       "type": "boolean"
+      }
+     ]
     }
    ],
    "requestShape": [
@@ -15026,6 +15064,44 @@
     {
      "name": "missingSerials",
      "type": "List<String>"
+    },
+    {
+     "name": "review",
+     "type": "CountReview",
+     "fields": [
+      {
+       "name": "state",
+       "type": "String"
+      },
+      {
+       "name": "approvalNo",
+       "type": "String"
+      },
+      {
+       "name": "round",
+       "type": "int"
+      },
+      {
+       "name": "submitterNo",
+       "type": "String"
+      },
+      {
+       "name": "decision",
+       "type": "String"
+      },
+      {
+       "name": "deciderName",
+       "type": "String"
+      },
+      {
+       "name": "lastError",
+       "type": "String"
+      },
+      {
+       "name": "configured",
+       "type": "boolean"
+      }
+     ]
     }
    ],
    "requestShape": null
@@ -15113,6 +15189,44 @@
     {
      "name": "missingSerials",
      "type": "List<String>"
+    },
+    {
+     "name": "review",
+     "type": "CountReview",
+     "fields": [
+      {
+       "name": "state",
+       "type": "String"
+      },
+      {
+       "name": "approvalNo",
+       "type": "String"
+      },
+      {
+       "name": "round",
+       "type": "int"
+      },
+      {
+       "name": "submitterNo",
+       "type": "String"
+      },
+      {
+       "name": "decision",
+       "type": "String"
+      },
+      {
+       "name": "deciderName",
+       "type": "String"
+      },
+      {
+       "name": "lastError",
+       "type": "String"
+      },
+      {
+       "name": "configured",
+       "type": "boolean"
+      }
+     ]
     }
    ],
    "requestShape": [
@@ -15205,6 +15319,44 @@
     {
      "name": "missingSerials",
      "type": "List<String>"
+    },
+    {
+     "name": "review",
+     "type": "CountReview",
+     "fields": [
+      {
+       "name": "state",
+       "type": "String"
+      },
+      {
+       "name": "approvalNo",
+       "type": "String"
+      },
+      {
+       "name": "round",
+       "type": "int"
+      },
+      {
+       "name": "submitterNo",
+       "type": "String"
+      },
+      {
+       "name": "decision",
+       "type": "String"
+      },
+      {
+       "name": "deciderName",
+       "type": "String"
+      },
+      {
+       "name": "lastError",
+       "type": "String"
+      },
+      {
+       "name": "configured",
+       "type": "boolean"
+      }
+     ]
     }
    ],
    "requestShape": null
@@ -15292,6 +15444,44 @@
     {
      "name": "missingSerials",
      "type": "List<String>"
+    },
+    {
+     "name": "review",
+     "type": "CountReview",
+     "fields": [
+      {
+       "name": "state",
+       "type": "String"
+      },
+      {
+       "name": "approvalNo",
+       "type": "String"
+      },
+      {
+       "name": "round",
+       "type": "int"
+      },
+      {
+       "name": "submitterNo",
+       "type": "String"
+      },
+      {
+       "name": "decision",
+       "type": "String"
+      },
+      {
+       "name": "deciderName",
+       "type": "String"
+      },
+      {
+       "name": "lastError",
+       "type": "String"
+      },
+      {
+       "name": "configured",
+       "type": "boolean"
+      }
+     ]
     }
    ],
    "requestShape": null
@@ -15379,6 +15569,44 @@
     {
      "name": "missingSerials",
      "type": "List<String>"
+    },
+    {
+     "name": "review",
+     "type": "CountReview",
+     "fields": [
+      {
+       "name": "state",
+       "type": "String"
+      },
+      {
+       "name": "approvalNo",
+       "type": "String"
+      },
+      {
+       "name": "round",
+       "type": "int"
+      },
+      {
+       "name": "submitterNo",
+       "type": "String"
+      },
+      {
+       "name": "decision",
+       "type": "String"
+      },
+      {
+       "name": "deciderName",
+       "type": "String"
+      },
+      {
+       "name": "lastError",
+       "type": "String"
+      },
+      {
+       "name": "configured",
+       "type": "boolean"
+      }
+     ]
     }
    ],
    "requestShape": [
@@ -15471,6 +15699,44 @@
     {
      "name": "missingSerials",
      "type": "List<String>"
+    },
+    {
+     "name": "review",
+     "type": "CountReview",
+     "fields": [
+      {
+       "name": "state",
+       "type": "String"
+      },
+      {
+       "name": "approvalNo",
+       "type": "String"
+      },
+      {
+       "name": "round",
+       "type": "int"
+      },
+      {
+       "name": "submitterNo",
+       "type": "String"
+      },
+      {
+       "name": "decision",
+       "type": "String"
+      },
+      {
+       "name": "deciderName",
+       "type": "String"
+      },
+      {
+       "name": "lastError",
+       "type": "String"
+      },
+      {
+       "name": "configured",
+       "type": "boolean"
+      }
+     ]
     }
    ],
    "requestShape": [
@@ -15563,6 +15829,44 @@
     {
      "name": "missingSerials",
      "type": "List<String>"
+    },
+    {
+     "name": "review",
+     "type": "CountReview",
+     "fields": [
+      {
+       "name": "state",
+       "type": "String"
+      },
+      {
+       "name": "approvalNo",
+       "type": "String"
+      },
+      {
+       "name": "round",
+       "type": "int"
+      },
+      {
+       "name": "submitterNo",
+       "type": "String"
+      },
+      {
+       "name": "decision",
+       "type": "String"
+      },
+      {
+       "name": "deciderName",
+       "type": "String"
+      },
+      {
+       "name": "lastError",
+       "type": "String"
+      },
+      {
+       "name": "configured",
+       "type": "boolean"
+      }
+     ]
     }
    ],
    "requestShape": null
@@ -17445,6 +17749,10 @@
        "type": "BigDecimal"
       }
      ]
+    },
+    {
+     "name": "requestKey",
+     "type": "String"
     }
    ]
   },
@@ -51449,6 +51757,55 @@
    "requestShape": null
   },
   {
+   "verb": "GET",
+   "path": "/internal/dev/cabinets/installation-candidate",
+   "perm": null,
+   "perms": [],
+   "handler": "CabinetQueryInternalController#installationCandidate",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "cabinetNo",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "query",
+     "name": "agentNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "CabinetBrief",
+   "returnContainer": null,
+   "returnElement": "CabinetBrief",
+   "responseShape": [
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "locationNo",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
    "verb": "POST",
    "path": "/internal/dev/ownership/by-locations",
    "perm": null,
@@ -55162,10 +55519,25 @@
    "OPEN",
    "DONE"
   ],
+  "CountReviewState": [
+   "DRAFT",
+   "PREPARING",
+   "SUBMITTING",
+   "IN_REVIEW",
+   "SUBMIT_FAILED",
+   "DECIDED",
+   "APPLY_FAILED",
+   "APPLIED"
+  ],
   "TransferEndpointType": [
    "WAREHOUSE",
    "SITE",
    "LOCATION"
+  ],
+  "CountReviewDecision": [
+   "APPROVED",
+   "REJECTED",
+   "WITHDRAWN"
   ],
   "DisposalReason": [
    "BROKEN",
@@ -55212,6 +55584,13 @@
    "MISSING",
    "EXTRA",
    "COUNT_MISMATCH"
+  ],
+  "CountStatus": [
+   "OPEN",
+   "SUBMITTED",
+   "APPROVED",
+   "POSTED",
+   "CANCELLED"
   ],
   "InboxStatus": [
    "DONE",
@@ -55843,10 +56222,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 626,
-  "records": 603,
+  "endpoints": 627,
+  "records": 606,
   "withPerm": 544,
   "withBody": 257,
-  "shapedResponses": 488
+  "shapedResponses": 489
  }
 }

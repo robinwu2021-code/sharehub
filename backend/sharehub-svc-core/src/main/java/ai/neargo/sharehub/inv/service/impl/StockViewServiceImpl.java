@@ -57,6 +57,7 @@ public class StockViewServiceImpl implements StockViewService {
     private static final Logger log = LoggerFactory.getLogger(StockViewServiceImpl.class);
     private static final int REMOTE_LEDGER_WINDOW = 500;
 
+    private final ai.neargo.sharehub.inv.service.CountReviewService reviews;
     private final SysParamPort params;
     private final MovementRecorder movements;
     private final RemoteInventoryPort remote;
@@ -64,9 +65,22 @@ public class StockViewServiceImpl implements StockViewService {
     private final CabinetMapper cabinets;
     private final PowerbankMapper powerbanks;
     private final InvIntakeItemMapper intakeItems;
+    private final ai.neargo.sharehub.inv.WarehouseDirectory warehouses;
+    private final ai.neargo.sharehub.inv.mapper.InvIntakeMapper intakes;
+    private final ai.neargo.sharehub.inv.mapper.InvTransferMapper transfers;
+    private final ai.neargo.sharehub.inv.mapper.InvTransferItemMapper transferItems;
+    private final ai.neargo.sharehub.inv.TransferAccess transferAccess;
+    private final ai.neargo.sharehub.api.core.port.OrderQueryPort orders;
 
     public StockViewServiceImpl(SysParamPort params, MovementRecorder movements, RemoteInventoryPort remote, InventoryLinks links,
-                                CabinetMapper cabinets, PowerbankMapper powerbanks, InvIntakeItemMapper intakeItems) {
+                                CabinetMapper cabinets, PowerbankMapper powerbanks, InvIntakeItemMapper intakeItems,
+                                ai.neargo.sharehub.inv.WarehouseDirectory warehouses,
+                                ai.neargo.sharehub.inv.mapper.InvIntakeMapper intakes,
+                                ai.neargo.sharehub.inv.mapper.InvTransferMapper transfers,
+                                ai.neargo.sharehub.inv.mapper.InvTransferItemMapper transferItems,
+                                ai.neargo.sharehub.inv.TransferAccess transferAccess, ai.neargo.sharehub.api.core.port.OrderQueryPort orders, ai.neargo.sharehub.inv.service.CountReviewService reviews) {
+        this.reviews=reviews;
+        this.orders=orders;
         this.params = params;
         this.movements = movements;
         this.remote = remote;
@@ -74,25 +88,27 @@ public class StockViewServiceImpl implements StockViewService {
         this.cabinets = cabinets;
         this.powerbanks = powerbanks;
         this.intakeItems = intakeItems;
+        this.warehouses = warehouses;
+        this.intakes = intakes;
+        this.transfers=transfers; this.transferItems=transferItems; this.transferAccess=transferAccess;
     }
 
     // —— 统一库存视图 ——
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly=true)
     public List<StockStage> stages() {
-        return DataScopeContext.executeWithoutScope(() -> {
-            List<StockStage> out = new ArrayList<>();
-            for (String stage : STAGES) {
-                if ("INTAKE".equals(stage)) {
-                    out.add(new StockStage(stage, pendingIntake("CABINET"), pendingIntake("POWERBANK")));
-                    continue;
-                }
-                var c = CAB_STAGE.get(stage);
-                var p = PB_STAGE.get(stage);
-                out.add(new StockStage(stage, c == null ? 0 : cab(c), p == null ? 0 : pb(p)));
+        List<StockStage> out = new ArrayList<>();
+        for (String stage : STAGES) {
+            if ("INTAKE".equals(stage)) {
+                out.add(new StockStage(stage, pendingIntake("CABINET"), pendingIntake("POWERBANK")));
+                continue;
             }
-            return out;
-        });
+            var c = CAB_STAGE.get(stage);
+            var p = PB_STAGE.get(stage);
+            out.add(new StockStage(stage, c == null ? 0 : cab(c), "IN_TRANSIT".equals(stage) ? powerbanksInTransit().size() : p == null ? 0 : pb(p)));
+        }
+        return out;
     }
 
     /** 阶段顺序（= 设备生命周期），与 {@link #CAB_STAGE} / {@link #PB_STAGE} 的键一致；INTAKE 读待检单。 */
@@ -125,6 +141,7 @@ public class StockViewServiceImpl implements StockViewService {
     private static final int STAGE_ITEMS_MAX = 2000;
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly=true)
     public ai.neargo.sharehub.inv.dto.StockDtos.StageItems stageItems(String stage, String itemType) {
         if (stage == null || !STAGES.contains(stage.trim())) throw BizException.badRequest("error.common.invalid_value", "stage");
         String st = stage.trim();
@@ -132,53 +149,135 @@ public class StockViewServiceImpl implements StockViewService {
         if (itemType != null && !itemType.isBlank() && !"CABINET".equals(itemType.trim()) && cabinet)
             throw BizException.badRequest("error.common.invalid_value", "itemType");
         String type = cabinet ? "CABINET" : "POWERBANK";
-        return DataScopeContext.executeWithoutScope(() -> {
-            List<ai.neargo.sharehub.inv.dto.StockDtos.StageItem> rows = new ArrayList<>();
-            long total;
-            if ("INTAKE".equals(st)) {
-                LambdaQueryWrapper<InvIntakeItem> w = new LambdaQueryWrapper<InvIntakeItem>().eq(InvIntakeItem::getItemType, type)
-                        .eq(InvIntakeItem::getDisposition, "PENDING");
-                total = intakeItems.selectCount(w);
-                for (InvIntakeItem i : intakeItems.selectList(w.orderByAsc(InvIntakeItem::getId).last("limit " + STAGE_ITEMS_MAX)))
-                    rows.add(new ai.neargo.sharehub.inv.dto.StockDtos.StageItem(type, i.getItemNo(), null, null, null, null, null, i.getIntakeNo()));
-            } else if (cabinet) {
-                var f = CAB_STAGE.get(st);
-                if (f == null) return new ai.neargo.sharehub.inv.dto.StockDtos.StageItems(st, type, 0, List.of());
-                LambdaQueryWrapper<DevCabinet> w = new LambdaQueryWrapper<DevCabinet>().isNull(DevCabinet::getArchivedAt);
-                f.accept(w);
-                total = cabinets.selectCount(w);
-                for (DevCabinet c : cabinets.selectList(w.orderByAsc(DevCabinet::getId).last("limit " + STAGE_ITEMS_MAX)))
-                    rows.add(new ai.neargo.sharehub.inv.dto.StockDtos.StageItem(type, c.getCabinetNo(), c.getModel(), c.getWarehouseNo(),
-                            c.getIssuedAgentNo() != null ? c.getIssuedAgentNo() : c.getAgentNo(), c.getSiteNo(), c.getLocationNo(), null));
-            } else {
-                var f = PB_STAGE.get(st);
-                if (f == null) return new ai.neargo.sharehub.inv.dto.StockDtos.StageItems(st, type, 0, List.of());
-                LambdaQueryWrapper<DevPowerbank> w = new LambdaQueryWrapper<DevPowerbank>().isNull(DevPowerbank::getArchivedAt);
-                f.accept(w);
-                total = powerbanks.selectCount(w);
-                for (DevPowerbank p : powerbanks.selectList(w.orderByAsc(DevPowerbank::getId).last("limit " + STAGE_ITEMS_MAX)))
-                    rows.add(new ai.neargo.sharehub.inv.dto.StockDtos.StageItem(type, p.getPowerbankNo(), p.getVendorCode(), p.getWarehouseNo(),
-                            null, null, p.getCabinetNo(), null));
-            }
-            return new ai.neargo.sharehub.inv.dto.StockDtos.StageItems(st, type, total, rows);
-        });
+        List<ai.neargo.sharehub.inv.dto.StockDtos.StageItem> rows = new ArrayList<>();
+        long total;
+        if ("INTAKE".equals(st)) {
+            LambdaQueryWrapper<InvIntakeItem> w = new LambdaQueryWrapper<InvIntakeItem>().eq(InvIntakeItem::getItemType, type)
+                    .eq(InvIntakeItem::getDisposition, "PENDING");
+            scopeIntakes(w);
+            total = intakeItems.selectCount(w);
+            for (InvIntakeItem i : intakeItems.selectList(w.orderByAsc(InvIntakeItem::getId).last("limit " + STAGE_ITEMS_MAX)))
+                rows.add(new ai.neargo.sharehub.inv.dto.StockDtos.StageItem(type, i.getItemNo(), null, null, null, null, null, i.getIntakeNo()));
+        } else if (cabinet) {
+            var f = CAB_STAGE.get(st);
+            if (f == null) return new ai.neargo.sharehub.inv.dto.StockDtos.StageItems(st, type, 0, List.of());
+            LambdaQueryWrapper<DevCabinet> w = new LambdaQueryWrapper<DevCabinet>().isNull(DevCabinet::getArchivedAt);
+            f.accept(w);
+            scopeCabinets(w);
+            total = cabinets.selectCount(w);
+            for (DevCabinet c : cabinets.selectList(w.orderByAsc(DevCabinet::getId).last("limit " + STAGE_ITEMS_MAX)))
+                rows.add(new ai.neargo.sharehub.inv.dto.StockDtos.StageItem(type, c.getCabinetNo(), c.getModel(), c.getWarehouseNo(),
+                        c.getIssuedAgentNo() != null ? c.getIssuedAgentNo() : c.getAgentNo(), c.getSiteNo(), c.getLocationNo(), null));
+        } else if ("IN_TRANSIT".equals(st)) {
+            List<String> nos=powerbanksInTransit();
+            total=nos.size();
+            if(!nos.isEmpty()) for(DevPowerbank p:powerbanks.selectList(new LambdaQueryWrapper<DevPowerbank>()
+                    .in(DevPowerbank::getPowerbankNo,nos).orderByAsc(DevPowerbank::getId).last("limit "+STAGE_ITEMS_MAX)))
+                rows.add(new ai.neargo.sharehub.inv.dto.StockDtos.StageItem(type,p.getPowerbankNo(),p.getVendorCode(),null,null,null,null,null));
+        } else {
+            var f = PB_STAGE.get(st);
+            if (f == null) return new ai.neargo.sharehub.inv.dto.StockDtos.StageItems(st, type, 0, List.of());
+            LambdaQueryWrapper<DevPowerbank> w = new LambdaQueryWrapper<DevPowerbank>().isNull(DevPowerbank::getArchivedAt);
+            f.accept(w);
+            scopePowerbanks(w);
+            total = powerbanks.selectCount(w);
+            for (DevPowerbank p : powerbanks.selectList(w.orderByAsc(DevPowerbank::getId).last("limit " + STAGE_ITEMS_MAX)))
+                rows.add(new ai.neargo.sharehub.inv.dto.StockDtos.StageItem(type, p.getPowerbankNo(), p.getVendorCode(), p.getWarehouseNo(),
+                        null, null, p.getCabinetNo(), null));
+        }
+        return new ai.neargo.sharehub.inv.dto.StockDtos.StageItems(st, type, total, rows);
     }
 
     private long cab(java.util.function.Consumer<LambdaQueryWrapper<DevCabinet>> f) {
         LambdaQueryWrapper<DevCabinet> w = new LambdaQueryWrapper<DevCabinet>().isNull(DevCabinet::getArchivedAt);
         f.accept(w);
+        scopeCabinets(w);
         return cabinets.selectCount(w);
     }
 
     private long pb(java.util.function.Consumer<LambdaQueryWrapper<DevPowerbank>> f) {
         LambdaQueryWrapper<DevPowerbank> w = new LambdaQueryWrapper<DevPowerbank>().isNull(DevPowerbank::getArchivedAt);
         f.accept(w);
+        scopePowerbanks(w);
         return powerbanks.selectCount(w);
     }
 
     private long pendingIntake(String itemType) {
-        return intakeItems.selectCount(new LambdaQueryWrapper<InvIntakeItem>().eq(InvIntakeItem::getItemType, itemType)
-                .eq(InvIntakeItem::getDisposition, "PENDING"));
+        LambdaQueryWrapper<InvIntakeItem> w = new LambdaQueryWrapper<InvIntakeItem>().eq(InvIntakeItem::getItemType, itemType)
+                .eq(InvIntakeItem::getDisposition, "PENDING");
+        scopeIntakes(w);
+        return intakeItems.selectCount(w);
+    }
+
+    private void scopeCabinets(LambdaQueryWrapper<DevCabinet> w) {
+        List<String> visible = warehouses.visibleWarehouseNos();
+        if (visible != null) w.and(q -> {
+            q.isNull(DevCabinet::getWarehouseNo);
+            if (!visible.isEmpty()) q.or().in(DevCabinet::getWarehouseNo, visible);
+        });
+    }
+
+    private void scopePowerbanks(LambdaQueryWrapper<DevPowerbank> w) {
+        List<String> visible = warehouses.visibleWarehouseNos();
+        if (visible == null) return;
+        LambdaQueryWrapper<DevCabinet> cabinetsInScope = new LambdaQueryWrapper<DevCabinet>().select(DevCabinet::getCabinetNo);
+        scopeCabinets(cabinetsInScope);
+        List<String> cabinetNos = cabinets.selectList(cabinetsInScope).stream().map(DevCabinet::getCabinetNo).toList();
+        List<String> offCabinet=orders.visiblePowerbanksFromLatestOrders();
+        List<String> retired=movements.visibleRetiredPowerbanks(visible);
+        if (visible.isEmpty() && cabinetNos.isEmpty() && offCabinet.isEmpty() && retired.isEmpty()) { w.apply("1=0"); return; }
+        w.and(q -> {
+            if (!visible.isEmpty()) q.nested(x->x.isNull(DevPowerbank::getCabinetNo)
+                    .in(DevPowerbank::getStatus,PowerbankStatus.IN_STOCK.name(),PowerbankStatus.FAULT.name())
+                    .in(DevPowerbank::getWarehouseNo, visible));
+            if (!cabinetNos.isEmpty()) {
+                if (!visible.isEmpty()) q.or();
+                q.nested(x->x.in(DevPowerbank::getCabinetNo, cabinetNos)
+                    .in(DevPowerbank::getStatus,PowerbankStatus.IN_CABINET.name(),PowerbankStatus.FAULT.name()));
+            }
+            if (!retired.isEmpty()) {
+                if (!visible.isEmpty() || !cabinetNos.isEmpty()) q.or();
+                q.nested(x->x.eq(DevPowerbank::getStatus,PowerbankStatus.SCRAP.name()).in(DevPowerbank::getPowerbankNo,retired));
+            }
+            if (!offCabinet.isEmpty()) {
+                if (!visible.isEmpty() || !cabinetNos.isEmpty() || !retired.isEmpty()) q.or();
+                q.nested(x->x.isNull(DevPowerbank::getCabinetNo)
+                    .in(DevPowerbank::getStatus,PowerbankStatus.RENTED.name(),PowerbankStatus.LOST.name(),PowerbankStatus.SOLD.name())
+                    .in(DevPowerbank::getPowerbankNo,offCabinet));
+            }
+        });
+    }
+
+    private void scopeIntakes(LambdaQueryWrapper<InvIntakeItem> w) {
+        List<String> visible = warehouses.visibleWarehouseNos();
+        if (visible == null) return;
+        if (visible.isEmpty()) { w.apply("1=0"); return; }
+        List<String> nos = intakes.selectList(new LambdaQueryWrapper<ai.neargo.sharehub.inv.entity.InvIntake>()
+                .select(ai.neargo.sharehub.inv.entity.InvIntake::getIntakeNo)
+                .in(ai.neargo.sharehub.inv.entity.InvIntake::getWarehouseNo, visible)).stream()
+                .map(ai.neargo.sharehub.inv.entity.InvIntake::getIntakeNo).toList();
+        if (nos.isEmpty()) w.apply("1=0"); else w.in(InvIntakeItem::getIntakeNo, nos);
+    }
+
+    private List<String> powerbanksInTransit() {
+        LambdaQueryWrapper<ai.neargo.sharehub.inv.entity.InvTransfer> q=new LambdaQueryWrapper<ai.neargo.sharehub.inv.entity.InvTransfer>()
+                .select(ai.neargo.sharehub.inv.entity.InvTransfer::getTransferNo)
+                .in(ai.neargo.sharehub.inv.entity.InvTransfer::getStatus,ai.neargo.sharehub.inv.InvTransferStatus.IN_TRANSIT.name(),ai.neargo.sharehub.inv.InvTransferStatus.DONE.name());
+        transferAccess.filter(q);
+        List<String> docs=transfers.selectList(q).stream().map(ai.neargo.sharehub.inv.entity.InvTransfer::getTransferNo).toList();
+        if(docs.isEmpty()) return List.of();
+        var candidates=transferItems.selectList(new LambdaQueryWrapper<ai.neargo.sharehub.inv.entity.InvTransferItem>()
+                .in(ai.neargo.sharehub.inv.entity.InvTransferItem::getTransferNo,docs)
+                .eq(ai.neargo.sharehub.inv.entity.InvTransferItem::getChecked,0)
+                .isNotNull(ai.neargo.sharehub.inv.entity.InvTransferItem::getPowerbankNo));
+        var latest=movements.latestShipments(candidates.stream().map(ai.neargo.sharehub.inv.entity.InvTransferItem::getPowerbankNo).distinct().toList());
+        List<String> nos=candidates.stream().filter(i->i.getTransferNo().equals(latest.get(i.getPowerbankNo())))
+                .map(ai.neargo.sharehub.inv.entity.InvTransferItem::getPowerbankNo).distinct().toList();
+        if(nos.isEmpty()) return List.of();
+        return powerbanks.selectList(new LambdaQueryWrapper<DevPowerbank>().select(DevPowerbank::getPowerbankNo)
+                .in(DevPowerbank::getPowerbankNo,nos).isNull(DevPowerbank::getWarehouseNo).isNull(DevPowerbank::getCabinetNo)
+                .isNull(DevPowerbank::getArchivedAt).eq(DevPowerbank::getStatus,PowerbankStatus.IN_STOCK.name()))
+                .stream().map(DevPowerbank::getPowerbankNo).toList();
     }
 
     // —— 期间报表 ——
@@ -189,28 +288,35 @@ public class StockViewServiceImpl implements StockViewService {
         LocalDateTime start = from.atStartOfDay();
         LocalDateTime end = to.plusDays(1).atStartOfDay();
         String wh = warehouseNo == null || warehouseNo.isBlank() ? null : warehouseNo.trim();
+        if (wh != null) warehouses.requireVisible(wh);
+        List<String> visible = warehouses.visibleWarehouseNos();
+        if (visible != null && visible.isEmpty()) return List.of();
         if (service()) {
             InventoryApi api = remote.api();
-            return call(() -> api.periodSummary(start, end, wh == null ? null : links.locationId(api, wh))).stream()
+            List<String> requested = wh != null ? List.of(wh) : visible;
+            return call(() -> requested == null ? api.periodSummary(start, end, null) : requested.stream()
+                    .flatMap(no -> api.periodSummary(start, end, links.locationId(api, no)).stream()).toList()).stream()
                     .map(r -> new StockPeriodRow(links.warehouseNoOf(r.locationId()), links.itemTypeOf(r.itemId()), n(r.opening()),
                             sum(r.inByReason()), sum(r.outByReason()), n(r.closing()), longs(r.inByReason()), longs(r.outByReason())))
                     .toList();
         }
-        return localPeriod(start, end, wh);
+        return localPeriod(start, end, wh, visible);
     }
 
     /**
      * 本地口径：期末 = 当前在仓数 − 期末之后的净进出；期初 = 期末 − 期内入 + 期内出。
      * 履历自 V196 起才有，更早的期间期初不可信（页面提示）。
      */
-    private List<StockPeriodRow> localPeriod(LocalDateTime start, LocalDateTime end, String wh) {
+    private List<StockPeriodRow> localPeriod(LocalDateTime start, LocalDateTime end, String wh, List<String> visible) {
         Map<String, long[]> now = new TreeMap<>();
         DataScopeContext.executeWithoutScope(() -> {
             for (DevCabinet c : cabinets.selectList(new LambdaQueryWrapper<DevCabinet>().select(DevCabinet::getWarehouseNo)
+                    .in(visible != null, DevCabinet::getWarehouseNo, visible)
                     .eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name()).isNotNull(DevCabinet::getWarehouseNo).isNull(DevCabinet::getArchivedAt))) {
                 now.computeIfAbsent(c.getWarehouseNo() + "|CABINET", k -> new long[1])[0]++;
             }
             for (DevPowerbank p : powerbanks.selectList(new LambdaQueryWrapper<DevPowerbank>().select(DevPowerbank::getWarehouseNo)
+                    .in(visible != null, DevPowerbank::getWarehouseNo, visible)
                     .eq(DevPowerbank::getStatus, PowerbankStatus.IN_STOCK.name()).isNotNull(DevPowerbank::getWarehouseNo).isNull(DevPowerbank::getArchivedAt))) {
                 now.computeIfAbsent(p.getWarehouseNo() + "|POWERBANK", k -> new long[1])[0]++;
             }
@@ -219,7 +325,7 @@ public class StockViewServiceImpl implements StockViewService {
         Map<String, Long> after = new HashMap<>();
         Map<String, Map<String, Long>> in = new TreeMap<>();
         Map<String, Map<String, Long>> out = new TreeMap<>();
-        for (DeviceMovement m : movements.warehouseMovesSince(start)) {
+        for (DeviceMovement m : movements.warehouseMovesSince(start, visible)) {
             boolean inPeriod = m.occurredAt() != null && m.occurredAt().isBefore(end);
             if (m.toRef() != null && m.toRef().startsWith("WH:")) {
                 String k = m.toRef().substring(3) + "|" + m.itemType();
@@ -238,6 +344,7 @@ public class StockViewServiceImpl implements StockViewService {
         List<StockPeriodRow> rows = new ArrayList<>();
         for (String k : keys) {
             String[] p = k.split("\\|", 2);
+            if (visible != null && !visible.contains(p[0])) continue;
             if (wh != null && !wh.equals(p[0])) continue;
             long closing = (now.containsKey(k) ? now.get(k)[0] : 0) - after.getOrDefault(k, 0L);
             Map<String, Long> i = in.getOrDefault(k, Map.of()), o = out.getOrDefault(k, Map.of());
@@ -293,23 +400,36 @@ public class StockViewServiceImpl implements StockViewService {
 
     @Override
     public PageResult<StockLedgerRow> ledger(String warehouseNo, String itemType, String keyword, Integer page, Integer size) {
+        if (warehouseNo != null && !warehouseNo.isBlank()) warehouses.requireVisible(warehouseNo.trim());
+        List<String> visible = warehouses.visibleWarehouseNos();
         int p = page == null || page < 1 ? 1 : page;
         int s = size == null || size < 1 ? 20 : Math.min(size, 200);
         if (!service()) {
-            PageResult<DeviceMovement> r = movements.warehouseMoves(warehouseNo, itemType, keyword, p, s);
-            return new PageResult<>(r.getList().stream().map(m -> localRow(m, warehouseNo)).toList(), r.getTotal());
+            PageResult<DeviceMovement> r = movements.warehouseMoves(warehouseNo, itemType, keyword, p, s, visible);
+            return new PageResult<>(r.getList().stream().map(m -> localRow(m, ledgerWarehouse(m, warehouseNo, visible))).toList(), r.getTotal());
         }
+        if (visible != null && visible.isEmpty()) return new PageResult<>(List.of(), 0);
         InventoryApi api = remote.api();
-        List<StockLedgerRow> all = call(() -> api.ledger(
-                        itemType == null || itemType.isBlank() ? null : links.itemId(api, itemType.trim()),
-                        warehouseNo == null || warehouseNo.isBlank() ? null : links.locationId(api, warehouseNo.trim()),
-                        keyword == null || keyword.isBlank() ? null : keyword.trim(), null, REMOTE_LEDGER_WINDOW))
+        List<StockLedgerRow> all = call(() -> {
+            String item = itemType == null || itemType.isBlank() ? null : links.itemId(api, itemType.trim());
+            String doc = keyword == null || keyword.isBlank() ? null : keyword.trim();
+            List<String> requested = warehouseNo == null || warehouseNo.isBlank() ? visible : List.of(warehouseNo.trim());
+            if (requested == null) return api.ledger(item, null, doc, null, REMOTE_LEDGER_WINDOW);
+            return requested.stream().flatMap(no -> api.ledger(item, links.locationId(api, no), doc, null, REMOTE_LEDGER_WINDOW).stream()).toList();
+        })
                 .stream().map(e -> new StockLedgerRow("S" + e.id(), links.warehouseNoOf(e.locationId()), links.itemTypeOf(e.itemId()), null,
                         e.docKind(), e.docNo(), e.qtyDelta() == null ? 0 : e.qtyDelta().intValue(), e.occurredAt(), e.operator()))
+                .filter(r -> visible == null || visible.contains(r.warehouseNo()))
                 .sorted(Comparator.comparing(StockLedgerRow::occurredAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
         int from = Math.min((p - 1) * s, all.size());
         return new PageResult<>(all.subList(from, Math.min(from + s, all.size())), all.size());
+    }
+
+    private static String ledgerWarehouse(DeviceMovement m, String selected, List<String> visible) {
+        if (selected != null && !selected.isBlank() || visible == null) return selected;
+        if (m.toRef() != null && m.toRef().startsWith("WH:") && visible.contains(m.toRef().substring(3))) return m.toRef().substring(3);
+        return m.fromRef() == null ? null : m.fromRef().replaceFirst("^WH:", "");
     }
 
     /** 履历 → 流水：to 是仓 = 进（+1），from 是仓 = 出（−1）；指定了仓时以该仓的视角定方向。 */
@@ -326,10 +446,13 @@ public class StockViewServiceImpl implements StockViewService {
     @Override
     public List<StockCount> counts(String warehouseNo, String status) {
         requireService();
+        List<String> visible = warehouses.visibleWarehouseNos();
+        if (warehouseNo != null && !warehouseNo.isBlank()) warehouses.requireVisible(warehouseNo.trim());
         List<StockCount> out = new ArrayList<>();
         for (InventorySyncState r : links.listByPrefix("count:")) {
             if (out.size() >= 50) break;
             String[] v = r.getV().split("\\|", 2);
+            if (visible != null && !visible.contains(v[0])) continue;
             if (warehouseNo != null && !warehouseNo.isBlank() && !warehouseNo.trim().equals(v[0])) continue;
             String no = r.getK().substring(6);
             String st;
@@ -351,6 +474,7 @@ public class StockViewServiceImpl implements StockViewService {
         if (warehouseNo == null || warehouseNo.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "warehouseNo");
         InventoryApi api = remote.api();
         String wh = warehouseNo.trim();
+        warehouses.requireVisible(wh);
         String no = call(() -> api.openCount(links.locationId(api, wh),
                 List.of(links.itemId(api, InventoryLinks.CABINET), links.itemId(api, InventoryLinks.POWERBANK)), key("count")));
         links.put("count:" + no, wh + "|" + LocalDateTime.now());
@@ -361,7 +485,7 @@ public class StockViewServiceImpl implements StockViewService {
     @Override
     public StockCountDetail count(String countNo) {
         requireService();
-        InventoryApi.CountView v = call(() -> remote.api().count(countNo));
+        InventoryApi.CountView v = accessibleCount(countNo);
         String wh = links.warehouseNoOf(v.locationId());
         String reg = links.get("count:" + countNo);
         LocalDateTime opened = reg != null && reg.contains("|") ? LocalDateTime.parse(reg.split("\\|", 2)[1]) : null;
@@ -369,57 +493,65 @@ public class StockViewServiceImpl implements StockViewService {
                 v.lines() == null ? List.of() : v.lines().stream()
                         .map(l -> new StockCountLine(links.itemTypeOf(l.itemId()), l.bookQty(), l.countedQty(), l.diffQty())).toList(),
                 v.exceptions() == null ? List.of() : v.exceptions().stream().map(x -> new StockCountScan(x.serialNo(), x.verdict())).toList(),
-                v.missingSerials() == null ? List.of() : v.missingSerials());
+                v.missingSerials() == null ? List.of() : v.missingSerials(),reviews.view(countNo));
     }
 
     @Override
     public StockCountDetail scan(String countNo, List<String> serialNos) {
         requireService();
+        var view=accessibleCount(countNo);
         List<String> nos = serialNos == null ? List.of()
                 : serialNos.stream().filter(x -> x != null && !x.isBlank()).map(String::trim).distinct().toList();
         if (nos.isEmpty()) throw BizException.badRequest("error.common.missing_parameter", "serialNos");
-        call(() -> remote.api().scanCount(countNo, nos, key("scan")));
+        call(() -> reviews.edit(countNo,links.warehouseNoOf(view.locationId()),()->remote.api().scanCount(countNo,nos,key("scan"))));
         return count(countNo);
     }
 
     @Override
     public StockCountDetail submit(String countNo) {
-        return act(countNo, () -> remote.api().submitCount(countNo, key("submit")));
+        requireService();var v=accessibleCount(countNo);
+        call(()->{reviews.submit(countNo,links.warehouseNoOf(v.locationId()));return null;});return count(countNo);
     }
 
     @Override
     public StockCountDetail approve(String countNo, String note) {
-        return act(countNo, () -> remote.api().approveCount(countNo, blankToNull(note), key("approve")));
+        requireService();accessibleCount(countNo);throw BizException.conflict("error.inventory.unified_review_required");
     }
 
     @Override
     public StockCountDetail reject(String countNo, String note) {
-        if (note == null || note.isBlank()) throw BizException.badRequest("error.common.note_required");
-        return act(countNo, () -> remote.api().rejectCount(countNo, note.trim(), key("reject")));
+        requireService();accessibleCount(countNo);throw BizException.conflict("error.inventory.unified_review_required");
     }
 
     @Override
     public StockCountDetail post(String countNo) {
-        requireService();
-        InventoryApi.CountPosted r = call(() -> remote.api().postCount(countNo, key("post")));
-        log.info("盘点过账 countNo={} 盘盈入库={} 盘亏出库={}", countNo, r.gainInboundNo(), r.lossOutboundNo());
-        return count(countNo);
+        requireService();accessibleCount(countNo);reviews.retry(countNo);return count(countNo);
     }
 
     @Override
     public StockCountDetail cancel(String countNo) {
-        return act(countNo, () -> remote.api().cancelCount(countNo, key("cancel")));
+        requireService();var v=accessibleCount(countNo);
+        call(()->reviews.edit(countNo,links.warehouseNoOf(v.locationId()),()->{remote.api().cancelCount(countNo,key("cancel"));return null;}));
+        return count(countNo);
     }
 
     // —— 内部 ——
 
     private StockCountDetail act(String countNo, Runnable r) {
         requireService();
+        accessibleCount(countNo);
         call(() -> {
             r.run();
             return null;
         });
         return count(countNo);
+    }
+
+    /** 以远端单据的实际仓位鉴权，不能只信本地索引，也不能先修改远端再鉴权。 */
+    private InventoryApi.CountView accessibleCount(String countNo) {
+        InventoryApi.CountView view = call(() -> remote.api().count(countNo));
+        warehouses.requireVisible(links.warehouseNoOf(view.locationId()));
+        return view;
     }
 
     private void requireService() {

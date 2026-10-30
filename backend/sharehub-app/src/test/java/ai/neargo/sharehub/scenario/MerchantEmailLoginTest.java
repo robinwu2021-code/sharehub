@@ -74,7 +74,7 @@ class MerchantEmailLoginTest extends ApiTestSupport {
     void email_only_merchant_logs_in_by_email_and_gets_verified() {
         String mail = email();
         String agentNo = opsCreate(mail, null, "邮箱登录 " + mail);
-        assertThat(principalByEmailOf(agentNo).get("email_verified")).as("运营录入的先记未验证（R3）").isEqualTo(0L);
+        assertThat(((Number) principalByEmailOf(agentNo).get("email_verified")).intValue()).as("运营录入的先记未验证（R3）").isZero();
 
         JsonNode s = loginWith("  " + mail.toUpperCase() + " ", OTP).okData();
         assertThat(s.path("agentNo").asText()).as("大小写与首尾空格归一后是同一个邮箱").isEqualTo(agentNo);

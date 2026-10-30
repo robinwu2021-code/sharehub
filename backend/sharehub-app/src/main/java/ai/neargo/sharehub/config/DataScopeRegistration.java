@@ -41,6 +41,8 @@ public class DataScopeRegistration implements DataScopeRegistrar {
 
     @Override
     public void register(DataScopeTableRegistry registry) {
+        // 仓管沿用区域范围；未配置REGION的收窄主体不能查询全局仓库。
+        registry.register("inv_warehouse", Map.of("REGION", "region_id"));
 
         /*
          * ⚠️ **一张表登记了一个维度，就不该漏掉它有列可用的其它已提供维度**。
@@ -84,6 +86,9 @@ public class DataScopeRegistration implements DataScopeRegistrar {
                 "AGENT", "scope_agent_no",
                 "SITE", "site_no",
                 "REGION", "region_id"));
+
+        // V215：交付凭证归本次出库商家；明细必须经单头查询，不能按设备当前归属重写历史。
+        registry.register("dev_delivery", Map.of("AGENT", "agent_no"));
 
         // —— 交易：订单归属随借出机柜（下单时快照，不随设备后续调拨变动）——
         // SELF → c_user_no 必须注册，理由见类注释「关于 SELF」一节：handler 是 fail-closed，

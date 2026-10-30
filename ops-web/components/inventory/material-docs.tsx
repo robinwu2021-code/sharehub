@@ -92,6 +92,7 @@ function DocDrawer({ draft, purposes, warehouses, onChange, onClose, onDone }: {
   onChange: (d: DocDraft) => void; onClose: () => void; onDone: (docNo: string) => void;
 }) {
   const qc = useQueryClient();
+  const [requestKey] = useState(() => crypto.randomUUID());
   const matQ = useQuery({ queryKey: ["materials", "all"], queryFn: () => api.listMaterials({ page: 1, size: UNPAGED_SIZE }) });
   const spQ = useQuery({ queryKey: ["suppliers", "active"], queryFn: () => api.listSuppliers({ page: 1, size: UNPAGED_SIZE }) });
   const materials = useMemo(() => (matQ.data?.list ?? []).filter((m) => !m.builtin), [matQ.data]);
@@ -110,6 +111,7 @@ function DocDrawer({ draft, purposes, warehouses, onChange, onClose, onDone }: {
           unitCost: inbound && l.unitCost ? Number(l.unitCost) : null };
       });
       return api.createMaterialDoc({
+        requestKey,
         purpose: p, warehouseNo: draft.warehouseNo, note: draft.note, lines,
         toWarehouseNo: p === "TRANSFER" ? draft.toWarehouseNo || null : null,
         supplierNo: p === "PURCHASE" || p === "RETURN_SUPPLIER" ? draft.supplierNo || null : null,

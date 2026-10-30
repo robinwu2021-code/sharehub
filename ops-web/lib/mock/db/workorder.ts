@@ -155,6 +155,16 @@ export function transitionWorkOrder(woNo: string, action: WorkOrderAction, patch
 }
 
 export function createWorkOrder(x: WorkOrderDraft): WorkOrder {
+  return createWorkOrderImpl(x, false);
+}
+
+/** 绑定链路专用：直营例外仅接受已绑定点位的设备，不能由sourceNo前缀触发。 */
+export function createBoundInstallWorkOrder(x: WorkOrderDraft): WorkOrder {
+  if (x.type !== "INSTALL") fail("仅支持安装单", "Installation work order required");
+  return createWorkOrderImpl(x, true);
+}
+
+function createWorkOrderImpl(x: WorkOrderDraft, fromBinding: boolean): WorkOrder {
   if (!x.type) throw fail("工单类型必填", "Work order type is required", "نوع أمر العمل مطلوب");
   if (!x.cabinetNo?.trim()) throw fail("机柜号必填", "Cabinet number is required", "رقم الخزانة مطلوب");
   if (!x.description?.trim()) throw fail("问题描述必填", "A problem description is required", "وصف المشكلة مطلوب");
@@ -163,6 +173,16 @@ export function createWorkOrder(x: WorkOrderDraft): WorkOrder {
     throw fail(`撤机去向取值非法：${x.disposition}`, `Invalid removal disposition: ${x.disposition}`);
   }
   const cab = cabinets.find((c) => c.cabinetNo === x.cabinetNo);
+  if (x.type === "INSTALL") {
+    const merchant = fromBinding ? cab?.agentNo : x.agentNo?.trim();
+    if (!fromBinding && !merchant) fail("安装单请选择商家", "Select a merchant for installation");
+    const direct = fromBinding && !merchant && !cab?.issuedAgentNo && !!cab?.locationNo;
+    if (!cab || cab.archivedAt || cab.status !== "IN_STOCK" || cab.warehouseNo
+      || (fromBinding && !cab.locationNo) || (cab.qcStatus != null && cab.qcStatus !== "PASSED")
+      || (!direct && (!merchant || cab.issuedAgentNo !== merchant || !cab.issueClaimedAt || (cab.locationNo != null && cab.agentNo !== merchant)))) {
+      fail("设备不符合安装条件：请选择该商家已签收、质检放行且未上线的已出库设备", "Select an accepted and quality-cleared issued device for this merchant");
+    }
+  }
   const created: WorkOrder = {
     // 手工开单从 WO70400 起，避开告警转工单(70200+)/投诉转工单(70300+)两段号段
     woNo: nextNo("WO", workOrders, 70400, "woNo"),

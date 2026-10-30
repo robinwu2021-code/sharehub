@@ -275,11 +275,17 @@ function WorkOrdersInner() {
     queryFn: () => api.listInspectionPlans({ page: paging.page, size: paging.size, keyword: inspKw }),
     placeholderData: keepPreviousData, enabled: view === "inspection",
   });
-  // 开单时机柜下拉：与设备台账同一份数据，避免手打错柜号
+  const creatingInstall = woForm?.type === "INSTALL";
+  const installMerchant = woForm?.agentNo ?? "";
+  const installMerchants = useQuery({
+    queryKey: ["issued-summary"], queryFn: () => api.issuedSummary(), enabled: !!woForm && creatingInstall,
+  });
+  // 安装单必须先选商家，再查该商家的已出库设备。通用工单仍按设备台账选择。
   const cabinetOpts = useQuery({
-    queryKey: ["wo-cabinet-options"],
-    queryFn: () => api.listCabinets({ page: 1, size: UNPAGED_SIZE }),
-    enabled: !!woForm,
+    queryKey: ["wo-cabinet-options", creatingInstall, installMerchant],
+    queryFn: () => api.listCabinets({ page: 1, size: UNPAGED_SIZE,
+      ...(creatingInstall ? { issuedAgentNo: installMerchant, pool: "ALL" as const, status: "IN_STOCK" } : {}) }),
+    enabled: !!woForm && (!creatingInstall || !!installMerchant),
   });
   // 站点筛选的选项：站点表有界（以运营站点数为上界），一次取完；没有站点查看权限就不出这个筛选
   const canSites = allow("location:poi:read");
@@ -398,13 +404,18 @@ function WorkOrdersInner() {
   };
 
   const WO_FIELDS: FieldDef[] = useMemo(() => {
-    const cabs = cabinetOpts.data?.list ?? [];
+    const cabs = (cabinetOpts.data?.list ?? []).filter((c) => !creatingInstall || (!c.archivedAt && !c.warehouseNo
+      && c.issuedAgentNo === installMerchant && c.issueClaimedAt && (c.qcStatus == null || c.qcStatus === "PASSED")
+      && (c.locationNo == null || c.agentNo === installMerchant)));
     return [
       { key: "type", label: "工单类型", type: "select", options: WO_TYPE_OPTIONS, required: true, section: "基本信息" },
+      ...(creatingInstall ? [{ key: "agentNo", label: "商家", type: "select" as const, required: true, section: "基本信息",
+        options: (installMerchants.data ?? []).map((a) => ({ value: a.agentNo, label: `${a.agentName}（${a.agentNo}）` })),
+        help: installMerchants.isError ? "商家列表加载失败，请关闭后重试" : "选择出库商家后，再选择待安装设备" }] : []),
       {
-        key: "cabinetNo", label: "机柜号", type: "select", required: true, section: "基本信息",
+        key: "cabinetNo", label: creatingInstall ? "待安装设备" : "机柜号", type: "select", required: true, section: "基本信息",
         options: [{ value: "", label: "请选择机柜" }, ...cabs.map((c) => ({ value: c.cabinetNo, label: `${c.cabinetNo} · ${c.locationName}` }))],
-        help: cabinetOpts.isLoading ? "机柜列表加载中…" : "与设备台账同一份数据",
+        help: cabinetOpts.isLoading ? "机柜列表加载中…" : creatingInstall ? (!installMerchant ? "请先选择商家" : "仅显示该商家已签收、质检放行且未上线的已出库设备") : "与设备台账同一份数据",
       },
       { key: "locationName", label: "站点", maxLength: 40, section: "基本信息", placeholder: "留空则按机柜自动带出", help: "仅在机柜刚移机、台账未同步时才需手填" },
       { key: "priority", label: "优先级", type: "select", options: PRIO_OPTIONS, required: true, section: "基本信息" },
@@ -414,9 +425,9 @@ function WorkOrdersInner() {
       { key: "disposition", label: "撤机去向", type: "select", section: "基本信息",
         options: (Object.keys(REMOVAL_DISPOSITION_LABEL) as RemovalDisposition[]).map((k) => ({ value: k, label: REMOVAL_DISPOSITION_LABEL[k] })),
         disabledWhen: (v) => v.type !== "REMOVE",
-        help: "回商家待绑定：柜子撤下后留在同一商家名下，可再绑到它的其它站点点位；回仓：撤下后生成回仓调拨单，离开商家" },
+        help: "留商家待安装：柜子撤下后留在同一商家名下，可再绑到它的其它站点点位；回仓：撤下后生成回仓调拨单，离开商家" },
     ];
-  }, [cabinetOpts.data, cabinetOpts.isLoading]);
+  }, [cabinetOpts.data, cabinetOpts.isLoading, creatingInstall, installMerchant, installMerchants.data, installMerchants.isError]);
 
   const saveSla = useMutation({
     mutationFn: (v: Partial<SlaRule>) => api.saveSlaRule(v),
@@ -751,7 +762,12 @@ function WorkOrdersInner() {
         isEdit={false}
         fields={WO_FIELDS}
         value={(woForm ?? {}) as Record<string, unknown>}
-        onChange={(v) => setWoForm(v as Partial<WorkOrderDraft>)}
+        onChange={(v) => {
+          const next = v as Partial<WorkOrderDraft>;
+          if (next.type !== woForm?.type) setWoForm({ ...next, cabinetNo: "", agentNo: undefined, locationName: "" });
+          else if (next.agentNo !== woForm?.agentNo) setWoForm({ ...next, cabinetNo: "", locationName: "" });
+          else setWoForm(next);
+        }}
         onSubmit={() => woForm && doCreate.mutate(woForm as WorkOrderDraft)}
         submitting={doCreate.isPending}
       />

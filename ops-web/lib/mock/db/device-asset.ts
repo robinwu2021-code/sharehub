@@ -1,11 +1,12 @@
 import type {
-  AssetDiff, AssetDiffKind, AssetDiffStatus, InventoryTransferDetail, Powerbank, PowerbankAction,
+  AssetDiff, AssetDiffKind, AssetDiffStatus, InventoryTransfer, InventoryTransferDetail, Powerbank, PowerbankAction,
   QcItemType, QcRecord, QcReq, QcStatus, ReceiveResult, TransferItemType, PageResult,
 } from "../../types";
 import { POWERBANK_TRANSITIONS, canPowerbankAction, canTransferAction, TRANSFER_TRANSITIONS } from "../../types";
 import { fail, notFound } from "../../biz-error";
 import { cabinets, powerbanks, inventoryTransfers, transferItemsOf, transferItemStore, getInventoryTransfer } from "./device";
 import { paginate } from "./helpers";
+import { recordMovement, ref, listDeviceMovements } from "./movement";
 
 /**
  * 设备资产线的 mock（批次 5b，照后端 `QcServiceImpl` / `TransferOpsServiceImpl` / `PowerbankStateMachine`）：
@@ -171,7 +172,14 @@ const findTransfer = (transferNo: string) => {
  * 这类**主数据查无**的件号只在种子单据里出现，跳过在库校验（否则种子草稿单一张都发不出去）；
  * 主数据里有的件照后端规则严格校验。经「设定明细」录入的件号必须在主数据里（见 {@link setTransferItems}）。
  */
-function checkShippable(itemType: TransferItemType | null, no: string, strict: boolean) {
+function checkShippable(t: InventoryTransfer, no: string, strict: boolean) {
+  const itemType = t.itemType ?? "POWERBANK";
+  const asset = itemType === "CABINET" ? cabinets.find((c) => c.cabinetNo === no) : powerbanks.find((p) => p.powerbankNo === no);
+  if (asset && t.fromType && t.fromRef) {
+    const actual = t.fromType === "WAREHOUSE" ? asset.warehouseNo : itemType === "CABINET"
+      ? t.fromType === "SITE" ? (asset as typeof cabinets[number]).siteNo : (asset as typeof cabinets[number]).locationNo : null;
+    if (actual !== t.fromRef) fail(`${no} 不在调拨单指定的调出位置`, `${no} is not at the transfer source location`);
+  }
   if (itemType === "CABINET") {
     const c = cabinets.find((x) => x.cabinetNo === no);
     if (!c) { if (strict) notFound("机柜", "Cabinet", no); return; }
@@ -179,7 +187,7 @@ function checkShippable(itemType: TransferItemType | null, no: string, strict: b
   } else {
     const p = powerbanks.find((x) => x.powerbankNo === no);
     if (!p) { if (strict) notFound("充电宝", "Powerbank", no); return; }
-    if (p.status !== "IN_STOCK") fail(`${no} 不在库（当前「${p.status}」），不能装车`, `${no} is not in stock`, "ليس في المخزون");
+    if (p.cabinetNo || p.status !== "IN_STOCK") fail(`${no} 不在库（当前「${p.status}」），不能装车`, `${no} is not in stock`, "ليس في المخزون");
   }
   if (!qcCleared(no)) fail(`${no} 质检未通过，不能发货`, `${no} has not passed QC`, "لم يجتز الفحص");
 }
@@ -190,27 +198,44 @@ export function setTransferItems(transferNo: string, itemNos: string[]): Invento
   if (t.status !== "DRAFT") fail(`只有草稿单能改明细，当前是「${t.status}」`, "Draft only", "المسودة فقط");
   const nos = [...new Set((itemNos ?? []).map((s) => s?.trim()).filter((s): s is string => !!s))];
   if (nos.length === 0) fail("明细不能为空", "itemNos is required", "القائمة فارغة");
-  const itemType = (t.itemType as TransferItemType | null) ?? "POWERBANK";
-  for (const no of nos) checkShippable(itemType, no, true);
+  for (const no of nos) checkShippable(t, no, true);
   transferItemStore.set(transferNo, nos.map((itemNo) => ({ transferNo, itemNo, checked: false })));
   t.powerbankCount = nos.length;
   return getInventoryTransfer(transferNo);
 }
 
+function requireSupportedPowerbankEndpoints(t: InventoryTransfer) {
+  if (t.itemType === "POWERBANK" && (t.fromType !== "WAREHOUSE" || t.toType !== "WAREHOUSE"))
+    fail("充电宝调拨仅支持仓库之间交接", "Powerbank transfers require warehouse endpoints");
+}
+
 /** 发货：DRAFT → IN_TRANSIT。**发货这一刻再核一遍**：建明细之后到装车之间，柜子可能被调走或质检被判不过。 */
 export function shipTransfer(transferNo: string): InventoryTransferDetail {
   const t = findTransfer(transferNo);
+  requireSupportedPowerbankEndpoints(t);
   if (!canTransferAction(t.status, "ship")) {
     fail(`调拨单当前是「${t.status}」，不能${TRANSFER_TRANSITIONS.ship.label}`, "Illegal transition", "انتقال غير مسموح");
   }
   const itemType = (t.itemType as TransferItemType | null) ?? "POWERBANK";
   const items = transferItemsOf(transferNo);
-  for (const i of items) checkShippable(itemType, i.itemNo, false);
+  if (!items.length) fail("明细不能为空", "Transfer items are required");
+  for (const i of items) checkShippable(t, i.itemNo, false);
   t.status = "IN_TRANSIT";
   if (itemType === "CABINET") {
     for (const i of items) {
       const c = cabinets.find((x) => x.cabinetNo === i.itemNo);
-      if (c) c.status = "IN_TRANSIT";
+      if (c) {
+        recordMovement({ itemNo: c.cabinetNo, event: "SHIP", fromRef: ref.wh(c.warehouseNo), toRef: "IN_TRANSIT", sourceRef: transferNo });
+        c.status = "IN_TRANSIT";
+      }
+    }
+  } else {
+    for (const i of items) {
+      const p = powerbanks.find((x) => x.powerbankNo === i.itemNo);
+      if (p) {
+        recordMovement({ itemType: "POWERBANK", itemNo: p.powerbankNo, event: "SHIP", fromRef: ref.wh(p.warehouseNo), toRef: "IN_TRANSIT", sourceRef: transferNo });
+        p.warehouseNo = null;
+      }
     }
   }
   return getInventoryTransfer(transferNo);
@@ -236,6 +261,7 @@ function addDiff(sourceRef: string, kind: AssetDiffKind, itemType: TransferItemT
  */
 export function receiveTransfer(transferNo: string, receivedNos: string[], _note?: string): ReceiveResult {
   const t = findTransfer(transferNo);
+  requireSupportedPowerbankEndpoints(t);
   if (!canTransferAction(t.status, "receive")) {
     fail(`调拨单当前是「${t.status}」，不能${TRANSFER_TRANSITIONS.receive.label}`, "Illegal transition", "انتقال غير مسموح");
   }
@@ -243,6 +269,11 @@ export function receiveTransfer(transferNo: string, receivedNos: string[], _note
   const got = new Set((receivedNos ?? []).map((s) => s?.trim()).filter((s): s is string => !!s));
   if (items.length > 0 && got.size === 0) fail("签收要逐件扫码：实收件号不能为空", "receivedNos is required", "مطلوب");
   const itemType = (t.itemType as TransferItemType | null) ?? "POWERBANK";
+  if (itemType === "POWERBANK") for (const i of items) {
+    const p = powerbanks.find((x) => x.powerbankNo === i.itemNo);
+    if (got.has(i.itemNo) && p && (p.warehouseNo || p.cabinetNo || p.status !== "IN_STOCK"
+        || listDeviceMovements(i.itemNo).find((m) => m.itemType === "POWERBANK" && m.event === "SHIP")?.sourceRef !== transferNo)) fail("设备位置已变化", "Device location has changed");
+  }
   t.status = "DONE";
 
   const missing: string[] = [];
@@ -258,7 +289,17 @@ export function receiveTransfer(transferNo: string, receivedNos: string[], _note
     i.checked = true;
     if (itemType === "CABINET") {
       const c = cabinets.find((x) => x.cabinetNo === i.itemNo);
-      if (c && c.status === "IN_TRANSIT") c.status = "IN_STOCK";
+      if (c && c.status === "IN_TRANSIT") {
+        c.status = "IN_STOCK";
+        c.warehouseNo = t.toType === "WAREHOUSE" ? t.toRef ?? null : null;
+        recordMovement({ itemNo: c.cabinetNo, event: "RECEIVE", fromRef: "IN_TRANSIT", toRef: ref.wh(c.warehouseNo), sourceRef: transferNo });
+      }
+    } else {
+      const p = powerbanks.find((x) => x.powerbankNo === i.itemNo);
+      if (p) {
+        p.warehouseNo = t.toType === "WAREHOUSE" ? t.toRef ?? null : null;
+        recordMovement({ itemType: "POWERBANK", itemNo: p.powerbankNo, event: "RECEIVE", fromRef: "IN_TRANSIT", toRef: ref.wh(p.warehouseNo), sourceRef: transferNo });
+      }
     }
   }
   const expected = new Set(items.map((i) => i.itemNo));

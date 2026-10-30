@@ -10,7 +10,7 @@
 // 审核队列：领取后才能决定；领取超时（30 分钟）读时自动放回并留痕。
 import { notFound } from "@/lib/biz-error";
 import { ME } from "./mock-db";
-import { requirePerm } from "./mock-auth";
+import { requirePerm, requireBackendPerm, hasBackendPerm } from "./mock-auth";
 import { ApiError } from "@/lib/api/error";
 import { FlowValidationError } from "./errors";
 import { useLocaleStore } from "@/lib/stores/locale";
@@ -49,6 +49,9 @@ interface StepDef { code: string; name: string; approver: string; condition?: { 
 interface ProcessDef { code: string; name: string; steps: StepDef[]; crossStepExclusive: boolean }
 
 const PROCESSES: Record<string, ProcessDef> = {
+  inventory_count_audit: { code: "inventory_count_audit", name: "盘点差异复核", crossStepExclusive: false, steps: [
+    { code: "inventory", name: "库存复核", approver: "持 device:inventory:audit" },
+  ] },
   LOC_CONTRACT: { code: "LOC_CONTRACT", name: "进场合同", crossStepExclusive: true, steps: [
     { code: "ops", name: "运营审批", approver: "持 location:contract:audit" },
     { code: "fin", name: "财务会签", approver: "持 location:contract:cosign", condition: { field: "needsCosign", label: "条件步：分成 > 30% 触发" } },
@@ -259,7 +262,7 @@ export function getApproval(no: string): ApprovalView {
   // （真服务是 JSON 不会这样，但会让界面在重新取数前就显示一半新状态，端到端场景 S2-2 抓到过）
   return structuredClone({
     ...row(r), facts: r.facts, steps, rounds: [...r.rounds].sort((a, b) => a.round - b.round), evidence: r.evidence,
-    mine: { ...(r.status === "PENDING" ? { taskNo: r.taskNo } : {}), canDecide: r.status === "PENDING" && !why, ...(why ? { whyNot: why } : {}),
+    mine: { ...(r.status === "PENDING" ? { taskNo: r.taskNo } : {}), canDecide: r.status === "PENDING" && !why && (r.processCode !== "inventory_count_audit" || hasBackendPerm("device:inventory:audit")), ...(why ? { whyNot: why } : {}),
       canWithdraw: r.status === "PENDING" && r.requestedBy.ref === ME.ref },
     rules: { crossStepExclusive: d.crossStepExclusive },
   });
@@ -273,6 +276,7 @@ export function decide(no: string, taskNo: string, decision: "APPROVE" | "REJECT
   if (r.status !== "PENDING" || r.taskNo !== taskNo) {
     conflict("这张单已被他人处理，请刷新后再看", "This approval was already handled by someone else — refresh and try again");
   }
+  if (r.processCode === "inventory_count_audit") requireBackendPerm("device:inventory:audit");
   const why = whyNotDecide(r);
   if (why) forbidKey(why);
   if (decision === "REJECT" && !reason?.trim()) {
@@ -283,6 +287,7 @@ export function decide(no: string, taskNo: string, decision: "APPROVE" | "REJECT
   if (decision === "REJECT") {
     r.status = "REJECTED"; r.finishedAtMs = now;
     if (cur) Object.assign(cur, { status: "REJECTED", atMs: now, by: ME.displayName, comment: reason!.trim() });
+    deliverBusinessDecision(r);
     return getApproval(no);
   }
   // 通过：找下一个进入条件满足的步
@@ -294,6 +299,7 @@ export function decide(no: string, taskNo: string, decision: "APPROVE" | "REJECT
   } else {
     r.stepIdx = next; r.stepStartedAtMs = now; r.taskNo = newTask();
   }
+  deliverBusinessDecision(r);
   return getApproval(no);
 }
 
@@ -305,6 +311,7 @@ export function withdraw(no: string, now: number = Date.now()): ApprovalView {
   r.status = "WITHDRAWN"; r.finishedAtMs = now; r.taskNo = newTask();
   const cur = r.rounds.find((x) => x.round === r.round);
   if (cur) Object.assign(cur, { status: "WITHDRAWN", atMs: now, by: ME.displayName });
+  deliverBusinessDecision(r);
   return getApproval(no);
 }
 
@@ -454,4 +461,24 @@ export function approvalSnapshots() {
     currentStep: r.status === "PENDING" ? def(r).steps[r.stepIdx]?.name : undefined,
     decisions: r.decisions.map((d) => ({ ...d, stepName: def(r).steps[d.step]?.name ?? "" })), rounds: r.rounds,
   }));
+}
+
+
+// Host business submissions enter the same approval store; callbacks only apply the already recorded decision.
+const businessCallbacks = new Map<string, (decision: "APPROVED" | "REJECTED" | "WITHDRAWN") => void>();
+let businessSequence = 0;
+function deliverBusinessDecision(r: ApprovalRec) {
+  if (r.status !== "PENDING") businessCallbacks.get(r.approvalNo)?.(r.status);
+}
+export function startBusinessApproval(subject: ApprovalRow["subject"], facts: ApprovalView["facts"],
+  callback: (decision: "APPROVED" | "REJECTED" | "WITHDRAWN") => void): string {
+  const approvalNo = `APINV${Date.now()}${++businessSequence}`;
+  const now = Date.now();
+  approvals.push({ approvalNo, processCode: "inventory_count_audit", subject, fields: {}, facts, evidence: [],
+    status: "PENDING", stepIdx: 0, round: 1, requestedBy: { ref: ME.ref, displayName: ME.displayName },
+    requestedAtMs: now, stepStartedAtMs: now, taskNo: newTask(), decisions: [],
+    rounds: [{ round: 1, status: "IN_PROGRESS", atMs: now, by: ME.displayName }],
+  });
+  businessCallbacks.set(approvalNo, callback);
+  return approvalNo;
 }

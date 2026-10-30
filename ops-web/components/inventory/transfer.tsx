@@ -73,11 +73,11 @@ const refSpec = (type: unknown, sites: Ref[], points: Ref[]): Partial<FieldDef> 
 const transferFields = (v: Record<string, unknown>, sites: Ref[], points: Ref[]): FieldDef[] => [
   { key: "itemType", label: "调拨物", type: "select", required: true, section: "调拨物",
     options: [{ value: "CABINET", label: "机柜" }, { value: "POWERBANK", label: "充电宝" }],
-    help: "机柜随发货转「运输中」、签收后回「在库」；充电宝只记去向" },
-  { key: "fromType", label: "调出方类型", type: "select", required: true, section: "调出方", options: TYPE_OPTIONS },
+    help: "充电宝仅支持仓库之间调拨；发货退出源仓，签收进入目标仓" },
+  { key: "fromType", label: "调出方类型", type: "select", required: true, section: "调出方", options: v.itemType === "POWERBANK" ? TYPE_OPTIONS.filter((o) => o.value === "WAREHOUSE") : TYPE_OPTIONS },
   { key: "fromRef", label: "调出方", required: true, section: "调出方", ...refSpec(v.fromType, sites, points) },
   { key: "fromName", label: "调出方名称", maxLength: 64, section: "调出方", help: "留空按所选站点 / 点位的名称自动填" },
-  { key: "toType", label: "调入方类型", type: "select", required: true, section: "调入方", options: TYPE_OPTIONS },
+  { key: "toType", label: "调入方类型", type: "select", required: true, section: "调入方", options: v.itemType === "POWERBANK" ? TYPE_OPTIONS.filter((o) => o.value === "WAREHOUSE") : TYPE_OPTIONS },
   { key: "toRef", label: "调入方", required: true, section: "调入方", ...refSpec(v.toType, sites, points) },
   { key: "toName", label: "调入方名称", maxLength: 64, section: "调入方", help: "调入仓库时，签收的机柜会记到这个仓" },
 ];
@@ -130,7 +130,18 @@ export function TransferForm({ value, onClose }: { value: Partial<InvTransferReq
       isEdit={!!value?.transferNo}
       fields={transferFields(form, sites, points)}
       value={form}
-      onChange={setForm}
+      onChange={(next) => {
+        const normalized = { ...next };
+        for (const side of ["from", "to"] as const) {
+          const key = `${side}Type`;
+          if (next.itemType === "POWERBANK" && next[key] !== "WAREHOUSE") normalized[key] = "WAREHOUSE";
+          if (normalized[key] !== form[key]) {
+            normalized[`${side}Ref`] = "";
+            normalized[`${side}Name`] = "";
+          }
+        }
+        setForm(normalized);
+      }}
       onSubmit={() => save.mutate()}
       submitting={save.isPending}
     />

@@ -66,7 +66,7 @@ const LEAF_TUPLES = [
   "/work-orders?view=list|设备报修|workorder:wo:create||报修与跟进",
   // 「运营管理」L1 2026-10-28 撤销（OM11）：基础管理五项归系统管理 › 基础资料，见下方 system 段
   // 分成两项 2026-10-28 迁到结算（OM08）
-  // 2026-10-28 设备管理按生命周期（V163）：设备档案 → 仓储与出库（含出库单）→ 绑定上线 → 运行监控
+  // 2026-10-28 设备管理按生命周期（V163）：设备档案 → 仓储与出库（含出库管理）→ 绑定上线 → 运行监控
   "/devices|设备台账|device:cabinet:read||设备档案",
   "/devices?tab=powerbanks|充电宝管理|device:powerbank:read||设备档案",
   "/devices?tab=installs|部署与装机|workorder:wo:read||部署与安装",
@@ -86,7 +86,7 @@ const LEAF_TUPLES = [
   "/inventory?tab=suppliers|供应商|device:inventory:read|1|主数据",
   "/inventory?tab=intakes|入库单|device:inventory:read|1|出入库",
   "/inventory?tab=material-docs|物料单据|device:inventory:read|1|出入库",
-  "/inventory?tab=issued|出库单|device:inventory:read||出入库",
+  "/inventory?tab=issued|出库管理|device:inventory:read||出入库",
   "/inventory?tab=disposals|处置出库|device:inventory:read|1|出入库",
   "/inventory?tab=transfers|库存调拨|device:inventory:read|1|库内作业",
   "/inventory?tab=counts|盘点|device:inventory:read|1|库内作业",
@@ -432,8 +432,8 @@ describe("默认落地与面包屑", () => {
   });
   it("面包屑三级：L1 › 分组 › 子功能", () => {
     expect(breadcrumb("/devices", "monitor", null, "OPS")).toEqual(["设备管理", "运行监控", "实时监控"]);
-    // 2026-10-29 出库单随库存管理拆出（V209）
-    expect(breadcrumb("/inventory", "issued", null, "OPS")).toEqual(["库存管理", "出入库", "出库单"]);
+    // 2026-10-29 出库管理随库存管理拆出（V209）
+    expect(breadcrumb("/inventory", "issued", null, "OPS")).toEqual(["库存管理", "出入库", "出库管理"]);
   });
   it("面包屑：工单在运维管理下三级（OM06 起工单有分组）", () => {
     expect(breadcrumb("/work-orders", null, "board", "OPS")).toEqual(["运维管理", "工单", "工单看板"]);

@@ -208,7 +208,9 @@ public class CabinetBindServiceImpl implements CabinetBindService {
 
     private DevCabinet require(String cabinetNo) {
         DevCabinet c = cabinets.selectOne(new LambdaQueryWrapper<DevCabinet>()
-                .eq(DevCabinet::getCabinetNo, cabinetNo).last("limit 1"));
+                .eq(DevCabinet::getCabinetNo, cabinetNo).last(
+                org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                && !org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly() ? "limit 1 for update" : "limit 1"));
         if (c == null) throw BizException.notFound(cabinetNo);
         if (c.getArchivedAt() != null) throw BizException.conflict("error.common.archived_readonly");
         return c;

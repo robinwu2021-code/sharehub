@@ -102,7 +102,7 @@ public class RemovalCompletedListener {
         // 1) 清点比对
         compare(e, "REMOVAL");
         // 2) 撤机：解绑点位与站点，回在库（已经撤过的不重复）
-        if (ON_SITE.contains(c.getStatus())) lifecycle.undeploy(c.getCabinetNo(), "撤场撤机（工单 " + e.woNo() + "）");
+        if (ON_SITE.contains(c.getStatus())) lifecycle.undeploy(c.getCabinetNo(), "撤场撤机（工单 " + e.woNo() + "）", e.woNo());
         // 3) 去向（V164）：回出库池 = 留在原商家那里，不生成回仓单，可再绑别的点位
         if (RETURN_TO_POOL.equals(e.disposition())) {
             log.info("撤机回出库池 woNo={} cabinetNo={} 出库池商家={}", e.woNo(), c.getCabinetNo(), c.getIssuedAgentNo());

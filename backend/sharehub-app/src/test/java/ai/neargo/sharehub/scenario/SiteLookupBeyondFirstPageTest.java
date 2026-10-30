@@ -46,6 +46,14 @@ class SiteLookupBeyondFirstPageTest extends ApiTestSupport {
     /** 顶到 200 之外就够了，灌太多只是让用例变慢。 */
     private static final int FILLER = 210;
 
+    @org.junit.jupiter.api.BeforeAll
+    void preparePaginationBoundary() {
+        for (int i = 0; i < FILLER; i++) {
+            String no = "STPG" + rnd();
+            jdbc.update("INSERT INTO loc_site (site_no,tenant_id,name,status,open_hours,region_id) VALUES (?,'MAIN',?,'ACTIVE','00:00-23:59','R-TEST')", no, "分页边界夹具 " + no);
+        }
+    }
+
     @Autowired
     JdbcTemplate jdbc;
     @Autowired

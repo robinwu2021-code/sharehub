@@ -44,6 +44,7 @@ public class OrdOrder extends BaseEntity {
      * 语义是「**下单时的快照**，不随设备后续调拨变动」（见 DataScopeRegistration
      * 里 ord_order 那段注释）—— 所以这三列只在 rent() 写一次，此后任何调拨都不回改。
      */
+    private String regionId;
     private String locationNo;
     private String siteNo;
     private String agentNo;

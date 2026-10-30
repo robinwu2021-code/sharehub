@@ -706,6 +706,15 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
         { name: "出库单", name_en: "Outbound Orders", name_ar: "أوامر الصرف" });
     },
   },
+  {
+    // 出库设备与交付状态管理，不冒充业务出库单据列表。
+    file: "V211__inventory_outbound_menu_name.sql",
+    mustContain: "UPDATE iam_menu SET name = '出库管理'",
+    apply: (rows) => {
+      Object.assign(rows.find((r) => r.parent_no === "M_inventory" && r.path === "/inventory?tab=issued")!,
+        { name: "出库管理", name_en: "Outbound Management", name_ar: "إدارة الصرف" });
+    },
+  },
 ];
 
 const COLS = [

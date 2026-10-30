@@ -194,7 +194,8 @@ class DeviceBindTest extends ApiTestSupport {
     @DisplayName("★ 直营站点不经出库池：在仓的柜子可直接绑直营点位，绑定即离开仓库（I5）")
     void direct_site_binds_straight_from_the_warehouse() {
         String admin = login("ADMIN");
-        String venue = get("/api/ops/venues?page=1&size=1", admin).okData().path("list").get(0).path("venueNo").asText();
+        String venue = "VNB" + tag + (++seq);
+        jdbc.update("INSERT INTO loc_venue (venue_no, tenant_id, name) VALUES (?, 'MAIN', '绑定测试场地')", venue);
         String site = post("/api/ops/sites", Map.of("name", "直营 " + tag, "venueNo", venue, "regionId", "Dubai Marina",
                 "openHours", "10:00-22:00"), admin).okData().path("siteNo").asText();
         String c = cabinet();

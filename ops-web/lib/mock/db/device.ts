@@ -2,11 +2,11 @@
 // cabinets 是全库的“机柜号来源”，其他域（订单/告警/客服/营销广告位…）一律通过 cabNo() 引用，不复制数据。
 import type {
   Cabinet, Slot, Vendor, Powerbank, CabinetMonitor, CommandRecord, CommandType,
-  InventoryTransfer, InventoryTransferDetail, TransferItem, InvTransferStatus, TransferAction, InvTransferReq,
+  InventoryTransfer, InventoryTransferDetail, TransferItem, InvTransferStatus, InvTransferReq,
   OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch, PageQuery,
 } from "../../types";
 // 指令词表是 types 层 SSOT：抽屉里的选项、这里的落库校验同源，避免「界面能选、落库不认」
-import { COMMAND_TYPES, SLOT_REQUIRED_COMMANDS, TRANSFER_TRANSITIONS, canTransferAction } from "../../types";
+import { COMMAND_TYPES, SLOT_REQUIRED_COMMANDS } from "../../types";
 import { VENDORS, LOCS, OPERATORS, p, iso } from "./internal";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 import { fail, notFound } from "@/lib/biz-error";
@@ -417,21 +417,10 @@ export function saveInventoryTransfer(
   }
   if (existing.status === "DRAFT") validateEndpoints({ ...existing, ...head });
 
-  const target = x.status;
-  if (target && target !== existing.status) {
-    const action = (Object.keys(TRANSFER_TRANSITIONS) as TransferAction[])
-      .find((a) => TRANSFER_TRANSITIONS[a].to === target);
-    if (!action) {
-      throw new TransferError(`不支持的目标状态: ${target}`);
-    }
-    if (!canTransferAction(existing.status, action)) {
-      throw new TransferError(
-        `调拨单 ${existing.transferNo} 当前是「${TRANSFER_STATUS_LABEL[existing.status]}」，`
-        + `不允许执行「${TRANSFER_TRANSITIONS[action].label}」`
-        + `（允许自：${TRANSFER_TRANSITIONS[action].from.join(" / ")}）`);
-    }
+  if (x.status && x.status !== existing.status) {
+    throw new TransferError(`调拨单 ${existing.transferNo} 的状态只能通过发货或签收操作变更`);
   }
-  // 单头只有草稿期可改（同后端）：在途单改台数 / 两端等于事后编账，只接受状态迁移
+  // 单头只有草稿期可改（同后端）：在途单改台数 / 两端等于事后编账，不接受状态迁移
   const nextStatus = head.status ?? existing.status;
   const patch = nextStatus === "DRAFT" ? head : { transferNo: existing.transferNo, status: nextStatus };
   return upsert(inventoryTransfers, patch, "transferNo", () => nextNo("TR", inventoryTransfers));
@@ -449,13 +438,10 @@ function validateEndpoints(t: Partial<InventoryTransfer>) {
   }
   if (!t.fromRef?.trim() || !t.toRef?.trim()) throw new TransferError("fromRef/toRef 不能为空");
   if (t.fromType === t.toType && t.fromRef === t.toRef) throw new TransferError("调出方与调入方不能相同");
+  if (t.itemType === "POWERBANK" && (t.fromType !== "WAREHOUSE" || t.toType !== "WAREHOUSE"))
+    throw new TransferError("充电宝调拨仅支持仓库之间交接");
   if (!["CABINET", "POWERBANK"].includes(t.itemType ?? "")) throw new TransferError("itemType 必须是 CABINET/POWERBANK 之一");
 }
-
-/** 报错里用中文说状态，与页面徽标同一套说法。 */
-const TRANSFER_STATUS_LABEL: Record<InvTransferStatus, string> = {
-  DRAFT: "草稿", IN_TRANSIT: "在途", DONE: "已完成",
-};
 
 export class TransferError extends Error {
   constructor(msg: string) { super(msg); this.name = "TransferError"; }

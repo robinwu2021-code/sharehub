@@ -41,4 +41,11 @@ public interface CabinetQueryPort {
      * <p>批量而非单个：回收抽屉一次提交 N 台，单个接口会诱导调用方写出 N+1。
      */
     List<CabinetBrief> briefsByNos(Collection<String> cabinetNos);
+
+    /**
+     * 已出库、已签收且尚未上线的安装候选；由core校验库存、质检和商家一致性。
+     * 返回归属快照，未绑定时agentNo取出库商家。不可见或不符合条件返回null。
+     * agentNo为空仅供内部绑定链路查询已绑定的直营设备；公开开单必须明确商家。
+     */
+    CabinetBrief installationCandidate(String cabinetNo, String agentNo);
 }

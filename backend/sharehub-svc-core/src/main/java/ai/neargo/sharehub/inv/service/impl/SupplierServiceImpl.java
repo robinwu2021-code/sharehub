@@ -23,6 +23,7 @@ public class SupplierServiceImpl implements SupplierService {
 
     private static final Logger log = LoggerFactory.getLogger(SupplierServiceImpl.class);
 
+    private final ai.neargo.sharehub.inv.service.InventoryOperationJournal journal;
     private final InvSupplierMapper suppliers;
     private final ai.neargo.sharehub.inv.mapper.InvIntakeMapper intakes;
     private final ai.neargo.sharehub.inv.mapper.InvIntakeItemMapper intakeItems;
@@ -30,7 +31,8 @@ public class SupplierServiceImpl implements SupplierService {
 
     public SupplierServiceImpl(InvSupplierMapper suppliers, ai.neargo.sharehub.inv.mapper.InvIntakeMapper intakes,
                                ai.neargo.sharehub.inv.mapper.InvIntakeItemMapper intakeItems,
-                               ai.neargo.sharehub.inv.mapper.InvDisposalMapper disposals) {
+                               ai.neargo.sharehub.inv.mapper.InvDisposalMapper disposals, ai.neargo.sharehub.inv.service.InventoryOperationJournal journal) {
+        this.journal = journal;
         this.intakes = intakes;
         this.intakeItems = intakeItems;
         this.disposals = disposals;
@@ -64,6 +66,7 @@ public class SupplierServiceImpl implements SupplierService {
     @Override
     @Transactional
     public Supplier update(String supplierNo, SupplierReq req) {
+        journal.requireMasterIdle(supplierNo, "$.supplierNo");
         InvSupplier s = require(supplierNo);
         apply(s, req);
         // 显式 set：编辑时清空联系人等可选项也要落库（updateById 会跳过 null）
@@ -78,6 +81,7 @@ public class SupplierServiceImpl implements SupplierService {
     @Override
     @Transactional
     public Supplier archive(String supplierNo) {
+        journal.requireMasterIdle(supplierNo, "$.supplierNo");
         InvSupplier s = require(supplierNo);
         if (s.getArchivedAt() == null) {
             s.setArchivedAt(LocalDateTime.now());

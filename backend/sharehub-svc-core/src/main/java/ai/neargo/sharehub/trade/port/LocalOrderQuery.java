@@ -27,6 +27,18 @@ public class LocalOrderQuery implements OrderQueryPort {
     }
 
     @Override
+    public List<String> visiblePowerbanksFromLatestOrders() {
+        // 先全局确定每颗宝的最新订单，再以正常 scoped 查询验证该订单归属，防止旧区域订单授权新区域资产。
+        List<Long> latest = DataScopeContext.executeWithoutScope(() -> orders.selectMaps(new QueryWrapper<OrdOrder>()
+                .select("MAX(id) AS latestId").isNotNull("powerbank_no").groupBy("powerbank_no")))
+                .stream().map(row -> ((Number)row.get("latestId")).longValue()).toList();
+        if (latest.isEmpty()) return List.of();
+        return orders.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrdOrder>()
+                .select(OrdOrder::getPowerbankNo).in(OrdOrder::getId,latest)).stream()
+                .map(OrdOrder::getPowerbankNo).distinct().toList();
+    }
+
+    @Override
     public Map<String, Long> inFlightCountBySites(Collection<String> siteNos) {
         if (siteNos == null || siteNos.isEmpty()) return Map.of();
         Map<String, Long> out = new HashMap<>();

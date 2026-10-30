@@ -120,7 +120,7 @@ class StockViewTest extends ApiTestSupport {
     }
 
     @Test
-    @DisplayName("★ 独立进销存引擎：开盘点 → 扫码 → 提交 → 复核 → 过账；只读角色不能开单")
+    @DisplayName("★ 独立进销存引擎：开盘点／扫码；未配置统一审批时拒绝提交及直接复核过账")
     void service_count_flow() {
         InventoryFake fake = new InventoryFake();
         remote.useApi(fake);
@@ -138,10 +138,10 @@ class StockViewTest extends ApiTestSupport {
             d = post("/api/ops/inventory/counts/" + no + "/scans", Map.of("serialNos", List.of(c)), wh).okData();
             assertThat(d.path("missingSerials")).isEmpty();
             assertThat(d.path("lines").get(0).path("itemType").asText()).isEqualTo("CABINET");
-            post("/api/ops/inventory/counts/" + no + "/submit", Map.of(), wh).okData();
-            post("/api/ops/inventory/counts/" + no + "/approve", Map.of(), wh).okData();
-            JsonNode posted = post("/api/ops/inventory/counts/" + no + "/post", Map.of(), wh).okData();
-            assertThat(posted.path("count").path("status").asText()).isEqualTo("POSTED");
+            assertThat(post("/api/ops/inventory/counts/" + no + "/submit", Map.of(), wh).status).isEqualTo(409);
+            assertThat(post("/api/ops/inventory/counts/" + no + "/approve", Map.of(), wh).status).isEqualTo(409);
+            assertThat(post("/api/ops/inventory/counts/" + no + "/post", Map.of(), wh).status).isEqualTo(409);
+            assertThat(fake.count(no).status()).isEqualTo("OPEN");
             assertThat(get("/api/ops/inventory/counts", wh).okData().toString()).contains(no);
             assertThat(get("/api/ops/inventory/ledger?warehouseNo=WH003", wh).okData().path("total").asInt()).isPositive();
         } finally {

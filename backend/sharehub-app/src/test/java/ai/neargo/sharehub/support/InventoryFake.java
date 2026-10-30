@@ -40,6 +40,11 @@ public class InventoryFake implements InventoryApi {
     public long acked;
     /** 设了就让下一次写操作失败（模拟库存服务拒绝）。 */
     public InventoryRemoteException failNext;
+    /** 精确模拟调拨第二步拒绝与已过账但响应丢失。 */
+    public String failInboundPurpose;
+    public boolean loseNextInboundPostResponse;
+    public boolean loseNextOutboundPostResponse;
+    private final Map<String, String> documentRequests = new HashMap<>();
     private final AtomicLong seq = new AtomicLong();
 
     public record Doc(String kind, String locationId, String purpose, List<InboundLine> lines, List<String> serials,
@@ -95,15 +100,22 @@ public class InventoryFake implements InventoryApi {
     @Override
     public String createInbound(String locationId, String purpose, String sourceRef, String remark, List<InboundLine> lines,
                                 String idempotencyKey) {
+        if (documentRequests.containsKey(idempotencyKey)) return documentRequests.get(idempotencyKey);
+        if (purpose.equals(failInboundPurpose)) {
+            failInboundPurpose = null;
+            throw err(503, "inventory.unreachable");
+        }
         maybeFail();
         String no = "IN-" + UUID.randomUUID().toString().substring(0, 8);
         docs.put(no, new Doc("IN", locationId, purpose, lines, List.of(), Map.of(), new boolean[]{false}));
+        documentRequests.put(idempotencyKey, no);
         return no;
     }
 
     @Override
     public void postInbound(String docNo, String idempotencyKey) {
         Doc d = docs.get(docNo);
+        if (d.posted()[0]) return;
         for (InboundLine l : d.lines()) {
             if (l.qty() != null && l.qty() <= 0) throw err(400, "inventory.bad_request", "qty");
             for (Serial s : l.serials() == null ? List.<Serial>of() : l.serials()) {
@@ -130,6 +142,10 @@ public class InventoryFake implements InventoryApi {
         }
         d.posted()[0] = true;
         emit("InboundPosted", docNo, "{\"purpose\":\"" + d.purpose() + "\"}");
+        if (loseNextInboundPostResponse) {
+            loseNextInboundPostResponse = false;
+            throw err(503, "inventory.unreachable");
+        }
     }
 
     @Override
@@ -140,6 +156,7 @@ public class InventoryFake implements InventoryApi {
     @Override
     public String createOutbound(String locationId, String purpose, String reasonCode, Map<String, String> t, String remark,
                                  List<OutboundLine> lines, List<String> serialNos, String idempotencyKey) {
+        if (documentRequests.containsKey(idempotencyKey)) return documentRequests.get(idempotencyKey);
         maybeFail();
         if (t == null) t = Map.of();
         if ("SCRAP".equals(purpose) && (reasonCode == null || reasonCode.isBlank())) throw err(400, "inventory.bad_request", "reasonCode");
@@ -151,12 +168,14 @@ public class InventoryFake implements InventoryApi {
         String no = "OUT-" + UUID.randomUUID().toString().substring(0, 8);
         docs.put(no, new Doc("OUT", locationId, purpose, List.of(), serialNos == null ? List.of() : serialNos, t, new boolean[]{false},
                 reasonCode, lines == null ? List.of() : lines));
+        documentRequests.put(idempotencyKey, no);
         return no;
     }
 
     @Override
     public void postOutbound(String docNo, String idempotencyKey) {
         Doc d = docs.get(docNo);
+        if (d.posted()[0]) return;
         for (String s : d.serials()) if (!d.locationId().equals(stock.get(s))) throw err(409, "inventory.serial.conflict", s + ":not_in_stock");
         Map<String, BigDecimal> need = new HashMap<>();
         for (OutboundLine l : d.outLines()) need.merge(d.locationId() + "|" + l.itemId(), BigDecimal.valueOf(l.qty()), BigDecimal::add);
@@ -166,6 +185,10 @@ public class InventoryFake implements InventoryApi {
         if (!"ISSUE".equals(d.purpose())) {
             d.serials().forEach(stock::remove);
             d.posted()[0] = true;
+            if (loseNextOutboundPostResponse) {
+                loseNextOutboundPostResponse = false;
+                throw err(503, "inventory.unreachable");
+            }
             return;
         }
         for (String s : d.serials()) {
@@ -248,9 +271,11 @@ public class InventoryFake implements InventoryApi {
 
     /** 盘点单：countNo → [locationId, status, 扫到的序列号]。 */
     public final Map<String, Object[]> counts = new LinkedHashMap<>();
+    public final List<String> ledgerLocations = new ArrayList<>();
 
     @Override
     public List<LedgerEntry> ledger(String itemId, String locationId, String docNo, Long afterId, int limit) {
+        ledgerLocations.add(locationId);
         List<LedgerEntry> out = new ArrayList<>();
         long id = 0;
         for (Doc d : docs.values()) {

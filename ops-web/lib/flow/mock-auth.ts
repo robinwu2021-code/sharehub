@@ -7,7 +7,7 @@
 //    单测用 setMockOperatorPerms 显式给权限。
 import { ApiError } from "@/lib/api/error";
 import { useAuth } from "@/lib/auth";
-import { can } from "@/lib/permissions";
+import { can, matchesBackendPermission } from "@/lib/permissions";
 
 let override: string[] | null = null;
 
@@ -27,4 +27,13 @@ export function hasPerm(code: string): boolean {
 /** 缺权限：403（与服务端同语义），说清缺哪个码 */
 export function requirePerm(code: string): void {
   if (!hasPerm(code)) throw new ApiError(403, `当前角色没有这项权限（${code}）`);
+}
+
+
+/** OpsKit PERM candidate selectors use canonical backend codes, not UI aliases or page readiness. */
+export function hasBackendPerm(code: string): boolean {
+  return perms().some((pattern) => matchesBackendPermission(pattern, code));
+}
+export function requireBackendPerm(code: string): void {
+  if (!hasBackendPerm(code)) throw new ApiError(403, `Missing approval permission: ${code}`);
 }

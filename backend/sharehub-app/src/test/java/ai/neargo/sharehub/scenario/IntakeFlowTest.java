@@ -29,6 +29,8 @@ class IntakeFlowTest extends ApiTestSupport {
     @Autowired
     TransferOpsService transferOps;
 
+    @Autowired ai.neargo.sharehub.dev.service.CabinetLifecycleService lifecycle;
+
     private final String tag = Long.toString(System.nanoTime(), 36).toUpperCase();
     private int seq;
     private final List<String> cabinets = new ArrayList<>();
@@ -126,8 +128,12 @@ class IntakeFlowTest extends ApiTestSupport {
         jdbc.update("UPDATE dev_cabinet SET qc_status='PASSED', issued_agent_no='AG-TEST', issued_at=NOW() WHERE cabinet_no=?", c);
         String wo = "WO-RM-" + tag;
         removalWos.add(wo);
+        jdbc.update("UPDATE dev_cabinet SET status='DEPLOYED',site_no=? WHERE cabinet_no=?","ST-TEST-"+tag,c);
+        lifecycle.undeploy(c,"removal completed",wo);
         String transferNo = transferOps.openReturn("ST-TEST-" + tag, "测试站点", c, wo);
         String wh = jdbc.queryForObject("SELECT to_ref FROM inv_transfer WHERE transfer_no=?", String.class, transferNo);
+        assertThat(post("/api/ops/inventory-transfers/"+transferNo+"/items",Map.of("itemNos",List.of(c)),admin).status).isEqualTo(409);
+        assertThat(post("/api/ops/inventory-transfers/"+transferNo,Map.of("fromRef","OTHER-SITE"),admin).status).isEqualTo(409);
 
         post("/api/ops/inventory-transfers/" + transferNo + "/ship", Map.of(), admin).okData();
         post("/api/ops/inventory-transfers/" + transferNo + "/receive", Map.of("receivedNos", List.of(c)), admin).okData();
@@ -191,4 +197,22 @@ class IntakeFlowTest extends ApiTestSupport {
         assertThat(post("/api/ops/inventory/intakes", Map.of("warehouseNo", "WH002", "cabinetNos", List.of(newCabinet())), login("VIEWER")).status)
                 .isEqualTo(403);
     }
+    @Test void oldRemovalCannotShipAnAssetAfterWarehouseReturnAndNewIssue() {
+        String admin=login("ADMIN"),cab=newCabinet(),wo="WO-STALE-"+tag;
+        removalWos.add(wo);
+        jdbc.update("UPDATE dev_cabinet SET qc_status='PASSED',issued_agent_no='AG-OLD',issued_at=NOW() WHERE cabinet_no=?",cab);
+        jdbc.update("UPDATE dev_cabinet SET status='DEPLOYED',site_no='ST-OLD' WHERE cabinet_no=?",cab);
+        lifecycle.undeploy(cab,"removal completed",wo);
+        String t=transferOps.openReturn("ST-OLD","old",cab,wo);
+        String wh=jdbc.queryForObject("SELECT to_ref FROM inv_transfer WHERE transfer_no=?",String.class,t);
+        String agent="AGRE"+tag;
+        jdbc.update("INSERT INTO agt_agent(agent_no,name,agent_type,status,address,lng,lat,industry) VALUES (?,?,'AGENT','ENABLED','test',1,1,'HOTEL')",agent,agent);
+        try {
+            post("/api/ops/devices/pool-return",Map.of("cabinetNos",List.of(cab),"warehouseNo",wh,"reason","new custody"),admin).okData();
+            post("/api/ops/devices/issue",Map.of("cabinetNos",List.of(cab),"agentNo",agent),admin).okData();
+            assertThat(post("/api/ops/inventory-transfers/"+t+"/ship",Map.of(),admin).status).isEqualTo(409);
+            assertThat(jdbc.queryForObject("SELECT issued_agent_no FROM dev_cabinet WHERE cabinet_no=?",String.class,cab)).isEqualTo(agent);
+        } finally {jdbc.update("DELETE FROM agt_agent WHERE agent_no=?",agent);}
+    }
+
 }

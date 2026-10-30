@@ -43,6 +43,7 @@ OpsKitWebhookService 1      # SHA-256 不可用（同上；仅超长幂等键取
 # —— 包裹底层异常（`IllegalStateException(e)`，无业务消息）——
 PhoneOtpStrategy 1          # 摘要计算失败
 PriceAdjustmentServiceImpl 1 # JSON 序列化失败
+InventoryOperationJournal 4 # 无业务事务/被嵌套调用是编程错误、持久操作行消失是完整性故障、JDK缺SHA-256是环境故障；均应500，不是用户业务拒绝
 
 # —— 配置缺失 / 数据不一致：要运营或排障介入 ——
 RentOrderServiceImpl 1      # 租借时间为空，无法计费 —— 订单数据不一致
@@ -53,3 +54,5 @@ CsTicketServiceImpl 1       # 未知报障状态 —— 词表坏了。
 # —— 已被控制器 catch 成更准确的状态码：改了抛出类型会让 catch 静默失配 ——
 OtpService 1                # 发送过于频繁 → AuthController:178 catch 成 429
 AgentLoginServiceImpl 1     # 名下无可用主体 → AuthController:285 catch 成 403
+
+CountReviewService 1       # JDK mandatory SHA-256 missing: runtime/provider misconfiguration, not a business refusal; never retry as new approval.

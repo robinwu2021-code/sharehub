@@ -6,6 +6,10 @@ import java.util.Map;
 /** 订单的系统读（站点关闭门禁、告警站点画像）。豁免数据范围。 */
 public interface OrderQueryPort {
 
+    /** 受当前数据范围约束的最新借出订单资产；与本接口其它系统统计不同，禁止豁免范围。 */
+    java.util.List<String> visiblePowerbanksFromLatestOrders();
+
+
     /** 各站点进行中（出宝中 / 使用中）的订单数。 */
     Map<String, Long> inFlightCountBySites(Collection<String> siteNos);
 

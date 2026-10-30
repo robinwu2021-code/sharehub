@@ -119,7 +119,7 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
   ],
 };
 
-function match(pattern: string, code: string): boolean {
+export function matchesBackendPermission(pattern: string, code: string): boolean {
   if (pattern === code) return true;
   if (pattern.endsWith("*")) return code.startsWith(pattern.slice(0, -1)); // '*' 或 'device:*'
   return false;
@@ -168,7 +168,7 @@ export function can(perms: string[] | undefined, code: string): boolean {
   }
   if (mapped === UNIMPLEMENTED) return false;
   if (perms.includes("*")) return true;
-  return perms.some((p) => match(p, mapped));
+  return perms.some((p) => matchesBackendPermission(p, mapped));
 }
 
 /** 模块级（导航/页面）：对某模块前缀是否有任一权限。 */

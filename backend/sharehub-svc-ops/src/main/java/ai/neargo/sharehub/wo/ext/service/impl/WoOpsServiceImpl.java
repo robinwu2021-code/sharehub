@@ -115,6 +115,18 @@ public class WoOpsServiceImpl implements WoOpsService {
     @Override
     @Transactional
     public WorkOrder create(WorkOrderDraft draft) {
+        return create(draft, false);
+    }
+
+    @Override
+    @Transactional
+    public WorkOrder createBoundInstall(WorkOrderDraft draft) {
+        if (draft == null || !WorkOrderType.INSTALL.name().equals(draft.type()))
+            throw BizException.badRequest("error.common.invalid_value", "type");
+        return create(draft, true);
+    }
+
+    private WorkOrder create(WorkOrderDraft draft, boolean fromBinding) {
         if (draft == null) throw new IllegalArgumentException("开单入参必填");
 
         String type = WorkOrderType.of(draft.type()).name();
@@ -123,6 +135,17 @@ public class WoOpsServiceImpl implements WoOpsService {
         String priority = (draft.priority() == null || draft.priority().isBlank())
                 ? ai.neargo.sharehub.wo.WoPriority.MEDIUM.name()
                 : ai.neargo.sharehub.wo.WoPriority.of(draft.priority()).name();
+
+        CabinetBrief own = notBlank(draft.cabinetNo())
+                ? cabinetQuery.briefsByNos(List.of(draft.cabinetNo())).stream().findFirst().orElse(null) : null;
+        if (WorkOrderType.INSTALL.name().equals(type)) {
+            if (!notBlank(draft.cabinetNo())) throw BizException.badRequest("error.common.missing_parameter", "cabinetNo");
+            if (!fromBinding && !notBlank(draft.agentNo())) throw BizException.badRequest("error.common.missing_parameter", "agentNo");
+            String merchant = fromBinding ? (own == null ? null : own.agentNo()) : draft.agentNo().trim();
+            own = cabinetQuery.installationCandidate(draft.cabinetNo(), merchant);
+            if (own == null || (fromBinding && (!notBlank(draft.locationNo()) || !draft.locationNo().equals(own.locationNo()))))
+                throw BizException.conflict("error.wo.install_candidate", draft.cabinetNo());
+        }
 
         // 幂等（[db-design §1.6]）：告警/投诉转工单重复点「转工单」应返回首次结果，不产生第二张单。
         // 落点是 wo_order.source_ref 上的 UNIQUE。手工开单 source_ref 为空，不参与幂等。
@@ -141,7 +164,7 @@ public class WoOpsServiceImpl implements WoOpsService {
         e.setSource(source);
         e.setPriority(priority);
         e.setCabinetNo(draft.cabinetNo());
-        e.setLocationName(draft.locationName());
+        e.setLocationName(WorkOrderType.INSTALL.name().equals(type) ? own.name() : draft.locationName());
         e.setDescription(draft.description());
         e.setStatus(WorkOrderStatus.CREATED.name());
         e.setWoCreatedAt(LocalDateTime.now().toString());
@@ -172,10 +195,6 @@ public class WoOpsServiceImpl implements WoOpsService {
          * 本仓库对机柜早就是这个规矩（CabinetServiceImpl：「只认 locationNo，
          * siteNo/agentNo 一律反查 —— 接受它们就等于允许三者互相矛盾」）。
          */
-        CabinetBrief own = notBlank(draft.cabinetNo())
-                ? cabinetQuery.briefsByNos(java.util.List.of(draft.cabinetNo()))
-                        .stream().findFirst().orElse(null)
-                : null;
         UpdateWrapper<WoOrder> extra = new UpdateWrapper<>();
         extra.eq("wo_no", e.getWoNo());
         boolean anyExtra = false;

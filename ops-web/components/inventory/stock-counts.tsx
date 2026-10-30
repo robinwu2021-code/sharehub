@@ -2,6 +2,9 @@
 
 // 盘点（设备管理 › 仓储与出库，S4 / V199）：开单 → 扫码 → 提交 → 复核 → 过账。只在独立进销存引擎下可用。
 import { useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { flowReady } from "@/lib/backend-ready";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { activeWarehouses } from "@/components/inventory/warehouses";
@@ -35,7 +38,8 @@ export function StockCountsTab() {
   const [warehouseNo, setWarehouseNo] = useState("");
   const [status, setStatus] = useState("");
   const [openFor, setOpenFor] = useState<string | null>(null);
-  const [countNo, setCountNo] = useState<string | null>(null);
+  const params = useSearchParams();
+  const [countNo, setCountNo] = useState<string | null>(params.get("countNo"));
   const engineQ = useQuery({ queryKey: ["inventory-engine"], queryFn: () => api.getInventoryEngine() });
   const service = engineQ.data?.engine === "SERVICE";
   const whQ = useQuery({ queryKey: ["warehouses"], queryFn: () => api.listWarehouses() });
@@ -92,18 +96,19 @@ function CountDrawer({ countNo, onClose }: { countNo: string | null; onClose: ()
   const qc = useQueryClient();
   const canWrite = useCan()("device:inventory:stocktake");
   const [scan, setScan] = useState("");
-  const [note, setNote] = useState("");
-  const q = useQuery({ queryKey: ["stock-count", countNo], queryFn: () => api.getStockCount(countNo!), enabled: !!countNo });
+  const canReadApproval = useCan()("flow:approval:read");
+  const q = useQuery({ queryKey: ["stock-count", countNo], queryFn: () => api.getStockCount(countNo!), enabled: !!countNo,
+    refetchInterval: (query) => ["PREPARING", "SUBMITTING", "IN_REVIEW", "DECIDED"].includes(query.state.data?.review?.state ?? "") ? 15000 : false });
   const d = q.data;
   const s = d?.count.status;
+  const review = d?.review;
+  const editable = s === "OPEN" && (!review || review.state === "DRAFT" || (review.state === "APPLIED" && review.decision !== "APPROVED"));
   const act = useMutation({
-    mutationFn: (step: "scan" | "submit" | "approve" | "reject" | "post" | "cancel") => {
+    mutationFn: (step: "scan" | "submit" | "post" | "cancel") => {
       const no = countNo!;
       switch (step) {
         case "scan": return api.scanStockCount(no, scan.split(/[\s,，]+/).map((x) => x.trim()).filter(Boolean));
         case "submit": return api.submitStockCount(no);
-        case "approve": return api.approveStockCount(no, note || undefined);
-        case "reject": return api.rejectStockCount(no, note);
         case "post": return api.postStockCount(no);
         default: return api.cancelStockCount(no);
       }
@@ -112,7 +117,7 @@ function CountDrawer({ countNo, onClose }: { countNo: string | null; onClose: ()
       qc.setQueryData(["stock-count", countNo], r);
       qc.invalidateQueries({ queryKey: ["stock-counts"] });
       setScan("");
-      setNote("");
+      qc.invalidateQueries({ queryKey: ["flow"] });
     },
   });
 
@@ -125,30 +130,30 @@ function CountDrawer({ countNo, onClose }: { countNo: string | null; onClose: ()
 
   return (
     <Drawer open={!!countNo} onOpenChange={(o) => !o && onClose()} title={`盘点 ${countNo ?? ""}`}
-      footer={canWrite && d && (
+      footer={d && (
         <span className="inline-flex flex-wrap gap-1.5">
-          {s === "OPEN" && <Button disabled={act.isPending} onClick={() => act.mutate("submit")}>提交</Button>}
-          {s === "SUBMITTED" && <Button disabled={act.isPending} onClick={() => act.mutate("approve")}>复核通过</Button>}
-          {s === "SUBMITTED" && <Button variant="outline" disabled={!note.trim() || act.isPending} onClick={() => act.mutate("reject")}>退回</Button>}
-          {s === "APPROVED" && <Button disabled={act.isPending} onClick={() => act.mutate("post")}>过账</Button>}
-          {(s === "OPEN" || s === "SUBMITTED" || s === "APPROVED") && (
-            <Button variant="ghost" disabled={act.isPending} onClick={() => act.mutate("cancel")}>作废</Button>
-          )}
+          {canWrite && editable && <Button disabled={act.isPending || review?.configured === false} onClick={() => act.mutate("submit")}>提交审核</Button>}
+          {canWrite && (review?.state === "PREPARING" || review?.state === "SUBMIT_FAILED") && <Button disabled={act.isPending || review.configured === false} onClick={() => act.mutate("submit")}>重试送审</Button>}
+          {canWrite && review?.state === "APPLY_FAILED" && <Button disabled={act.isPending} onClick={() => act.mutate("post")}>重试执行</Button>}
+          {canWrite && editable && <Button variant="ghost" disabled={act.isPending} onClick={() => act.mutate("cancel")}>作废</Button>}
+          {review?.approvalNo && canReadApproval && flowReady() && <Link className="inline-flex items-center text-primary underline" href={`/flow/approvals/detail/?no=${encodeURIComponent(review.approvalNo)}`}>查看审批</Link>}
         </span>
       )}>
       {d && (
         <div className="space-y-4">
           <StatusBadge map={STATUS} value={d.count.status} />
+          {review?.configured === false && <Notice>统一审批尚未接通，当前可录入盘点，暂不能提交审核。</Notice>}
+          {(review?.state === "SUBMITTING" || review?.state === "IN_REVIEW") && <Notice>已提交统一审批，审核结果将自动回写。{review.approvalNo ? `审批单：${review.approvalNo}` : "正在送审。"}</Notice>}
+          {review?.state === "PREPARING" && <Notice>提交结果待确认，请重试送审以核对原操作。</Notice>}
+          {(review?.state === "SUBMIT_FAILED" || review?.state === "APPLY_FAILED") && <Notice>操作尚未完成：{review.lastError ?? "请核查后重试"}。已确认的审批结论将保留。</Notice>}
+          {review?.decision && <Notice>审核结果：{review.decision === "APPROVED" ? "通过" : review.decision === "REJECTED" ? "驳回" : "撤回"}{review.deciderName ? ` · ${review.deciderName}` : ""}。{review.state === "APPLIED" ? review.decision === "APPROVED" ? "库存调整已完成。" : "可修正后重新提交。" : "等待执行完成。"}</Notice>}
           <DataTable rowKey={(l: StockCountLine) => l.itemType ?? "-"} columns={lineCols} rows={d.lines}
             loading={q.isFetching && !d} error={q.error} onRetry={q.refetch} empty="无明细" />
-          {canWrite && s === "OPEN" && (
+          {canWrite && editable && (
             <Field label="扫码">
               <Textarea value={scan} onChange={setScan} placeholder="每行一个设备号" />
               <Button size="sm" className="mt-2" disabled={!scan.trim() || act.isPending} onClick={() => act.mutate("scan")}>记入</Button>
             </Field>
-          )}
-          {canWrite && s === "SUBMITTED" && (
-            <Field label="复核意见（退回必填）"><Textarea value={note} onChange={setNote} /></Field>
           )}
           {d.missingSerials.length > 0 && (
             <Field label={`未盘到（${d.missingSerials.length}）`}>

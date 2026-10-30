@@ -71,6 +71,9 @@ public final class RemotePorts {
     /** 机柜只读查询 → core。 */
     public static final class RemoteCabinetQuery implements CabinetQueryPort {
 
+        private static final ParameterizedTypeReference<RemoteCaller.Envelope<CabinetBrief>> CANDIDATE =
+                new ParameterizedTypeReference<>() { };
+
         private static final ParameterizedTypeReference<RemoteCaller.Envelope<List<CabinetBrief>>> T =
                 new ParameterizedTypeReference<>() {
                 };
@@ -95,6 +98,14 @@ public final class RemotePorts {
             if (cabinetNos == null || cabinetNos.isEmpty()) return List.of();
             // 与 RemoteSiteQuery.briefsByNos 同理走 POST：编号可能几百个，query string 会超长
             return caller.post("core", "/internal/dev/cabinets/briefs", cabinetNos, T);
+        }
+
+        @Override
+        public CabinetBrief installationCandidate(String cabinetNo, String agentNo) {
+            Map<String, Object> query = new java.util.HashMap<>();
+            query.put("cabinetNo", cabinetNo);
+            if (agentNo != null && !agentNo.isBlank()) query.put("agentNo", agentNo);
+            return caller.get("core", "/internal/dev/cabinets/installation-candidate", query, CANDIDATE);
         }
     }
 

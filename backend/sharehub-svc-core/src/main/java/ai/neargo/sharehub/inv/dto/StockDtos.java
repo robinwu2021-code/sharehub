@@ -31,8 +31,13 @@ public final class StockDtos {
     public record StockCountScan(String serialNo, String verdict) {
     }
 
+    public record CountReview(String state,String approvalNo,int round,String submitterNo,String decision,String deciderName,String lastError,boolean configured) {}
+
     public record StockCountDetail(StockCount count, List<StockCountLine> lines, List<StockCountScan> exceptions,
-                                   List<String> missingSerials) {
+                                   List<String> missingSerials,CountReview review) {
+        public StockCountDetail(StockCount count,List<StockCountLine> lines,List<StockCountScan> exceptions,List<String> missingSerials) {
+            this(count,lines,exceptions,missingSerials,null);
+        }
     }
 
     /**

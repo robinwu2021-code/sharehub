@@ -4,11 +4,13 @@ import type {
   InventoryEngine, StockStage, StockStageCode, StageItem, StageItems, IntakeItemType, StockPeriodRow, InventoryMigrationPlan, InventoryMigrationResult, MigrationCandidate, PageResult, StockCount, StockCountDetail, StockCountStatus, StockLedgerRow,
 } from "../../types";
 import { fail, notFound } from "../../biz-error";
-import { cabinets, powerbanks } from "./device";
-import { allMovements } from "./movement";
+import { cabinets, powerbanks, inventoryTransfers, transferItemsOf } from "./device";
+import { listDeviceMovements, allMovements } from "./movement";
 import { WAREHOUSES, ensurePoolSeed } from "./device-pool";
+import { startBusinessApproval } from "../../flow/mock-approvals";
+import { ME } from "../../flow/mock-db";
 
-const counts: (StockCount & { scanned: string[] })[] = [];
+const counts: (StockCount & { scanned: string[]; review?: import("../../types").StockCountReview })[] = [];
 let seq = 0;
 
 export const engine = (): InventoryEngine => ({ engine: "SERVICE", configured: true, endpointMode: "STATIC", reachable: true, failure: null });
@@ -46,6 +48,7 @@ function detail(no: string): StockCountDetail {
     lines: [{ itemType: "CABINET", bookQty: book.length, countedQty: counted, diffQty: counted - book.length }],
     exceptions: c.scanned.filter((x) => !book.includes(x)).map((serialNo) => ({ serialNo, verdict: "NOT_IN_BOOK" })),
     missingSerials: book.filter((x) => !c.scanned.includes(x)),
+    review: c.review ?? { state: "DRAFT", approvalNo: null, round: 0, submitterNo: null, decision: null, deciderName: null, lastError: null, configured: true },
   };
 }
 
@@ -86,7 +89,7 @@ export function rejectStockCount(no: string, note: string): StockCountDetail {
 
 export function cancelStockCount(no: string): StockCountDetail {
   const c = head(no);
-  if (c.status === "POSTED") fail("已过账的盘点单不能作废", "Posted count cannot be cancelled");
+  if (c.status !== "OPEN") fail("请在统一审批中心处理已送审盘点", "Use unified approval for submitted counts");
   c.status = "CANCELLED";
   return detail(no);
 }
@@ -107,7 +110,10 @@ const CAB_STAGE: Partial<Record<StockStageCode, (c: Cab) => boolean>> = {
   RETIRED: (c) => c.status === "RETIRED",
 };
 const PB_STAGE: Partial<Record<StockStageCode, (p: Pb) => boolean>> = {
-  IN_STOCK: (p) => p.status === "IN_STOCK" && !!p.warehouseNo,
+  IN_TRANSIT: (p) => p.status === "IN_STOCK" && !p.warehouseNo && !p.cabinetNo
+    && inventoryTransfers.some((t) => (t.status === "IN_TRANSIT" || t.status === "DONE")
+      && t.transferNo === listDeviceMovements(p.powerbankNo).find((m) => m.itemType === "POWERBANK" && m.event === "SHIP")?.sourceRef
+      && transferItemsOf(t.transferNo).some((i) => !i.checked && i.itemNo === p.powerbankNo)),
   LIVE: (p) => p.status === "IN_CABINET",
   RENTED: (p) => p.status === "RENTED",
   FAULT: (p) => p.status === "FAULT",
@@ -218,4 +224,31 @@ export function runMigration(limit: number): InventoryMigrationResult {
   const batch = pending.slice(0, limit);
   batch.forEach((c) => migrated.add(c.itemNo));
   return { processed: batch.length, failed: 0, remaining: pending.length - batch.length, failures: [] };
+}
+
+
+export function submitStockCount(no: string): StockCountDetail {
+  const c = head(no);
+  if (c.status === "SUBMITTED" && c.review?.approvalNo) return detail(no);
+  if (c.status !== "OPEN") fail("盘点状态已变化", "Count state changed");
+  c.status = "SUBMITTED";
+  c.review = { state: "IN_REVIEW", approvalNo: null, round: (c.review?.round ?? 0) + 1,
+    submitterNo: ME.ref, decision: null, deciderName: null, lastError: null, configured: true };
+  const review = c.review;
+  const approvalNo = startBusinessApproval({ type: "inventory_count", ref: no, display: { title: `盘点差异复核 · ${c.warehouseNo} · ${no}` } },
+    [{ label: "盘点单", value: no }, { label: "仓库", value: c.warehouseNo ?? "-" }], (decision) => {
+      if (c.review !== review || c.review.approvalNo !== approvalNo) return;
+      c.review.decision = decision; c.review.deciderName = ME.displayName; c.review.state = "APPLIED";
+      c.status = decision === "APPROVED" ? "POSTED" : "OPEN";
+    });
+  review.approvalNo = approvalNo;
+  return detail(no);
+}
+export function rejectDirectCountReview(): never {
+  return fail("请在统一审批中心审核盘点", "Use the unified approval center");
+}
+export function retryCountExecution(no: string): StockCountDetail {
+  const c = head(no);
+  if (c.review?.decision !== "APPROVED" || c.review.state !== "APPLIED") rejectDirectCountReview();
+  return detail(no);
 }

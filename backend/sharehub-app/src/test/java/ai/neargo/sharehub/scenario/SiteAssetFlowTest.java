@@ -177,6 +177,7 @@ class SiteAssetFlowTest extends ApiTestSupport {
     void transferReceiving() {
         String w1 = warehouse(), w2 = warehouse();
         String a = stockCabinet("PASSED"), b = stockCabinet(null), pending = stockCabinet("PENDING");
+        jdbc.update("UPDATE dev_cabinet SET warehouse_no=? WHERE cabinet_no IN (?,?,?)", w1, a, b, pending);
         Map<String, Object> head = new HashMap<>();
         head.put("fromType", "WAREHOUSE");
         head.put("fromRef", w1);

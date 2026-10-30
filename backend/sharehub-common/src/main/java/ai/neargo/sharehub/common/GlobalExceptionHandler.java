@@ -120,6 +120,23 @@ public class GlobalExceptionHandler {
         return Result.error(HttpStatus.METHOD_NOT_ALLOWED.value(), Messages.msg("error.bad_request"));
     }
 
+    /** 锁等待后的记录变更属于并发冲突；未知数据库异常仍按500记录，不自动重试业务。 */
+    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
+    public ResponseEntity<Result<Void>> onDataAccess(org.springframework.dao.DataAccessException e,
+                                                    jakarta.servlet.http.HttpServletRequest req) {
+        boolean conflict = e instanceof org.springframework.dao.ConcurrencyFailureException;
+        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+            if (cause instanceof java.sql.SQLException sql && "HY000".equals(sql.getSQLState()) && sql.getErrorCode() == 1020)
+                conflict = true;
+        }
+        if (conflict) {
+            log.warn("数据库并发冲突 → 409: {} {}", req.getMethod(), req.getRequestURI());
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Result.error(ErrorCode.CONFLICT.getCode(), Messages.msg("error.common.state_changed")));
+        }
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(onError(e, req));
+    }
+
     /**
      * 兜底：未预期异常 → 500。
      *

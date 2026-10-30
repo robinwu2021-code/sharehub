@@ -270,6 +270,12 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     @Override
     @Transactional
     public Cabinet undeploy(String cabinetNo, String reason) {
+        return undeploy(cabinetNo, reason, null);
+    }
+
+    @Override
+    @Transactional
+    public Cabinet undeploy(String cabinetNo, String reason, String sourceRef) {
         String r = requireReason(reason);
         DevCabinet c = require(cabinetNo);
         // 撤机：解绑点位 / 站点，商家号随点位一起清（V164：agent_no 只由点位派生，I3）。
@@ -282,7 +288,7 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
          */
         AuditChanges.record("撤机原因", c.getFaultReason(), r);
         move(c, MovementEvent.UNDEPLOY, MovementRecorder.loc(c.getLocationNo()), MovementRecorder.pool(c.getIssuedAgentNo(), c.getIssuedSiteNo()),
-                c.getAgentNo(), null, r, null);
+                c.getAgentNo(), null, r, sourceRef);
         transit(c, "UNDEPLOY", u -> u.set(DevCabinet::getLocationNo, null).set(DevCabinet::getLocationName, null)
                         .set(DevCabinet::getSiteNo, null).set(DevCabinet::getAgentNo, null).set(DevCabinet::getFaultReason, r),
                 x -> {
@@ -349,7 +355,9 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     }
 
     private DevCabinet require(String cabinetNo) {
-        DevCabinet c = cabinets.selectOne(new LambdaQueryWrapper<DevCabinet>().eq(DevCabinet::getCabinetNo, cabinetNo).last("limit 1"));
+        DevCabinet c = cabinets.selectOne(new LambdaQueryWrapper<DevCabinet>().eq(DevCabinet::getCabinetNo, cabinetNo).last(
+                org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                && !org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly() ? "limit 1 for update" : "limit 1"));
         if (c == null) throw BizException.notFound(cabinetNo);
         if (c.getArchivedAt() != null) throw ai.neargo.sharehub.common.BizException.conflict("error.common.archived_readonly");
         return c;

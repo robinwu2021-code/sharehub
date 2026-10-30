@@ -90,6 +90,11 @@ public class DisposalServiceImpl implements DisposalService {
     @Override
     public PageResult<Disposal> page(Integer page, Integer size, String keyword, String kind, String warehouseNo, String supplierNo) {
         LambdaQueryWrapper<InvDisposal> w = new LambdaQueryWrapper<InvDisposal>().orderByDesc(InvDisposal::getId);
+        List<String> visible = warehouses.visibleWarehouseNos();
+        if (visible != null) {
+            if (visible.isEmpty()) return new PageResult<>(List.of(), 0);
+            w.in(InvDisposal::getWarehouseNo, visible);
+        }
         if (notBlank(kind)) w.eq(InvDisposal::getKind, kind.trim());
         if (notBlank(warehouseNo)) w.eq(InvDisposal::getWarehouseNo, warehouseNo.trim());
         if (notBlank(supplierNo)) w.eq(InvDisposal::getSupplierNo, supplierNo.trim());
@@ -112,6 +117,7 @@ public class DisposalServiceImpl implements DisposalService {
         InvDisposal d = disposalNo == null ? null
                 : disposals.selectOne(new LambdaQueryWrapper<InvDisposal>().eq(InvDisposal::getDisposalNo, disposalNo).last("limit 1"));
         if (d == null) throw BizException.notFound(disposalNo);
+        warehouses.requireVisible(d.getWarehouseNo());
         List<DisposalItem> rows = items.selectList(new LambdaQueryWrapper<InvDisposalItem>().eq(InvDisposalItem::getDisposalNo, disposalNo)
                 .orderByAsc(InvDisposalItem::getId)).stream().map(i -> new DisposalItem(i.getItemType(), i.getItemNo())).toList();
         return new DisposalDetail(vo(d), rows);

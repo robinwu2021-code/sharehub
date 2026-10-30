@@ -281,8 +281,7 @@ public class HttpInventoryApi implements InventoryApi {
             RestClient.RequestBodySpec req = http.method(method).uri(base + path)
                     .header("Authorization", "Bearer " + appKey + ":" + appSecret)
                     .accept(MediaType.APPLICATION_JSON);
-            String actor = SecurityUtils.userNo();
-            req.header("X-Inventory-Actor", actor == null ? "SYSTEM" : "STAFF:" + actor);
+            req.header("X-Inventory-Actor", InventoryActor.current());
             if (idempotencyKey != null) req.header("Idempotency-Key", idempotencyKey.length() > 64 ? idempotencyKey.substring(0, 64) : idempotencyKey);
             if (body != null) req.contentType(MediaType.APPLICATION_JSON).body(body);
             String raw = req.retrieve().body(String.class);

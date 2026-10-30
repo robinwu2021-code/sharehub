@@ -3,6 +3,7 @@ import * as da from "./device-asset";
 import { cabinets, powerbanks, inventoryTransfers, saveInventoryTransfer, getInventoryTransfer } from "./device";
 import { POWERBANK_TRANSITIONS } from "../../types";
 import type { Cabinet, Powerbank, PowerbankStatus } from "../../types";
+import * as stock from "./stock";
 
 /**
  * 设备资产线（批次 5b）：入库质检 · 调拨逐件明细 / 发货 / 逐件签收 · 资产差异 · 充电宝人工动作。
@@ -17,7 +18,7 @@ const newCabinet = (over: Partial<Cabinet> = {}): Cabinet => {
   const c = {
     cabinetNo: `CAB-A${uniq()}`, sn: `SN-A${uniq()}`, status: "IN_STOCK", slotTotal: 8, availableCount: 0,
     vendorCode: "cd-tech", model: "X6", locationNo: null, siteNo: null, locationName: null, agentNo: null,
-    onlineStatus: "OFFLINE", fwVersion: "1.0.0", lastHeartbeatAt: null, archivedAt: null, ...over,
+    onlineStatus: "OFFLINE", fwVersion: "1.0.0", lastHeartbeatAt: null, archivedAt: null, warehouseNo: "WH01", ...over,
   } as Cabinet;
   cabinets.unshift(c);
   return c;
@@ -25,7 +26,7 @@ const newCabinet = (over: Partial<Cabinet> = {}): Cabinet => {
 const newPowerbank = (status: PowerbankStatus = "IN_STOCK"): Powerbank => {
   const p: Powerbank = {
     powerbankNo: `PB-A${uniq()}`, sn: null, vendorCode: "cd-tech", cabinetNo: "", slotIndex: null,
-    battery: 90, status, health: "OK", cycles: 10, archivedAt: null,
+    battery: 90, status, health: "OK", cycles: 10, archivedAt: null, warehouseNo: "WH01",
   };
   powerbanks.unshift(p);
   return p;
@@ -74,6 +75,47 @@ describe("入库质检", () => {
 });
 
 describe("调拨作业", () => {
+  it("不能用单头的来源仓调走别仓设备", () => {
+    const c = newCabinet({ warehouseNo: "WH-OTHER" });
+    const t = newTransfer("CABINET");
+    expect(() => da.setTransferItems(t.transferNo, [c.cabinetNo])).toThrow(/调出位置/);
+    expect(c.warehouseNo).toBe("WH-OTHER");
+  });
+  it("充电宝发出退出源仓、进入在途，不能重复调拨，签收后只进目标仓", () => {
+    stock.stages();
+    const p = newPowerbank(), t = newTransfer("POWERBANK"), duplicate = newTransfer("POWERBANK");
+    da.setTransferItems(t.transferNo, [p.powerbankNo]);
+    da.setTransferItems(duplicate.transferNo, [p.powerbankNo]);
+    da.shipTransfer(t.transferNo);
+    expect(p.warehouseNo).toBeNull();
+    expect(stock.stageItems("IN_TRANSIT", "POWERBANK").items.map((i) => i.itemNo)).toContain(p.powerbankNo);
+    expect(() => da.shipTransfer(duplicate.transferNo)).toThrow(/调出位置/);
+    da.receiveTransfer(t.transferNo, [p.powerbankNo]);
+    expect(p.warehouseNo).toBe("WH02");
+    expect(stock.stageItems("IN_TRANSIT", "POWERBANK").items.map((i) => i.itemNo)).not.toContain(p.powerbankNo);
+  });
+  it("旧调拨单不能签收新一轮发货的充电宝", () => {
+    const p = newPowerbank(), old = newTransfer("POWERBANK"), next = newTransfer("POWERBANK");
+    da.setTransferItems(old.transferNo, [p.powerbankNo]);
+    da.shipTransfer(old.transferNo);
+    p.warehouseNo = "WH01"; // 实物找回并入仓后的状态
+    da.setTransferItems(next.transferNo, [p.powerbankNo]);
+    da.shipTransfer(next.transferNo);
+    expect(() => da.receiveTransfer(old.transferNo, [p.powerbankNo])).toThrow(/位置已变化/);
+    expect(old.status).toBe("IN_TRANSIT");
+    expect(p.warehouseNo).toBeNull();
+    da.receiveTransfer(next.transferNo, [p.powerbankNo]);
+    expect(p.warehouseNo).toBe("WH02");
+  });
+  it("充电宝不能通过不支持的站点端点发货", () => {
+    expect(() => saveInventoryTransfer({ fromType: "WAREHOUSE", fromRef: "WH01", toType: "SITE", toRef: "ST300", itemType: "POWERBANK" })).toThrow(/仓库/);
+    const t = newTransfer("POWERBANK"), p = newPowerbank();
+    da.setTransferItems(t.transferNo, [p.powerbankNo]);
+    t.toType = "SITE";
+    expect(() => da.shipTransfer(t.transferNo)).toThrow(/仓库/);
+    expect(p.warehouseNo).toBe("WH01");
+    expect(t.status).toBe("DRAFT");
+  });
   it("建单校验两端：类型必须合法、两端不能相同", () => {
     expect(() => saveInventoryTransfer({ fromType: "WAREHOUSE", fromRef: "WH01", toType: "WAREHOUSE", toRef: "WH01", itemType: "CABINET" }))
       .toThrowError(/不能相同/);
@@ -114,6 +156,7 @@ describe("调拨作业", () => {
     const r = da.receiveTransfer(t.transferNo, [a.powerbankNo, "PB-STRAY"]);
     expect(r.status).toBe("DONE");
     expect(r.missing).toEqual([b.powerbankNo]);
+    expect(stock.stageItems("IN_TRANSIT", "POWERBANK").items.map((i) => i.itemNo)).toContain(b.powerbankNo);
     expect(r.extra).toEqual(["PB-STRAY"]);
     expect(r.diffs.map((d) => d.kind).sort()).toEqual(["EXTRA", "MISSING"]);
     const open = da.listAssetDiffs({ status: "OPEN", sourceRef: t.transferNo });

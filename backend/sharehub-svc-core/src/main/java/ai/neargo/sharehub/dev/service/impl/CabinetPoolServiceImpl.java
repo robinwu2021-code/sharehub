@@ -82,6 +82,7 @@ public class CabinetPoolServiceImpl implements CabinetPoolService {
         List<Cabinet> out = new ArrayList<>();
         for (String no : nos) {
             DevCabinet c = require(no);
+            warehouseLookup.requireVisible(c.getWarehouseNo());
             if (!CabinetStatus.IN_STOCK.name().equals(c.getStatus()) || c.getLocationNo() != null
                     || c.getIssuedAgentNo() != null) {
                 throw BizException.conflict("error.issue.not_issuable", no);
@@ -126,6 +127,7 @@ public class CabinetPoolServiceImpl implements CabinetPoolService {
             if (wh == null) throw BizException.conflict("error.issue.no_warehouse");
         } else {
             wh = warehouseNo.trim();
+            warehouseLookup.requireVisible(wh);
             if (!warehouseLookup.exists(wh)) throw BizException.notFound(wh);
         }
         List<Cabinet> out = new ArrayList<>();
@@ -265,7 +267,9 @@ public class CabinetPoolServiceImpl implements CabinetPoolService {
 
     private DevCabinet require(String cabinetNo) {
         DevCabinet c = cabinets.selectOne(new LambdaQueryWrapper<DevCabinet>()
-                .eq(DevCabinet::getCabinetNo, cabinetNo).last("limit 1"));
+                .eq(DevCabinet::getCabinetNo, cabinetNo).last(
+                org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                && !org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly() ? "limit 1 for update" : "limit 1"));
         if (c == null) throw BizException.notFound(cabinetNo);
         if (c.getArchivedAt() != null) throw BizException.conflict("error.common.archived_readonly");
         return c;

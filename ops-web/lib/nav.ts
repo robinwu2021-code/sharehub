@@ -249,7 +249,7 @@ export const NAV: NavSection[] = [
       { href: "/inventory?tab=intakes", label: "入库单", perm: "device:inventory:read", phase: 1, ready: true, group: "出入库" },
       // 物料单据：数量物料（备件、耗材）与其他整机的入库 / 领用 / 报废 / 退供应商 / 调拨
       { href: "/inventory?tab=material-docs", label: "物料单据", perm: "device:inventory:read", phase: 1, ready: true, group: "出入库" },
-      { href: "/inventory?tab=issued", label: "出库单", perm: "device:inventory:read", group: "出入库" },
+      { href: "/inventory?tab=issued", label: "出库管理", perm: "device:inventory:read", group: "出入库" },
       // 处置出库（V203）：在库设备报废 / 退供应商，写码 device:inventory:transfer
       { href: "/inventory?tab=disposals", label: "处置出库", perm: "device:inventory:read", phase: 1, ready: true, group: "出入库" },
       { href: "/inventory?tab=transfers", label: "库存调拨", perm: "device:inventory:read", phase: 1, ready: true, group: "库内作业" },

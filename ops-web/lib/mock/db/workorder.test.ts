@@ -6,6 +6,7 @@
 //   ② 非法迁移必须**抛错**，不能默默通过
 //   ③ 关单必须有验收结论、驳回必须有原因
 import { describe, it, expect, beforeEach } from "vitest";
+import { cabinets } from "./device";
 import type { WorkOrderAction, WorkOrderStatus } from "../../types";
 import {
   workOrders, WO_TRANSITIONS, WorkOrderTransitionError, canTransition, nextActions,
@@ -25,6 +26,26 @@ function fixture(status: WorkOrderStatus) {
 }
 
 describe("状态机定义", () => {
+  it("安装须选商家，并且只允许该商家已签收、质检放行的待安装设备", () => {
+    const cabinet = cabinets[0];
+    const original = { ...cabinet };
+    const req = { type: "INSTALL" as const, cabinetNo: cabinet.cabinetNo, priority: "MEDIUM" as const, description: "安装" };
+    try {
+      Object.assign(cabinet, { status: "IN_STOCK", qcStatus: "PASSED", warehouseNo: null, issuedAgentNo: "AG-INSTALL", issueClaimedAt: "2026-10-30T09:00:00" });
+      expect(() => createWorkOrder(req)).toThrow(/商家/);
+      expect(() => createWorkOrder({ ...req, agentNo: "AG-OTHER" })).toThrow(/安装条件/);
+      cabinet.warehouseNo = "WH001";
+      expect(() => createWorkOrder({ ...req, agentNo: "AG-INSTALL" })).toThrow(/安装条件/);
+      cabinet.warehouseNo = null;
+      cabinet.issueClaimedAt = null;
+      expect(() => createWorkOrder({ ...req, agentNo: "AG-INSTALL" })).toThrow(/安装条件/);
+      cabinet.issueClaimedAt = "2026-10-30T09:00:00";
+      cabinet.locationNo = null;
+      expect(createWorkOrder({ ...req, agentNo: "AG-INSTALL" }).status).toBe("CREATED");
+    } finally {
+      Object.assign(cabinet, original);
+    }
+  });
   it("七个动作齐备（开单之外的全部流转）", () => {
     expect(Object.keys(WO_TRANSITIONS).sort()).toEqual(
       ["accept", "close", "complete", "dispatch", "process", "reject", "rework"],

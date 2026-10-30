@@ -83,6 +83,8 @@ export interface MaterialDoc {
   createdAt: string | null;
 }
 export interface MaterialDocReq {
+  /** 同一单据的重复提交和失败重试保持不变。旧客户端未传时不保证请求级重放。 */
+  requestKey?: string;
   purpose: MaterialDocPurpose;
   warehouseNo: string;
   toWarehouseNo?: string | null;

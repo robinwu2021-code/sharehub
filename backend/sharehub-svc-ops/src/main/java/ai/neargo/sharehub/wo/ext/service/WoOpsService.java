@@ -34,6 +34,9 @@ public interface WoOpsService {
     /** 手工开单（补 G6 缺口）。落 {@code wo_order} + 按 SLA 规则算出 {@code wo_sla} 计时行。 */
     WorkOrder create(WorkOrderDraft draft);
 
+    /** 内部绑定链路开安装单；商家由设备归属推导，仍校验安装资格及已绑定点位。 */
+    WorkOrder createBoundInstall(WorkOrderDraft draft);
+
     /** 接单：{@code DISPATCHED → ACCEPTED}，留痕 {@code wo_dispatch}，判定响应 SLA 是否超时。 */
     WorkOrder accept(String woNo, AcceptReq req);
 

@@ -32,8 +32,9 @@ import ai.neargo.sharehub.inv.mapper.InvMaterialMapper;
 import ai.neargo.sharehub.inv.mapper.InvMaterialThresholdMapper;
 import ai.neargo.sharehub.inv.remote.InventoryApi;
 import ai.neargo.sharehub.inv.remote.InventoryLinks;
-import ai.neargo.sharehub.inv.remote.InventoryRemoteException;
 import ai.neargo.sharehub.inv.remote.RemoteInventoryPort;
+import ai.neargo.sharehub.inv.service.InventoryOperationJournal;
+import ai.neargo.sharehub.inv.service.InventoryOperationJournal.Operation;
 import ai.neargo.sharehub.inv.service.MaterialService;
 import ai.neargo.sharehub.inv.service.SupplierService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -74,10 +75,11 @@ public class MaterialServiceImpl implements MaterialService {
     private final RemoteInventoryPort remote;
     private final InventoryLinks links;
     private final SysParamPort params;
+    private final InventoryOperationJournal journal;
 
     public MaterialServiceImpl(InvMaterialMapper materials, InvMaterialDocMapper docs, InvMaterialDocLineMapper lines,
                                InvMaterialThresholdMapper thresholds, WarehouseDirectory warehouses, SupplierService suppliers,
-                               RemoteInventoryPort remote, InventoryLinks links, SysParamPort params) {
+                               RemoteInventoryPort remote, InventoryLinks links, SysParamPort params, InventoryOperationJournal journal) {
         this.materials = materials;
         this.docs = docs;
         this.lines = lines;
@@ -87,6 +89,7 @@ public class MaterialServiceImpl implements MaterialService {
         this.remote = remote;
         this.links = links;
         this.params = params;
+        this.journal = journal;
     }
 
     // —— 物料档案 ——
@@ -120,6 +123,7 @@ public class MaterialServiceImpl implements MaterialService {
     @Override
     @Transactional
     public Material update(String materialNo, MaterialReq r) {
+        journal.requireMasterIdle(materialNo, "$.lines[*].materialNo");
         InvMaterial m = require(materialNo);
         if (m.getDeviceType() != null) throw BizException.conflict("error.material.builtin", materialNo);
         String tracking = m.getTrackingMode();
@@ -141,6 +145,7 @@ public class MaterialServiceImpl implements MaterialService {
     @Override
     @Transactional
     public Material archive(String materialNo) {
+        journal.requireMasterIdle(materialNo, "$.lines[*].materialNo");
         InvMaterial m = require(materialNo);
         if (m.getDeviceType() != null) throw BizException.conflict("error.material.builtin", materialNo);
         if (m.getArchivedAt() != null) return vo(m);
@@ -185,6 +190,11 @@ public class MaterialServiceImpl implements MaterialService {
     public PageResult<MaterialDoc> docs(Integer page, Integer size, String keyword, String kind, String purpose, String warehouseNo,
                                         String materialNo) {
         LambdaQueryWrapper<InvMaterialDoc> w = new LambdaQueryWrapper<InvMaterialDoc>().orderByDesc(InvMaterialDoc::getId);
+        List<String> visible = warehouses.visibleWarehouseNos();
+        if (visible != null) {
+            if (visible.isEmpty()) return new PageResult<>(List.of(), 0);
+            w.and(q -> q.in(InvMaterialDoc::getWarehouseNo, visible).or().in(InvMaterialDoc::getToWarehouseNo, visible));
+        }
         if (notBlank(kind)) w.eq(InvMaterialDoc::getKind, kind.trim());
         if (notBlank(purpose)) w.eq(InvMaterialDoc::getPurpose, purpose.trim());
         if (notBlank(warehouseNo)) {
@@ -222,6 +232,7 @@ public class MaterialServiceImpl implements MaterialService {
         InvMaterialDoc d = docNo == null ? null
                 : docs.selectOne(new LambdaQueryWrapper<InvMaterialDoc>().eq(InvMaterialDoc::getDocNo, docNo).last("limit 1"));
         if (d == null) throw BizException.notFound(docNo);
+        warehouses.requireAnyVisible(d.getWarehouseNo(), d.getToWarehouseNo());
         return vo(d, lines.selectList(new LambdaQueryWrapper<InvMaterialDocLine>().eq(InvMaterialDocLine::getDocNo, docNo)
                 .orderByAsc(InvMaterialDocLine::getLineNo)));
     }
@@ -234,10 +245,22 @@ public class MaterialServiceImpl implements MaterialService {
     }
 
     @Override
-    @Transactional
     public MaterialDoc createDoc(MaterialDocReq r) {
-        requireService();
+        return journal.execute(() -> postDoc(r));
+    }
+
+    private MaterialDoc postDoc(MaterialDocReq r) {
         if (r == null || !notBlank(r.purpose())) throw BizException.badRequest("error.common.missing_parameter", "purpose");
+        String key = notBlank(r.requestKey()) ? r.requestKey().trim() : IdGenerator.next("MR");
+        if (key.length() > 128) throw BizException.badRequest("error.common.invalid_value", "requestKey");
+        String payload = journal.payload(r);
+        Operation existing = journal.find("MATERIAL_DOC", key, payload);
+        if (existing == null) requireService();
+        else {
+            // 旧操作固定SERVICE，不随全局引擎切换改走LOCAL；已完成的请求直接回放本地结果。
+            if ("COMPLETED".equals(existing.phase())) return doc(existing.bizRef());
+            ai.neargo.sharehub.inv.remote.InventoryCalls.requireConfigured(remote.api());
+        }
         MaterialDocPurpose purpose = enumOf(MaterialDocPurpose.values(), r.purpose(), "purpose");
         MaterialDocKind kind = purpose.kind;
         if (!notBlank(r.note())) throw BizException.badRequest("error.common.note_required");
@@ -288,38 +311,36 @@ public class MaterialServiceImpl implements MaterialService {
                 ok.add(new Line(m, l.qty(), List.of(), inbound ? l.unitCost() : null));
             }
         }
-        if (bad.isEmpty() && !inbound) bad.addAll(shortages(wh, ok));
         if (!bad.isEmpty()) throw BizException.conflict("error.material.lines_rejected", String.join("；", bad));
 
-        String docNo = IdGenerator.next("MD");
+        Operation operation = journal.lock("MATERIAL_DOC", key, payload, "SERVICE", "MD");
+        if ("COMPLETED".equals(operation.phase())) return doc(operation.bizRef());
+        // 已发送出库过账的请求可能已扣库，恢复时不再用现余额预检同一批数量。
+        if (!inbound && !journal.attempted(operation, "OUT_POST")) bad.addAll(journal.reference(() -> shortages(wh, ok)));
+        if (!bad.isEmpty()) throw BizException.conflict("error.material.lines_rejected", String.join("；", bad));
+        String docNo = operation.bizRef();
         InventoryApi api = remote.api();
         String remark = (purpose.name() + " " + docNo + "：" + r.note().trim());
         final WarehouseItem toWh = to;
         final String rsn = reason;
         String[] remoteNos = call(() -> {
-            String loc = links.locationId(api, wh.warehouseNo());
+            String loc = journal.reference(() -> links.locationId(api, wh.warehouseNo()));
             Map<String, String> itemIds = new HashMap<>();
-            for (Line l : ok) itemIds.computeIfAbsent(l.material().getMaterialNo(), k -> syncItem(l.material()));
-            if (inbound) return new String[]{null, inboundDoc(api, loc, purpose.name(), docNo, remark, ok, itemIds, "md-in-" + docNo)};
+            for (Line l : ok) itemIds.computeIfAbsent(l.material().getMaterialNo(), k -> journal.reference(() -> syncItem(l.material())));
+            if (inbound) return new String[]{null, inboundDoc(api, loc, purpose.name(), docNo, remark, ok, itemIds, operation)};
             Map<String, String> targets = Map.of();
             if (purpose == MaterialDocPurpose.RETURN_SUPPLIER) {
                 api.upsertTarget("SUPPLIER", r.supplierNo().trim(), suppliers.activeName(r.supplierNo().trim()), null);
                 targets = Map.of("SUPPLIER", r.supplierNo().trim());
             }
             String outPurpose = purpose == MaterialDocPurpose.TRANSFER ? "TRANSFER_OUT" : purpose.name();
-            String out = api.createOutbound(loc, outPurpose, rsn, targets, remark,
+            final Map<String, String> outboundTargets = targets;
+            String out = journal.step(operation, "OUT_CREATE", () -> api.createOutbound(loc, outPurpose, rsn, outboundTargets, remark,
                     ok.stream().filter(l -> !l.serial()).map(l -> new InventoryApi.OutboundLine(itemIds.get(l.material().getMaterialNo()), l.qty(), null)).toList(),
-                    ok.stream().filter(Line::serial).flatMap(l -> l.serials().stream()).toList(), "md-out-" + docNo);
-            api.postOutbound(out, "md-out-post-" + docNo);
+                    ok.stream().filter(Line::serial).flatMap(l -> l.serials().stream()).toList(), journal.stepKey(operation, "OUT_CREATE")));
+            journal.step(operation, "OUT_POST", () -> { api.postOutbound(out, journal.stepKey(operation, "OUT_POST")); return out; });
             if (toWh == null) return new String[]{out, null};
-            // 调拨的入库：出库已过账、入库失败时库存服务里东西「在途」—— 记 ERROR 让人补，幂等键可原样重试
-            try {
-                return new String[]{out, inboundDoc(api, links.locationId(api, toWh.warehouseNo()), "TRANSFER_IN", docNo, remark, ok, itemIds,
-                        "md-in-" + docNo)};
-            } catch (InventoryRemoteException e) {
-                log.error("物料调拨入库失败，出库已过账 docNo={} outNo={} code={}：须在库存服务补入库（幂等键 md-in-{}）", docNo, out, e.code, docNo, e);
-                throw e;
-            }
+            return new String[]{out, inboundDoc(api, journal.reference(() -> links.locationId(api, toWh.warehouseNo())), "TRANSFER_IN", docNo, remark, ok, itemIds, operation)};
         });
 
         InvMaterialDoc d = new InvMaterialDoc();
@@ -341,6 +362,7 @@ public class MaterialServiceImpl implements MaterialService {
         d.setTotalQty(ok.stream().mapToInt(Line::qty).sum());
         d.setRemoteOutNo(remoteNos[0]);
         d.setRemoteInNo(remoteNos[1]);
+        d.setOperationNo(operation.operationNo());
         d.setCreatedBy(operator());
         docs.insert(d);
         int n = 0;
@@ -357,17 +379,18 @@ public class MaterialServiceImpl implements MaterialService {
         }
         log.info("物料单据过账 docNo={} purpose={} warehouseNo={} toWarehouseNo={} 行={} 数量={} remoteOut={} remoteIn={}", docNo, purpose,
                 wh.warehouseNo(), d.getToWarehouseNo(), ok.size(), d.getTotalQty(), remoteNos[0], remoteNos[1]);
+        journal.complete(operation);
         return doc(docNo);
     }
 
     private String inboundDoc(InventoryApi api, String loc, String purpose, String docNo, String remark, List<Line> ok,
-                              Map<String, String> itemIds, String key) {
+                              Map<String, String> itemIds, Operation operation) {
         List<InventoryApi.InboundLine> in = ok.stream().map(l -> l.serial()
                 ? new InventoryApi.InboundLine(itemIds.get(l.material().getMaterialNo()), null, null,
                         l.serials().stream().map(sn -> new InventoryApi.Serial(sn, null, null)).toList())
                 : new InventoryApi.InboundLine(itemIds.get(l.material().getMaterialNo()), l.qty(), null, List.of())).toList();
-        String no = api.createInbound(loc, purpose, docNo, remark, in, key);
-        api.postInbound(no, key + "-post");
+        String no = journal.step(operation, "IN_CREATE", () -> api.createInbound(loc, purpose, docNo, remark, in, journal.stepKey(operation, "IN_CREATE")));
+        journal.step(operation, "IN_POST", () -> { api.postInbound(no, journal.stepKey(operation, "IN_POST")); return no; });
         return no;
     }
 
@@ -523,6 +546,7 @@ public class MaterialServiceImpl implements MaterialService {
 
     private WarehouseItem liveWarehouse(String no) {
         if (!notBlank(no)) throw BizException.badRequest("error.common.missing_parameter", "warehouseNo");
+        warehouses.requireVisible(no.trim());
         return warehouses.list().stream().filter(w -> w.warehouseNo().equals(no.trim()) && w.archivedAt() == null).findFirst()
                 .orElseThrow(() -> BizException.notFound(no));
     }

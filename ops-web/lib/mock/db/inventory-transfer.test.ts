@@ -28,15 +28,17 @@ describe("建单一律 DRAFT", () => {
   });
 });
 
-describe("合法迁移放行，非法迁移拒", () => {
-  it("DRAFT --ship--> IN_TRANSIT", () => {
+describe("单头保存不能代替发货和签收", () => {
+  it("保存单头不能把草稿发出", () => {
     const t = mk("TR-SM-1", "DRAFT");
-    expect(saveInventoryTransfer({ transferNo: t.transferNo, status: "IN_TRANSIT" }).status).toBe("IN_TRANSIT");
+    expect(() => saveInventoryTransfer({ transferNo: t.transferNo, status: "IN_TRANSIT" })).toThrow(TransferError);
+    expect(t.status).toBe("DRAFT");
   });
 
-  it("IN_TRANSIT --receive--> DONE", () => {
+  it("保存单头不能把在途单签收", () => {
     const t = mk("TR-SM-2", "IN_TRANSIT");
-    expect(saveInventoryTransfer({ transferNo: t.transferNo, status: "DONE" }).status).toBe("DONE");
+    expect(() => saveInventoryTransfer({ transferNo: t.transferNo, status: "DONE" })).toThrow(TransferError);
+    expect(t.status).toBe("IN_TRANSIT");
   });
 
   it("DRAFT 不能直接跳 DONE——跳过在途等于货没发就记收到了", () => {

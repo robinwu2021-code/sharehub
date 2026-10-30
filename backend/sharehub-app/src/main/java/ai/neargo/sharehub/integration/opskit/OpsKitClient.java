@@ -21,7 +21,7 @@ import java.util.Map;
  * 超时即失败，交给 outbox 退避重投。
  */
 @Component
-public class OpsKitClient {
+public class OpsKitClient implements ai.neargo.sharehub.api.platform.flow.ApprovalAvailability {
 
     private final RestClient http;
     private final String baseUrl;

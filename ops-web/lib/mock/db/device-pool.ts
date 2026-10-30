@@ -16,7 +16,7 @@ import { agentCoreComplete } from "../../types";
 import { cabinets } from "./device";
 import { sites, locations, ensureDefaultPoint } from "./location";
 import { agents, syncDefaultSite, saveSiteAgent, listSiteAgents } from "./agent";
-import { createWorkOrder } from "./workorder";
+import { createBoundInstallWorkOrder } from "./workorder";
 import { recordMovement, ref } from "./movement";
 import { fail, notFound } from "@/lib/biz-error";
 import { sysParams } from "./system";
@@ -300,6 +300,8 @@ function checkBind(c: Cabinet, req: BindReq): SitePoint {
 
 function bindOne(c: Cabinet, req: BindReq): BindResult {
   const loc = checkBind(c, req);
+  if (req.openInstallWo && c.qcStatus != null && c.qcStatus !== "PASSED")
+    fail("设备不符合安装条件：质检未放行", "Quality clearance required for installation");
   const site = siteOf(loc.siteNo)!;
   recordMovement({ itemNo: c.cabinetNo, event: "BIND",
     fromRef: c.locationNo ? ref.loc(c.locationNo) : c.issuedAgentNo ? ref.pool(c.issuedAgentNo, c.issuedSiteNo) : ref.wh(c.warehouseNo),
@@ -311,10 +313,10 @@ function bindOne(c: Cabinet, req: BindReq): BindResult {
   });
   let woNo: string | null = null;
   if (req.openInstallWo) {
-    woNo = createWorkOrder({
+    woNo = createBoundInstallWorkOrder({
       type: "INSTALL", source: "MANUAL", cabinetNo: c.cabinetNo, locationName: loc.name,
       description: `装机：${c.cabinetNo} → ${site.name} · ${loc.name}（出库单绑定生成）`,
-    } as Parameters<typeof createWorkOrder>[0]).woNo;
+    } as Parameters<typeof createBoundInstallWorkOrder>[0]).woNo;
   }
   return { cabinet: c, woNo };
 }

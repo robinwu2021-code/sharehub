@@ -1,4 +1,4 @@
-# 接口参考（全量 431 个端点）
+# 接口参考（全量 627 个端点）
 
 > **本文件由脚本生成，不要手改**：
 >
@@ -24,12 +24,12 @@
 
 | | |
 |---|---|
-| 端点 | **431** |
-| 带功能权限码 | 368 |
-| 有请求体 | 188 |
-| 数据结构 | 241 个（文末统一定义） |
+| 端点 | **627** |
+| 带功能权限码 | 544 |
+| 有请求体 | 257 |
+| 数据结构 | 437 个（文末统一定义） |
 
-### ⚠️ 3 个 `/api/**` 端点没有功能权限码
+### ⚠️ 7 个 `/api/**` 端点没有功能权限码
 
 它们**不是匿名可读** —— `SecurityConfig` 对 `/api/**` 是 `anyRequest().authenticated()`，未登录仍是 401。但没有 `@PreAuthorize` 意味着**任何已登录员工都能读**，不分角色：客服能读账务分录、能读员工名册、能读审计日志。
 
@@ -40,17 +40,19 @@
 | `POST /api/agent/apply` | `AgentApplyController#selfServiceApply` |
 | `GET /api/agent/apply/mine` | `AgentApplyController#mine` |
 | `POST /api/agent/apply/otp` | `AgentApplyController#applyOtp` |
+| `POST /api/platform/files` | `FileController#upload` |
+| `GET /api/platform/files/raw/{fileNo}` | `FileController#raw` |
+| `GET /api/platform/files/{fileNo}` | `FileController#download` |
+| `GET /api/platform/files/{fileNo}/url` | `FileController#url` |
 
 ---
 
 
 ## 登录与会话
 
-7 个端点。
+8 个端点。
 
 ### `POST /api/auth/login`
-
-登录出参。
 
 **无权限码** · `AuthController#login`
 
@@ -111,9 +113,17 @@
 
 ### `POST /api/auth/otp`
 
+**无权限码** · `AuthController#loginOtp`
+
+**请求体** `对象（字符串值）`
+
+**出参** `对象（自由键）`
+
+### `POST /api/auth/password`
+
 发送代理端登录验证码（匿名）。
 
-**无权限码** · `AuthController#loginOtp`
+**无权限码** · `AuthController#changePassword`
 
 **请求体** `对象（字符串值）`
 
@@ -122,7 +132,7 @@
 
 ## 运营：设备 · 场地 · 工单 · 告警 · 库存
 
-132 个端点。
+266 个端点。
 
 ### `GET /api/ops/ad-slots`
 
@@ -145,7 +155,7 @@
 
 权限码 `marketing:ad:update` · `MarketingController#createAdSlot`
 
-**请求体** `AdSlot`
+**请求体** [`AdSlot`](#adslot)
 
 **出参** [`AdSlotVO`](#adslotvo)
 
@@ -159,9 +169,48 @@
 |---|---|---|---|
 | 路径 | `slotNo` | `String` | 是 |
 
-**请求体** `AdSlot`
+**请求体** [`AdSlot`](#adslot)
 
 **出参** [`AdSlotVO`](#adslotvo)
+
+### `GET /api/ops/alarm-todos`
+
+告警待办（经营看板 › 待办中心）：合作 / 经营类告警的处置落点（TDD/05 §7.4）。
+
+权限码 `dashboard:todo:read` · `AlarmTodoController#page`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `mine` | `boolean` | 否 |
+| 查询 | `status` | `String` | 否 |
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+
+**出参** 分页<[`AlarmTodo`](#alarmtodo)>
+
+### `GET /api/ops/alarm-todos/count`
+
+权限码 `dashboard:todo:read` · `AlarmTodoController#openCount`
+
+**出参** `Map<String, Long>`
+
+### `POST /api/ops/alarm-todos/{todoNo}/done`
+
+完成待办：告警条件已不成立 → 告警关闭；仍成立 → 下一轮重新生成待办。
+
+权限码 `dashboard:todo:read` · `AlarmTodoController#done`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `todoNo` | `String` | 是 |
+
+**请求体** [`NoteReq`](#notereq)
+
+**出参** [`AlarmTodo`](#alarmtodo)
 
 ### `POST /api/ops/alarms/auto-work-orders`
 
@@ -191,9 +240,23 @@
 
 权限码 `workorder:alarm:config` · `AlarmController#createCode`
 
-**请求体** `DevAlarmCode`
+**请求体** [`DevAlarmCode`](#devalarmcode)
 
 **出参** [`AlarmCode`](#alarmcode)
+
+### `GET /api/ops/alarms/codes/stats`
+
+每码统计（近 N 天）：数量、误报率、自愈率 —— 调规则的依据。
+
+权限码 `workorder:alarm:read` · `AlarmController#codeStats`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `days` | `int` | 否 |
+
+**出参** `List<ai.neargo.sharehub.alarm.dto.AlarmDtos.CodeStat>`
 
 ### `POST /api/ops/alarms/codes/{code}`
 
@@ -205,9 +268,37 @@
 |---|---|---|---|
 | 路径 | `code` | `String` | 是 |
 
-**请求体** `DevAlarmCode`
+**请求体** [`DevAlarmCode`](#devalarmcode)
 
 **出参** [`AlarmCode`](#alarmcode)
+
+### `GET /api/ops/alarms/codes/{code}/routes`
+
+根因路由：同一业务告警，根因不同派的活不同。
+
+权限码 `workorder:alarm:read` · `AlarmController#routes`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `code` | `String` | 是 |
+
+**出参** `List<ai.neargo.sharehub.alarm.dto.AlarmDtos.AlarmRoute>`
+
+### `POST /api/ops/alarms/codes/{code}/routes`
+
+权限码 `workorder:alarm:config` · `AlarmController#saveRoutes`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `code` | `String` | 是 |
+
+**请求体** `List<ai.neargo.sharehub.alarm.dto.AlarmDtos.RouteReq>`
+
+**出参** `List<ai.neargo.sharehub.alarm.dto.AlarmDtos.AlarmRoute>`
 
 ### `POST /api/ops/alarms/codes/{no}/archive`
 
@@ -284,8 +375,31 @@
 | 查询 | `level` | `String` | 否 |
 | 查询 | `status` | `String` | 否 |
 | 查询 | `cabinetNo` | `String` | 否 |
+| 查询 | `domain` | `String` | 否 |
+| 查询 | `subjectType` | `String` | 否 |
+| 查询 | `siteNo` | `String` | 否 |
+| 查询 | `cause` | `String` | 否 |
+| 查询 | `disposition` | `String` | 否 |
+| 查询 | `from` | `.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate` | 否 |
+| 查询 | `to` | `.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate` | 否 |
+| 查询 | `topOnly` | `Boolean` | 否 |
+| 查询 | `preset` | `String` | 否 |
 
 **出参** 分页<[`AlarmRecord`](#alarmrecord)>
+
+### `GET /api/ops/alarms/records/{alarmNo}`
+
+告警详情：证据、时间线、同对象近 7 天。
+
+权限码 `workorder:alarm:read` · `AlarmController#detail`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `alarmNo` | `String` | 是 |
+
+**出参** [`AlarmDetail`](#alarmdetail)
 
 ### `POST /api/ops/alarms/records/{alarmNo}/ack`
 
@@ -318,6 +432,34 @@
 **请求体** `对象（自由键）`
 
 **出参** [`AckResult`](#ackresult)
+
+### `POST /api/ops/alarms/records/{alarmNo}/dispose`
+
+人工立即处置（忽略开单延迟）。
+
+权限码 `workorder:wo:create` · `AlarmController#dispose`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `alarmNo` | `String` | 是 |
+
+**出参** `对象（自由键）`
+
+### `GET /api/ops/alarms/records/{alarmNo}/disposition-preview`
+
+处置预览：现在处置会开什么单、派给谁、是否并入已有工单。
+
+权限码 `workorder:alarm:read` · `AlarmController#dispositionPreview`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `alarmNo` | `String` | 是 |
+
+**出参** [`DispositionPreview`](#dispositionpreview)
 
 ### `POST /api/ops/alarms/records/{alarmNo}/work-order`
 
@@ -355,7 +497,7 @@
 
 权限码 `workorder:alarm:config` · `AlarmController#createRule`
 
-**请求体** `DevAlarmRule`
+**请求体** [`DevAlarmRule`](#devalarmrule)
 
 **出参** [`AlarmRule`](#alarmrule)
 
@@ -397,9 +539,47 @@
 |---|---|---|---|
 | 路径 | `ruleNo` | `String` | 是 |
 
-**请求体** `DevAlarmRule`
+**请求体** [`DevAlarmRule`](#devalarmrule)
 
 **出参** [`AlarmRule`](#alarmrule)
+
+### `GET /api/ops/alarms/summary`
+
+告警中心摘要条：按业务域的未关闭 / 严重数，已处置未关闭，今日自动恢复。
+
+权限码 `workorder:alarm:read` · `AlarmController#summary`
+
+**出参** [`AlarmSummary`](#alarmsummary)
+
+### `GET /api/ops/asset-diffs`
+
+权限码 `device:inventory:read` · `AssetOpsController#diffs`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+| 查询 | `status` | `String` | 否 |
+| 查询 | `sourceType` | `String` | 否 |
+| 查询 | `sourceRef` | `String` | 否 |
+
+**出参** 分页<[`AssetDiff`](#assetdiff)>
+
+### `POST /api/ops/asset-diffs/{diffNo}/resolve`
+
+权限码 `device:inventory:diff` · `AssetOpsController#resolve`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `diffNo` | `String` | 是 |
+
+**请求体** [`ResolveReq`](#resolvereq)
+
+**出参** [`AssetDiff`](#assetdiff)
 
 ### `GET /api/ops/cabinet-monitor`
 
@@ -429,6 +609,8 @@
 | 查询 | `keyword` | `String` | 否 |
 | 查询 | `onlineStatus` | `String` | 否 |
 | 查询 | `status` | `String` | 否 |
+| 查询 | `issuedAgentNo` | `String` | 否 |
+| 查询 | `pool` | `String` | 否 |
 
 **出参** 分页<[`Cabinet`](#cabinet)>
 
@@ -452,7 +634,7 @@
 
 批量导入机柜。
 
-权限码 `device:cabinet:create` · `OpsController#importCabinets`
+权限码 `device:cabinet:import` · `OpsController#importCabinets`
 
 **请求体** `对象（自由键）`
 
@@ -496,7 +678,7 @@
 |---|---|---|---|
 | 路径 | `cabinetNo` | `String` | 是 |
 
-**请求体** `对象（自由键）`
+**请求体** [`CommandReq`](#commandreq)
 
 **出参** [`CommandResult`](#commandresult)
 
@@ -547,7 +729,7 @@
 
 ### `GET /api/ops/contracts`
 
-权限码 `location:contract:read` · `OpsController#contracts`
+权限码 `location:contract:read` · `ContractController#page`
 
 **入参**
 
@@ -556,22 +738,44 @@
 | 查询 | `page` | `Integer` | 否 |
 | 查询 | `size` | `Integer` | 否 |
 | 查询 | `keyword` | `String` | 否 |
+| 查询 | `status` | `String` | 否 |
+| 查询 | `venueNo` | `String` | 否 |
+| 查询 | `siteNo` | `String` | 否 |
+| 查询 | `endFrom` | `LocalDate` | 否 |
+| 查询 | `endTo` | `LocalDate` | 否 |
+| 查询 | `pendingMine` | `Boolean` | 否 |
 
 **出参** 分页<[`Contract`](#contract)>
 
 ### `POST /api/ops/contracts`
 
-新建 / 修改进场合同。
+权限码 `location:contract:create` · `ContractController#create`
 
-权限码 `location:contract:create` · `OpsController#createContract`
+**请求体** [`ContractReq`](#contractreq)
 
-**请求体** `LocContract`
+**出参** [`Contract`](#contract)
+
+### `GET /api/ops/contracts/summary`
+
+权限码 `location:contract:read` · `ContractController#summary`
+
+**出参** [`ContractSummary`](#contractsummary)
+
+### `GET /api/ops/contracts/{contractNo}`
+
+权限码 `location:contract:read` · `ContractController#get`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `contractNo` | `String` | 是 |
 
 **出参** [`Contract`](#contract)
 
 ### `POST /api/ops/contracts/{contractNo}`
 
-权限码 `location:contract:update` · `OpsController#updateContract`
+权限码 `location:contract:update` · `ContractController#update`
 
 **入参**
 
@@ -579,15 +783,13 @@
 |---|---|---|---|
 | 路径 | `contractNo` | `String` | 是 |
 
-**请求体** `LocContract`
+**请求体** [`ContractReq`](#contractreq)
 
 **出参** [`Contract`](#contract)
 
 ### `POST /api/ops/contracts/{contractNo}/attachments`
 
-添加合同附件元数据。
-
-权限码 `location:contract:update` · `LocExtController#addContractAttachment`
+权限码 `location:contract:update` · `ContractController#attach`
 
 **入参**
 
@@ -595,15 +797,13 @@
 |---|---|---|---|
 | 路径 | `contractNo` | `String` | 是 |
 
-**请求体** `对象（自由键）`
+**请求体** [`AttachReq`](#attachreq)
 
-**出参** `Object`
+**出参** [`Contract`](#contract)
 
 ### `POST /api/ops/contracts/{contractNo}/attachments/{attachNo}/remove`
 
-移除合同附件。
-
-权限码 `location:contract:update` · `LocExtController#removeContractAttachment`
+权限码 `location:contract:update` · `ContractController#removeAttachment`
 
 **入参**
 
@@ -612,7 +812,147 @@
 | 路径 | `contractNo` | `String` | 是 |
 | 路径 | `attachNo` | `String` | 是 |
 
-**出参** `Object`
+**出参** [`Contract`](#contract)
+
+### `POST /api/ops/contracts/{contractNo}/audit`
+
+权限码 `location:contract:audit` · `ContractController#audit`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `contractNo` | `String` | 是 |
+
+**请求体** [`AuditReq`](#auditreq)
+
+**出参** [`Contract`](#contract)
+
+### `POST /api/ops/contracts/{contractNo}/cosign`
+
+财务会签（条件加签）：运营通过后超阈值的合同停在 PENDING（auditStage=FINANCE）。
+
+权限码 `location:contract:cosign` · `ContractController#cosign`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `contractNo` | `String` | 是 |
+
+**请求体** [`AuditReq`](#auditreq)
+
+**出参** [`Contract`](#contract)
+
+### `GET /api/ops/contracts/{contractNo}/logs`
+
+权限码 `location:contract:read` · `ContractController#logs`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `contractNo` | `String` | 是 |
+
+**出参** 数组<[`ContractLogItem`](#contractlogitem)>
+
+### `POST /api/ops/contracts/{contractNo}/renew`
+
+权限码 `location:contract:create` · `ContractController#renew`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `contractNo` | `String` | 是 |
+
+**出参** [`Contract`](#contract)
+
+### `POST /api/ops/contracts/{contractNo}/sign`
+
+权限码 `location:contract:update` · `ContractController#sign`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `contractNo` | `String` | 是 |
+
+**请求体** [`SignReq`](#signreq)
+
+**出参** [`Contract`](#contract)
+
+### `POST /api/ops/contracts/{contractNo}/submit`
+
+权限码 `location:contract:submit` · `ContractController#submit`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `contractNo` | `String` | 是 |
+
+**出参** [`Contract`](#contract)
+
+### `POST /api/ops/contracts/{contractNo}/supplement`
+
+生效中合同改条款：生成补充协议草稿（关联原合同），走同样的提交 → 审批 → 签署。
+
+权限码 `location:contract:create` · `ContractController#supplement`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `contractNo` | `String` | 是 |
+
+**请求体** [`SupplementReq`](#supplementreq)
+
+**出参** [`Contract`](#contract)
+
+### `POST /api/ops/contracts/{contractNo}/terminate`
+
+发起提前终止申请（裁决 #4）：审批期间合同照常生效。
+
+权限码 `location:contract:terminate` · `ContractController#terminate`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `contractNo` | `String` | 是 |
+
+**请求体** [`TerminateReq`](#terminatereq)
+
+**出参** [`Contract`](#contract)
+
+### `POST /api/ops/contracts/{contractNo}/termination/audit`
+
+权限码 `location:contract:audit` · `ContractController#auditTermination`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `contractNo` | `String` | 是 |
+
+**请求体** [`AuditReq`](#auditreq)
+
+**出参** [`Contract`](#contract)
+
+### `POST /api/ops/contracts/{contractNo}/withdraw`
+
+权限码 `location:contract:submit` · `ContractController#withdraw`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `contractNo` | `String` | 是 |
+
+**请求体** [`NoteReq`](#notereq)
+
+**出参** [`Contract`](#contract)
 
 ### `GET /api/ops/cs/sessions`
 
@@ -681,6 +1021,20 @@
 权限码 `cs:ticket:handle` · `CsController#createTicket`
 
 **请求体** [`TicketCreateReq`](#ticketcreatereq)
+
+**出参** [`CsTicketVO`](#csticketvo)
+
+### `GET /api/ops/cs/tickets/{ticketNo}`
+
+单张详情 —— 列表放不下报障截图，而截图往往是唯一能看清现场的东西。
+
+权限码 `cs:ticket:read` · `CsController#ticket`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `ticketNo` | `String` | 是 |
 
 **出参** [`CsTicketVO`](#csticketvo)
 
@@ -755,7 +1109,7 @@
 
 权限码 `device:cabinet:update` · `DeviceController#createCodeBatch`
 
-**请求体** `DevCodeBatch`
+**请求体** [`DevCodeBatch`](#devcodebatch)
 
 **出参** [`CodeBatchRow`](#codebatchrow)
 
@@ -769,7 +1123,7 @@
 |---|---|---|---|
 | 路径 | `batchNo` | `String` | 是 |
 
-**请求体** `DevCodeBatch`
+**请求体** [`DevCodeBatch`](#devcodebatch)
 
 **出参** [`CodeBatchRow`](#codebatchrow)
 
@@ -792,6 +1146,257 @@
 
 **出参** 分页<[`DeviceLogRow`](#devicelogrow)>
 
+### `GET /api/ops/device-movements`
+
+设备履历（V196，仓外段）：位置与归属的每一次变化，新的在前。
+
+权限码 `device:cabinet:read` · `AssetOpsController#movements`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `itemNo` | `String` | 是 |
+
+**出参** 数组<[`DeviceMovement`](#devicemovement)>
+
+### `GET /api/ops/device-signals`
+
+权限码 `device:cabinet:read` · `DeviceSignalController#codes`
+
+**出参** 数组<[`SignalCode`](#signalcode)>
+
+### `POST /api/ops/devices/bind-batch`
+
+批量绑定：同一商家的一批出库池设备，一个事务（任一台不满足整批不动）。
+
+权限码 `device:cabinet:update` · `DevicePoolController#bindBatch`
+
+**请求体** [`BindBatchReq`](#bindbatchreq)
+
+**出参** 数组<[`BindResult`](#bindresult)>
+
+### `POST /api/ops/devices/claim`
+
+接收人签收（V195）：只能签给自己的 —— 权限码只是门槛，「本人 = 接收人」在服务里校验。
+
+权限码 `device:cabinet:update` · `DevicePoolController#claim`
+
+**请求体** [`ClaimReq`](#claimreq)
+
+**出参** 数组<[`Cabinet`](#cabinet)>
+
+### `POST /api/ops/devices/issue`
+
+权限码 `device:inventory:transfer` · `DevicePoolController#issue`
+
+**请求体** [`IssueReq`](#issuereq)
+
+**出参** 数组<[`Cabinet`](#cabinet)>
+
+### `POST /api/ops/devices/issue-redirect`
+
+出库调整（V195）：改商家 / 站点 / 接收人，只收未绑定的。
+
+权限码 `device:inventory:transfer` · `DevicePoolController#redirect`
+
+**请求体** [`RedirectReq`](#redirectreq)
+
+**出参** 数组<[`Cabinet`](#cabinet)>
+
+### `POST /api/ops/devices/pool-return`
+
+权限码 `device:inventory:transfer` · `DevicePoolController#poolReturn`
+
+**请求体** [`PoolReturnReq`](#poolreturnreq)
+
+**出参** 数组<[`Cabinet`](#cabinet)>
+
+### `POST /api/ops/devices/protections/{protectionNo}/release`
+
+只能解除人工持有的保护；信号 / 告警持有的随恢复自动解除。
+
+权限码 `device:cabinet:update` · `DeviceOpsController#releaseProtection`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `protectionNo` | `String` | 是 |
+
+**请求体** [`ReasonReq`](#reasonreq)
+
+**出参** [`Protection`](#protection)
+
+### `POST /api/ops/devices/{cabinetNo}/qc`
+
+权限码 `device:qc:inspect` · `AssetOpsController#inspectCabinet`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `cabinetNo` | `String` | 是 |
+
+**请求体** [`QcReq`](#qcreq)
+
+**出参** [`QcRecord`](#qcrecord)
+
+### `POST /api/ops/devices/{deviceNo}/bind`
+
+绑定（V164）：出库池设备绑到点位；不给点位 = 出库池商家默认站点的默认点位。
+
+权限码 `device:cabinet:update` · `DevicePoolController#bind`
+
+**请求体** [`BindReq`](#bindreq)
+
+**出参** [`BindResult`](#bindresult)
+
+### `POST /api/ops/devices/{deviceNo}/go-live`
+
+门禁全过才上线；站点若在筹备中随之转营业。
+
+权限码 `device:cabinet:update` · `DeviceOpsController#goLive`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `deviceNo` | `String` | 是 |
+
+**出参** [`Cabinet`](#cabinet)
+
+### `GET /api/ops/devices/{deviceNo}/go-live-gate`
+
+权限码 `device:cabinet:read` · `DeviceOpsController#goLiveGate`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `deviceNo` | `String` | 是 |
+
+**出参** [`Checklist`](#checklist)
+
+### `POST /api/ops/devices/{deviceNo}/mark-fault`
+
+权限码 `device:cabinet:update` · `DeviceOpsController#markFault`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `deviceNo` | `String` | 是 |
+
+**请求体** [`ReasonReq`](#reasonreq)
+
+**出参** [`Cabinet`](#cabinet)
+
+### `GET /api/ops/devices/{deviceNo}/protections`
+
+权限码 `device:cabinet:read` · `DeviceOpsController#protections`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `deviceNo` | `String` | 是 |
+| 查询 | `activeOnly` | `boolean` | 否 |
+
+**出参** 数组<[`Protection`](#protection)>
+
+### `POST /api/ops/devices/{deviceNo}/protections`
+
+人工停借 / 禁仓。
+
+权限码 `device:cabinet:update` · `DeviceOpsController#applyProtection`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `deviceNo` | `String` | 是 |
+
+**请求体** [`ProtectionReq`](#protectionreq)
+
+**出参** [`Protection`](#protection)
+
+### `POST /api/ops/devices/{deviceNo}/repair`
+
+权限码 `device:cabinet:update` · `DeviceOpsController#repair`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `deviceNo` | `String` | 是 |
+
+**出参** [`Cabinet`](#cabinet)
+
+### `POST /api/ops/devices/{deviceNo}/retire`
+
+权限码 `device:cabinet:update` · `DeviceOpsController#retire`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `deviceNo` | `String` | 是 |
+
+**请求体** [`ReasonReq`](#reasonreq)
+
+**出参** [`Cabinet`](#cabinet)
+
+### `GET /api/ops/devices/{deviceNo}/trial-rents`
+
+权限码 `device:cabinet:read` · `DeviceOpsController#trialRents`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `deviceNo` | `String` | 是 |
+
+**出参** 数组<[`TrialRent`](#trialrent)>
+
+### `POST /api/ops/devices/{deviceNo}/trial-rents`
+
+发起试借还：下发弹出指令（异步），结果以设备信号回推。
+
+权限码 `device:command:send` · `DeviceOpsController#startTrialRent`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `deviceNo` | `String` | 是 |
+
+**出参** [`TrialRent`](#trialrent)
+
+### `POST /api/ops/devices/{deviceNo}/unbind`
+
+解绑：仅已绑定未上线；回同一商家的出库池。
+
+权限码 `device:cabinet:update` · `DevicePoolController#unbind`
+
+**请求体** [`UnbindReq`](#unbindreq)
+
+**出参** [`Cabinet`](#cabinet)
+
+### `POST /api/ops/devices/{deviceNo}/undeploy`
+
+权限码 `device:cabinet:update` · `DeviceOpsController#undeploy`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `deviceNo` | `String` | 是 |
+
+**请求体** [`ReasonReq`](#reasonreq)
+
+**出参** [`Cabinet`](#cabinet)
+
 ### `GET /api/ops/inspection-plans`
 
 权限码 `workorder:wo:read` · `WoExtController#inspectionPlans`
@@ -809,9 +1414,9 @@
 
 ### `POST /api/ops/inspection-plans`
 
-权限码 `workorder:wo:update` · `WoExtController#createInspectionPlan`
+权限码 `workorder:inspection:update` · `WoExtController#createInspectionPlan`
 
-**请求体** `WoInspectionPlan`
+**请求体** [`InspectionPlanReq`](#inspectionplanreq)
 
 **出参** [`InspectionPlan`](#inspectionplan)
 
@@ -829,7 +1434,7 @@
 
 ### `POST /api/ops/inspection-plans/{planNo}`
 
-权限码 `workorder:wo:update` · `WoExtController#updateInspectionPlan`
+权限码 `workorder:inspection:update` · `WoExtController#updateInspectionPlan`
 
 **入参**
 
@@ -837,7 +1442,7 @@
 |---|---|---|---|
 | 路径 | `planNo` | `String` | 是 |
 
-**请求体** `WoInspectionPlan`
+**请求体** [`InspectionPlanReq`](#inspectionplanreq)
 
 **出参** [`InspectionPlan`](#inspectionplan)
 
@@ -877,7 +1482,7 @@
 
 权限码 `device:inventory:transfer` · `InventoryController#createTransfer`
 
-**请求体** `InvTransfer`
+**请求体** [`InvTransferReq`](#invtransferreq)
 
 **出参** [`InventoryTransfer`](#inventorytransfer)
 
@@ -907,9 +1512,656 @@
 |---|---|---|---|
 | 路径 | `transferNo` | `String` | 是 |
 
-**请求体** `InvTransfer`
+**请求体** [`InvTransferReq`](#invtransferreq)
 
 **出参** [`InventoryTransfer`](#inventorytransfer)
+
+### `POST /api/ops/inventory-transfers/{transferNo}/items`
+
+权限码 `device:inventory:transfer` · `AssetOpsController#setItems`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `transferNo` | `String` | 是 |
+
+**请求体** [`ItemsReq`](#itemsreq)
+
+**出参** [`InventoryTransferDetail`](#inventorytransferdetail)
+
+### `POST /api/ops/inventory-transfers/{transferNo}/receive`
+
+权限码 `device:inventory:transfer` · `AssetOpsController#receive`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `transferNo` | `String` | 是 |
+
+**请求体** [`ReceiveReq`](#receivereq)
+
+**出参** [`ReceiveResult`](#receiveresult)
+
+### `POST /api/ops/inventory-transfers/{transferNo}/ship`
+
+权限码 `device:inventory:transfer` · `AssetOpsController#ship`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `transferNo` | `String` | 是 |
+
+**请求体** [`ShipInfo`](#shipinfo)
+
+**出参** [`InventoryTransferDetail`](#inventorytransferdetail)
+
+### `GET /api/ops/inventory/counts`
+
+权限码 `device:inventory:read` · `InventoryController#counts`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `warehouseNo` | `String` | 否 |
+| 查询 | `status` | `String` | 否 |
+
+**出参** [`StockCount`](#stockcount)
+
+### `POST /api/ops/inventory/counts`
+
+权限码 `device:inventory:stocktake` · `InventoryController#openCount`
+
+**请求体** [`OpenCountReq`](#opencountreq)
+
+**出参** [`StockCountDetail`](#stockcountdetail)
+
+### `GET /api/ops/inventory/counts/{countNo}`
+
+权限码 `device:inventory:read` · `InventoryController#count`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `countNo` | `String` | 是 |
+
+**出参** [`StockCountDetail`](#stockcountdetail)
+
+### `POST /api/ops/inventory/counts/{countNo}/approve`
+
+权限码 `device:inventory:stocktake` · `InventoryController#approveCount`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `countNo` | `String` | 是 |
+
+**请求体** [`CountNoteReq`](#countnotereq)
+
+**出参** [`StockCountDetail`](#stockcountdetail)
+
+### `POST /api/ops/inventory/counts/{countNo}/cancel`
+
+权限码 `device:inventory:stocktake` · `InventoryController#cancelCount`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `countNo` | `String` | 是 |
+
+**出参** [`StockCountDetail`](#stockcountdetail)
+
+### `POST /api/ops/inventory/counts/{countNo}/post`
+
+权限码 `device:inventory:stocktake` · `InventoryController#postCount`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `countNo` | `String` | 是 |
+
+**出参** [`StockCountDetail`](#stockcountdetail)
+
+### `POST /api/ops/inventory/counts/{countNo}/reject`
+
+权限码 `device:inventory:stocktake` · `InventoryController#rejectCount`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `countNo` | `String` | 是 |
+
+**请求体** [`CountNoteReq`](#countnotereq)
+
+**出参** [`StockCountDetail`](#stockcountdetail)
+
+### `POST /api/ops/inventory/counts/{countNo}/scans`
+
+权限码 `device:inventory:stocktake` · `InventoryController#scanCount`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `countNo` | `String` | 是 |
+
+**请求体** [`CountScanReq`](#countscanreq)
+
+**出参** [`StockCountDetail`](#stockcountdetail)
+
+### `POST /api/ops/inventory/counts/{countNo}/submit`
+
+权限码 `device:inventory:stocktake` · `InventoryController#submitCount`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `countNo` | `String` | 是 |
+
+**出参** [`StockCountDetail`](#stockcountdetail)
+
+### `GET /api/ops/inventory/disposals`
+
+权限码 `device:inventory:read` · `InventoryController#disposals`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+| 查询 | `keyword` | `String` | 否 |
+| 查询 | `kind` | `String` | 否 |
+| 查询 | `warehouseNo` | `String` | 否 |
+| 查询 | `supplierNo` | `String` | 否 |
+
+**出参** 分页<[`Disposal`](#disposal)>
+
+### `POST /api/ops/inventory/disposals`
+
+建单即过账：报废须原因码，退供应商须供应商。
+
+权限码 `device:inventory:transfer` · `InventoryController#createDisposal`
+
+**请求体** [`DisposalReq`](#disposalreq)
+
+**出参** [`DisposalDetail`](#disposaldetail)
+
+### `GET /api/ops/inventory/disposals/{disposalNo}`
+
+权限码 `device:inventory:read` · `InventoryController#disposal`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `disposalNo` | `String` | 是 |
+
+**出参** [`DisposalDetail`](#disposaldetail)
+
+### `GET /api/ops/inventory/engine`
+
+当前库存引擎：盘点只在 SERVICE 下可用，页面据此提示。
+
+权限码 `device:inventory:read` · `InventoryController#engine`
+
+**出参** [`InventoryEngine`](#inventoryengine)
+
+### `GET /api/ops/inventory/intakes`
+
+权限码 `device:inventory:read` · `InventoryController#intakes`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+| 查询 | `keyword` | `String` | 否 |
+| 查询 | `status` | `String` | 否 |
+| 查询 | `warehouseNo` | `String` | 否 |
+
+**出参** 分页<[`Intake`](#intake)>
+
+### `POST /api/ops/inventory/intakes`
+
+权限码 `device:inventory:inbound` · `InventoryController#createIntake`
+
+**请求体** [`CreateReq`](#createreq)
+
+**出参** [`IntakeDetail`](#intakedetail)
+
+### `GET /api/ops/inventory/intakes/{intakeNo}`
+
+权限码 `device:inventory:read` · `InventoryController#intake`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `intakeNo` | `String` | 是 |
+
+**出参** [`IntakeDetail`](#intakedetail)
+
+### `POST /api/ops/inventory/intakes/{intakeNo}/dispose`
+
+权限码 `device:inventory:inbound` · `InventoryController#disposeIntake`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `intakeNo` | `String` | 是 |
+
+**请求体** [`DisposeReq`](#disposereq)
+
+**出参** [`IntakeDetail`](#intakedetail)
+
+### `POST /api/ops/inventory/intakes/{intakeNo}/inbound`
+
+权限码 `device:inventory:inbound` · `InventoryController#inboundIntake`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `intakeNo` | `String` | 是 |
+
+**请求体** [`ItemsReq`](#itemsreq)
+
+**出参** [`IntakeDetail`](#intakedetail)
+
+### `POST /api/ops/inventory/intakes/{intakeNo}/items/{itemType}/{itemNo}/qc`
+
+权限码 `device:qc:inspect` · `InventoryController#inspectIntakeItem`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `intakeNo` | `String` | 是 |
+| 路径 | `itemType` | `String` | 是 |
+| 路径 | `itemNo` | `String` | 是 |
+
+**请求体** [`QcReq`](#qcreq)
+
+**出参** [`IntakeDetail`](#intakedetail)
+
+### `GET /api/ops/inventory/issued-summary`
+
+出库池页左侧的商家汇总。
+
+权限码 `device:inventory:read` · `DevicePoolController#summary`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `agentNo` | `String` | 否 |
+
+**出参** 数组<[`IssuedSummary`](#issuedsummary)>
+
+### `GET /api/ops/inventory/ledger`
+
+权限码 `device:inventory:read` · `InventoryController#ledger`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `warehouseNo` | `String` | 否 |
+| 查询 | `itemType` | `String` | 否 |
+| 查询 | `keyword` | `String` | 否 |
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+
+**出参** 分页<[`StockLedgerRow`](#stockledgerrow)>
+
+### `GET /api/ops/inventory/material-balances`
+
+权限码 `device:inventory:read` · `InventoryController#materialBalances`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `warehouseNo` | `String` | 否 |
+| 查询 | `materialNo` | `String` | 否 |
+| 查询 | `category` | `String` | 否 |
+| 查询 | `lowOnly` | `Boolean` | 否 |
+
+**出参** [`MaterialBalance`](#materialbalance)
+
+### `GET /api/ops/inventory/material-docs`
+
+权限码 `device:inventory:read` · `InventoryController#materialDocs`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+| 查询 | `keyword` | `String` | 否 |
+| 查询 | `kind` | `String` | 否 |
+| 查询 | `purpose` | `String` | 否 |
+| 查询 | `warehouseNo` | `String` | 否 |
+| 查询 | `materialNo` | `String` | 否 |
+
+**出参** 分页<[`MaterialDoc`](#materialdoc)>
+
+### `POST /api/ops/inventory/material-docs`
+
+入库类用途判 :inbound，出库与调拨判 :transfer（与设备单据同口径）。
+
+权限码 `device:inventory:inbound` 或 `device:inventory:transfer` · `InventoryController#createMaterialDoc`
+
+**请求体** [`MaterialDocReq`](#materialdocreq)
+
+**出参** [`MaterialDoc`](#materialdoc)
+
+### `GET /api/ops/inventory/material-docs/{docNo}`
+
+权限码 `device:inventory:read` · `InventoryController#materialDoc`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `docNo` | `String` | 是 |
+
+**出参** [`MaterialDoc`](#materialdoc)
+
+### `POST /api/ops/inventory/material-thresholds`
+
+权限码 `device:inventory:warehouse` · `InventoryController#saveMaterialMinQty`
+
+**请求体** [`MaterialMinQtyReq`](#materialminqtyreq)
+
+**出参** [`MaterialBalance`](#materialbalance)
+
+### `GET /api/ops/inventory/materials`
+
+权限码 `device:inventory:read` · `InventoryController#materials`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+| 查询 | `keyword` | `String` | 否 |
+| 查询 | `category` | `String` | 否 |
+| 查询 | `showArchived` | `Boolean` | 否 |
+
+**出参** 分页<[`Material`](#material)>
+
+### `POST /api/ops/inventory/materials`
+
+权限码 `device:inventory:warehouse` · `InventoryController#createMaterial`
+
+**请求体** [`MaterialReq`](#materialreq)
+
+**出参** [`Material`](#material)
+
+### `POST /api/ops/inventory/materials/{materialNo}`
+
+权限码 `device:inventory:warehouse` · `InventoryController#updateMaterial`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `materialNo` | `String` | 是 |
+
+**请求体** [`MaterialReq`](#materialreq)
+
+**出参** [`Material`](#material)
+
+### `POST /api/ops/inventory/materials/{materialNo}/archive`
+
+权限码 `device:inventory:warehouse` · `InventoryController#archiveMaterial`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `materialNo` | `String` | 是 |
+
+**出参** [`Material`](#material)
+
+### `POST /api/ops/inventory/materials/{materialNo}/unarchive`
+
+权限码 `device:inventory:warehouse` · `InventoryController#unarchiveMaterial`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `materialNo` | `String` | 是 |
+
+**出参** [`Material`](#material)
+
+### `GET /api/ops/inventory/migration`
+
+存量迁移试跑（S7）：要入库的、要出库的、跳过的（附原因）、已完成的。
+
+权限码 `system:param:read` · `InventoryController#migrationPlan`
+
+**出参** [`InventoryMigrationPlan`](#inventorymigrationplan)
+
+### `POST /api/ops/inventory/migration`
+
+存量迁移执行一批（S7）：每台独立、可重跑；失败逐台列出。
+
+权限码 `system:param:update` · `InventoryController#runMigration`
+
+**请求体** [`MigrationRunReq`](#migrationrunreq)
+
+**出参** [`InventoryMigrationResult`](#inventorymigrationresult)
+
+### `GET /api/ops/inventory/period-summary`
+
+期间报表（S6）：期初 / 入 / 出 / 期末，按仓与设备类型。
+
+权限码 `device:inventory:read` · `InventoryController#periodSummary`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `from` | `LocalDate` | 是 |
+| 查询 | `to` | `LocalDate` | 是 |
+| 查询 | `warehouseNo` | `String` | 否 |
+
+**出参** `List<ai.neargo.sharehub.inv.dto.StockDtos.StockPeriodRow>`
+
+### `GET /api/ops/inventory/shipments`
+
+权限码 `device:inventory:read` · `InventoryController#shipments`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `docType` | `String` | 否 |
+| 查询 | `docRef` | `String` | 否 |
+| 查询 | `itemNo` | `String` | 否 |
+
+**出参** `List<ai.neargo.sharehub.inv.dto.ShipmentDtos.Shipment>`
+
+### `GET /api/ops/inventory/stage-items`
+
+阶段下钻（P2 #6）：某阶段 × 类型的设备清单，口径同 stages。
+
+权限码 `device:inventory:read` · `InventoryController#stageItems`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `stage` | `String` | 是 |
+| 查询 | `itemType` | `String` | 否 |
+
+**出参** [`StageItems`](#stageitems)
+
+### `GET /api/ops/inventory/stages`
+
+统一库存视图（S6）：按生命周期阶段的台数。
+
+权限码 `device:inventory:read` · `InventoryController#stages`
+
+**出参** [`StockStage`](#stockstage)
+
+### `GET /api/ops/inventory/stock-thresholds`
+
+权限码 `device:inventory:read` · `InventoryController#stockThresholds`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `warehouseNo` | `String` | 否 |
+
+**出参** [`StockThreshold`](#stockthreshold)
+
+### `POST /api/ops/inventory/stock-thresholds`
+
+权限码 `device:inventory:warehouse` · `InventoryController#saveStockThreshold`
+
+**请求体** [`StockThresholdReq`](#stockthresholdreq)
+
+**出参** [`StockThreshold`](#stockthreshold)
+
+### `GET /api/ops/inventory/suppliers`
+
+权限码 `device:inventory:read` · `InventoryController#suppliers`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+| 查询 | `keyword` | `String` | 否 |
+| 查询 | `showArchived` | `Boolean` | 否 |
+
+**出参** 分页<[`Supplier`](#supplier)>
+
+### `POST /api/ops/inventory/suppliers`
+
+权限码 `device:inventory:warehouse` · `InventoryController#createSupplier`
+
+**请求体** [`SupplierReq`](#supplierreq)
+
+**出参** [`Supplier`](#supplier)
+
+### `GET /api/ops/inventory/suppliers/stats`
+
+供应商绩效（V207）：到货 / 入库 / 不合格 / 退货台数与合格率。
+
+权限码 `device:inventory:read` · `InventoryController#supplierStats`
+
+**出参** `List<ai.neargo.sharehub.inv.dto.SupplierDtos.SupplierStats>`
+
+### `POST /api/ops/inventory/suppliers/{supplierNo}`
+
+权限码 `device:inventory:warehouse` · `InventoryController#updateSupplier`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `supplierNo` | `String` | 是 |
+
+**请求体** [`SupplierReq`](#supplierreq)
+
+**出参** [`Supplier`](#supplier)
+
+### `POST /api/ops/inventory/suppliers/{supplierNo}/archive`
+
+权限码 `device:inventory:warehouse` · `InventoryController#archiveSupplier`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `supplierNo` | `String` | 是 |
+
+**出参** [`Supplier`](#supplier)
+
+### `POST /api/ops/inventory/suppliers/{supplierNo}/unarchive`
+
+权限码 `device:inventory:warehouse` · `InventoryController#unarchiveSupplier`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `supplierNo` | `String` | 是 |
+
+**出参** [`Supplier`](#supplier)
+
+### `GET /api/ops/inventory/warehouses`
+
+权限码 `device:inventory:read` · `InventoryController#warehouses`
+
+**出参** [`WarehouseItem`](#warehouseitem)
+
+### `POST /api/ops/inventory/warehouses`
+
+权限码 `device:inventory:warehouse` · `InventoryController#createWarehouse`
+
+**请求体** [`WarehouseReq`](#warehousereq)
+
+**出参** [`WarehouseItem`](#warehouseitem)
+
+### `POST /api/ops/inventory/warehouses/{warehouseNo}`
+
+权限码 `device:inventory:warehouse` · `InventoryController#updateWarehouse`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `warehouseNo` | `String` | 是 |
+
+**请求体** [`WarehouseReq`](#warehousereq)
+
+**出参** [`WarehouseItem`](#warehouseitem)
+
+### `POST /api/ops/inventory/warehouses/{warehouseNo}/archive`
+
+权限码 `device:inventory:warehouse` · `InventoryController#archiveWarehouse`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `warehouseNo` | `String` | 是 |
+
+**出参** [`WarehouseItem`](#warehouseitem)
+
+### `POST /api/ops/inventory/warehouses/{warehouseNo}/unarchive`
+
+权限码 `device:inventory:warehouse` · `InventoryController#unarchiveWarehouse`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `warehouseNo` | `String` | 是 |
+
+**出参** [`WarehouseItem`](#warehouseitem)
 
 ### `GET /api/ops/leads`
 
@@ -924,6 +2176,7 @@
 | 查询 | `keyword` | `String` | 否 |
 | 查询 | `stage` | `String` | 否 |
 | 查询 | `owner` | `String` | 否 |
+| 查询 | `inPool` | `Boolean` | 否 |
 
 **出参** 分页<[`Lead`](#lead)>
 
@@ -931,7 +2184,7 @@
 
 权限码 `location:crm:update` · `LocExtController#createLead`
 
-**请求体** `LocLead`
+**请求体** [`LocLead`](#loclead)
 
 **出参** [`Lead`](#lead)
 
@@ -957,9 +2210,39 @@
 |---|---|---|---|
 | 路径 | `leadNo` | `String` | 是 |
 
-**请求体** `LocLead`
+**请求体** [`LocLead`](#loclead)
 
 **出参** [`Lead`](#lead)
+
+### `POST /api/ops/leads/{leadNo}/claim`
+
+从公共线索池认领（超 M 天无跟进的商机会被回收进池）。
+
+权限码 `location:crm:update` · `LocExtController#claimLead`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `leadNo` | `String` | 是 |
+
+**出参** [`Lead`](#lead)
+
+### `POST /api/ops/leads/{leadNo}/convert`
+
+签约转化：场地方 + 站点（筹备中）+ 带谈判条款的合同草稿，一次生成，不重复录入。
+
+权限码 `location:crm:update` · `LocExtController#convertLead`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `leadNo` | `String` | 是 |
+
+**请求体** [`LeadConvertReq`](#leadconvertreq)
+
+**出参** [`LeadConversion`](#leadconversion)
 
 ### `GET /api/ops/leads/{leadNo}/follow-ups`
 
@@ -1005,6 +2288,8 @@
 | 查询 | `size` | `Integer` | 否 |
 | 查询 | `keyword` | `String` | 否 |
 | 查询 | `showArchived` | `Boolean` | 否 |
+| 查询 | `siteNo` | `String` | 否 |
+| 查询 | `agentNo` | `String` | 否 |
 
 **出参** 分页<[`Location`](#location)>
 
@@ -1080,7 +2365,7 @@
 
 权限码 `marketing:notice:update` · `MarketingController#createNotice`
 
-**请求体** `MktNotice`
+**请求体** [`NoticeReq`](#noticereq)
 
 **出参** [`NoticeVO`](#noticevo)
 
@@ -1094,7 +2379,7 @@
 |---|---|---|---|
 | 路径 | `noticeNo` | `String` | 是 |
 
-**请求体** `MktNotice`
+**请求体** [`NoticeReq`](#noticereq)
 
 **出参** [`NoticeVO`](#noticevo)
 
@@ -1112,6 +2397,32 @@
 
 **出参** `Object`
 
+### `POST /api/ops/marketing/notices/{no}/offline`
+
+权限码 `marketing:notice:update` · `MarketingController#offlineNotice`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `no` | `String` | 是 |
+
+**出参** [`NoticeVO`](#noticevo)
+
+### `POST /api/ops/marketing/notices/{no}/publish`
+
+发布 / 下线公告。
+
+权限码 `marketing:notice:update` · `MarketingController#publishNotice`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `no` | `String` | 是 |
+
+**出参** [`NoticeVO`](#noticevo)
+
 ### `POST /api/ops/marketing/notices/{no}/unarchive`
 
 取消归档Notice：清空时间戳，回到默认列表。
@@ -1126,6 +2437,54 @@
 
 **出参** `Object`
 
+### `GET /api/ops/merchant-revenue/alerts`
+
+设备提醒：在用设备里离线几台、在线但没有可借电池几台，各带最多 20 个柜号供点进去处理。
+
+权限码 `dashboard:overview:read` · `MerchantRevenueController#alerts`
+
+**出参** [`DeviceAlerts`](#devicealerts)
+
+### `GET /api/ops/merchant-revenue/by-device`
+
+权限码 `dashboard:overview:read` · `MerchantRevenueController#byDevice`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `from` | `String` | 否 |
+| 查询 | `to` | `String` | 否 |
+| 查询 | `limit` | `Integer` | 否 |
+
+**出参** 数组<[`RevenueByDevice`](#revenuebydevice)>
+
+### `GET /api/ops/merchant-revenue/summary`
+
+权限码 `dashboard:overview:read` · `MerchantRevenueController#summary`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `from` | `String` | 否 |
+| 查询 | `to` | `String` | 否 |
+
+**出参** [`RevenueSummary`](#revenuesummary)
+
+### `GET /api/ops/merchant-revenue/trend`
+
+权限码 `dashboard:overview:read` · `MerchantRevenueController#trend`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `from` | `String` | 否 |
+| 查询 | `to` | `String` | 否 |
+
+**出参** 数组<[`RevenueDay`](#revenueday)>
+
 ### `GET /api/ops/operation/overview`
 
 权限码 `location:overview:read` · `OperationController#overview`
@@ -1138,6 +2497,21 @@
 | 查询 | `to` | `String` | 否 |
 
 **出参** [`OperationOverview`](#operationoverview)
+
+### `GET /api/ops/ops-flow-metrics`
+
+运营核心流程指标（G5）。
+
+权限码 `dashboard:overview:read` · `OpsFlowMetricsController#metrics`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `from` | `LocalDate` | 否 |
+| 查询 | `to` | `LocalDate` | 否 |
+
+**出参** [`OpsFlowMetrics`](#opsflowmetrics)
 
 ### `GET /api/ops/ota-releases`
 
@@ -1160,7 +2534,7 @@
 
 权限码 `device:ota:manage` · `DeviceController#createOtaRelease`
 
-**请求体** `DevOtaRelease`
+**请求体** [`DevOtaRelease`](#devotarelease)
 
 **出参** [`OtaReleaseRow`](#otareleaserow)
 
@@ -1185,7 +2559,7 @@
 
 权限码 `device:ota:manage` · `DeviceController#createOtaRollout`
 
-**请求体** `DevOtaRollout`
+**请求体** [`DevOtaRollout`](#devotarollout)
 
 **出参** [`OtaRolloutRow`](#otarolloutrow)
 
@@ -1201,7 +2575,7 @@
 |---|---|---|---|
 | 路径 | `rolloutNo` | `String` | 是 |
 
-**请求体** `DevOtaRollout`
+**请求体** [`DevOtaRollout`](#devotarollout)
 
 **出参** [`OtaRolloutRow`](#otarolloutrow)
 
@@ -1232,6 +2606,7 @@
 | 查询 | `keyword` | `String` | 否 |
 | 查询 | `status` | `String` | 否 |
 | 查询 | `cabinetNo` | `String` | 否 |
+| 查询 | `suspectedLost` | `Boolean` | 否 |
 
 **出参** 分页<[`PowerbankRow`](#powerbankrow)>
 
@@ -1286,6 +2661,64 @@
 **请求体** [`PowerbankCmd`](#powerbankcmd)
 
 **出参** [`PowerbankRow`](#powerbankrow)
+
+### `POST /api/ops/powerbanks/{powerbankNo}/confirm-lost`
+
+疑似丢失经核实：确认丢失（RENTED → LOST，状态机 CONFIRM_LOST）。
+
+权限码 `device:powerbank:update` · `DeviceController#confirmLost`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `powerbankNo` | `String` | 是 |
+
+**请求体** [`LostVerdictReq`](#lostverdictreq)
+
+**出参** [`PowerbankRow`](#powerbankrow)
+
+### `POST /api/ops/powerbanks/{powerbankNo}/dismiss-lost`
+
+疑似丢失经核实：已找回 / 误判 —— 清标记并重置失联计时。
+
+权限码 `device:powerbank:update` · `DeviceController#dismissLost`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `powerbankNo` | `String` | 是 |
+
+**请求体** [`LostVerdictReq`](#lostverdictreq)
+
+**出参** [`PowerbankRow`](#powerbankrow)
+
+### `POST /api/ops/powerbanks/{powerbankNo}/qc`
+
+权限码 `device:qc:inspect` · `AssetOpsController#inspectPowerbank`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `powerbankNo` | `String` | 是 |
+
+**请求体** [`QcReq`](#qcreq)
+
+**出参** [`QcRecord`](#qcrecord)
+
+### `GET /api/ops/qc-records`
+
+权限码 `device:cabinet:read` · `AssetOpsController#qcRecords`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `itemNo` | `String` | 是 |
+
+**出参** 数组<[`QcRecord`](#qcrecord)>
 
 ### `GET /api/ops/reports/consumer-insight`
 
@@ -1356,6 +2789,22 @@
 
 **出参** 分页<[`ReportFinance`](#reportfinance)>
 
+### `GET /api/ops/reports/inventory`
+
+库存报表（V206）：现算，不走 T+1 快照；期间默认本月。
+
+权限码 `report:inventory:read` · `ReportController#inventory`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `from` | `LocalDate` | 否 |
+| 查询 | `to` | `LocalDate` | 否 |
+| 查询 | `warehouseNo` | `String` | 否 |
+
+**出参** [`InventoryReport`](#inventoryreport)
+
 ### `GET /api/ops/reports/location`
 
 权限码 `report:location:read` · `ReportController#location`
@@ -1410,6 +2859,70 @@
 
 **出参** [`ReportTrend`](#reporttrend)
 
+### `GET /api/ops/reports/{kind}/export`
+
+三张周期报表的后端导出（K8 / RQ-RPT-03 / AC-09）：同列表的筛选、全量（到 `ExportSupport#MAX_ROWS`）， `format=xlsx|pdf`。
+
+权限码 `report:device:read` 或 `report:location:read` 或 `report:finance:read` · `ReportController#export`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `kind` | `String` | 是 |
+| 查询 | `format` | `String` | 否 |
+| 查询 | `keyword` | `String` | 否 |
+| 查询 | `period` | `String` | 否 |
+
+**出参** `void`
+
+### `GET /api/ops/settlement-adjustments`
+
+权限码 `finance:settlement:read` · `AdjustmentController#page`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+| 查询 | `status` | `String` | 否 |
+| 查询 | `payeeNo` | `String` | 否 |
+| 查询 | `siteNo` | `String` | 否 |
+| 查询 | `kind` | `String` | 否 |
+| 查询 | `source` | `String` | 否 |
+| 查询 | `period` | `String` | 否 |
+
+**出参** 分页<[`Adjustment`](#adjustment)>
+
+### `POST /api/ops/settlement-adjustments/{adjNo}/confirm`
+
+权限码 `finance:settlement:confirm` · `AdjustmentController#confirm`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `adjNo` | `String` | 是 |
+
+**请求体** [`ConfirmReq`](#confirmreq)
+
+**出参** [`Adjustment`](#adjustment)
+
+### `POST /api/ops/settlement-adjustments/{adjNo}/void`
+
+权限码 `finance:settlement:confirm` · `AdjustmentController#voidIt`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `adjNo` | `String` | 是 |
+
+**请求体** [`VoidReq`](#voidreq)
+
+**出参** [`Adjustment`](#adjustment)
+
 ### `GET /api/ops/site-analysis`
 
 读模型：`loc_site ⋈ ord_order` 聚合，不落表。
@@ -1430,6 +2943,8 @@
 
 ### `GET /api/ops/site-lifecycles`
 
+只读漏斗（2026-09-25：站点状态与门店生命周期合并）：签约前是商机阶段，签约后是站点状态。
+
 权限码 `location:venue:read` · `LocExtController#siteLifecycles`
 
 **入参**
@@ -1439,29 +2954,19 @@
 | 查询 | `page` | `Integer` | 否 |
 | 查询 | `size` | `Integer` | 否 |
 | 查询 | `keyword` | `String` | 否 |
-| 查询 | `stage` | `String` | 否 |
+| 查询 | `phase` | `String` | 否 |
 
-**出参** 分页<[`SiteLifecycle`](#sitelifecycle)>
+**出参** 分页<[`LifecycleRow`](#lifecyclerow)>
 
-### `POST /api/ops/site-lifecycles/{siteNo}/stage`
+### `GET /api/ops/site-lifecycles/funnel`
 
-阶段流转，留痕到 `loc_site_lifecycle_log`。
+权限码 `location:venue:read` · `LocExtController#siteLifecycleFunnel`
 
-权限码 `location:venue:update` · `LocExtController#changeStage`
-
-**入参**
-
-| 位置 | 名 | 类型 | 必填 |
-|---|---|---|---|
-| 路径 | `siteNo` | `String` | 是 |
-
-**请求体** [`StageChangeReq`](#stagechangereq)
-
-**出参** [`SiteLifecycle`](#sitelifecycle)
+**出参** 数组<[`FunnelStage`](#funnelstage)>
 
 ### `GET /api/ops/sites`
 
-权限码 `location:poi:read` · `OpsController#sites`
+权限码 `location:poi:read` · `SiteController#page`
 
 **入参**
 
@@ -1471,50 +2976,30 @@
 | 查询 | `size` | `Integer` | 否 |
 | 查询 | `keyword` | `String` | 否 |
 | 查询 | `showArchived` | `Boolean` | 否 |
+| 查询 | `status` | `String` | 否 |
+| 查询 | `missingOwner` | `Boolean` | 否 |
+| 查询 | `missingOpenHours` | `Boolean` | 否 |
+| 查询 | `agentNo` | `String` | 否 |
 
 **出参** 分页<[`Site`](#site)>
 
 ### `POST /api/ops/sites`
 
-权限码 `location:poi:create` · `OpsController#saveSite`
+权限码 `location:poi:create` · `SiteController#create`
 
-**入参**
-
-| 位置 | 名 | 类型 | 必填 |
-|---|---|---|---|
-| 路径 | `siteNo` | `String` | 是 |
-
-**请求体** [`Site`](#site)
+**请求体** [`SiteReq`](#sitereq)
 
 **出参** [`Site`](#site)
 
-### `POST /api/ops/sites/{no}/archive`
+### `GET /api/ops/sites/summary`
 
-权限码 `location:site:update` · `OpsController#archiveSite`
+权限码 `location:poi:read` · `SiteController#summary`
 
-**入参**
+**出参** [`SiteSummary`](#sitesummary)
 
-| 位置 | 名 | 类型 | 必填 |
-|---|---|---|---|
-| 路径 | `no` | `String` | 是 |
+### `GET /api/ops/sites/{siteNo}`
 
-**出参** `Object`
-
-### `POST /api/ops/sites/{no}/unarchive`
-
-权限码 `location:site:update` · `OpsController#unarchiveSite`
-
-**入参**
-
-| 位置 | 名 | 类型 | 必填 |
-|---|---|---|---|
-| 路径 | `no` | `String` | 是 |
-
-**出参** `Object`
-
-### `POST /api/ops/sites/{siteNo}`
-
-权限码 `location:poi:create` · `OpsController#saveSite`
+权限码 `location:poi:read` · `SiteController#get`
 
 **入参**
 
@@ -1522,7 +3007,19 @@
 |---|---|---|---|
 | 路径 | `siteNo` | `String` | 是 |
 
-**请求体** [`Site`](#site)
+**出参** [`Site`](#site)
+
+### `POST /api/ops/sites/{siteNo}`
+
+权限码 `location:poi:create` · `SiteController#update`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `siteNo` | `String` | 是 |
+
+**请求体** [`SiteReq`](#sitereq)
 
 **出参** [`Site`](#site)
 
@@ -1567,11 +3064,11 @@
 
 **出参** [`OkResult`](#okresult)
 
-### `POST /api/ops/sites/{siteNo}/pause`
+### `POST /api/ops/sites/{siteNo}/archive`
 
-暂停 / 恢复营业（运营管理清单 OM-S3）。
+归档 / 取消归档（前端契约 Archivable）。
 
-权限码 `location:poi:update` · `OpsController#pauseSite`
+权限码 `location:site:update` · `SiteController#archive`
 
 **入参**
 
@@ -1579,13 +3076,69 @@
 |---|---|---|---|
 | 路径 | `siteNo` | `String` | 是 |
 
-**请求体** `对象（自由键）`
+**出参** [`Site`](#site)
+
+### `POST /api/ops/sites/{siteNo}/close`
+
+关闭：无设备、无未结工单、无在借订单（见 close-gate）。
+
+权限码 `location:poi:update` · `SiteController#close`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `siteNo` | `String` | 是 |
+
+**请求体** [`CloseReq`](#closereq)
+
+**出参** [`Site`](#site)
+
+### `GET /api/ops/sites/{siteNo}/close-gate`
+
+权限码 `location:poi:read` · `SiteController#closeGate`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `siteNo` | `String` | 是 |
+
+**出参** [`Checklist`](#checklist)
+
+### `GET /api/ops/sites/{siteNo}/opening-checklist`
+
+权限码 `location:poi:read` · `SiteController#openingChecklist`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `siteNo` | `String` | 是 |
+
+**出参** [`Checklist`](#checklist)
+
+### `POST /api/ops/sites/{siteNo}/pause`
+
+暂停营业：停借保还 —— 已借出的仍可归还，停业不该把用户的充电宝扣在手里。
+
+权限码 `location:poi:update` · `SiteController#pause`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `siteNo` | `String` | 是 |
+
+**请求体** [`PauseReq`](#pausereq)
 
 **出参** [`Site`](#site)
 
 ### `POST /api/ops/sites/{siteNo}/resume`
 
-权限码 `location:poi:update` · `OpsController#resumeSite`
+恢复营业：站点须有生效合同。
+
+权限码 `location:poi:update` · `SiteController#resume`
 
 **入参**
 
@@ -1609,6 +3162,72 @@
 
 **出参** [`SiteStats`](#sitestats)
 
+### `GET /api/ops/sites/{siteNo}/status-logs`
+
+权限码 `location:poi:read` · `SiteController#statusLogs`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `siteNo` | `String` | 是 |
+
+**出参** 数组<[`SiteStatusLogItem`](#sitestatuslogitem)>
+
+### `GET /api/ops/sites/{siteNo}/surveys`
+
+权限码 `location:poi:read` · `SiteController#surveys`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `siteNo` | `String` | 是 |
+
+**出参** 数组<[`SiteSurvey`](#sitesurvey)>
+
+### `POST /api/ops/sites/{siteNo}/surveys`
+
+现场勘测（C1）：信号 / 电源 / 可摆位置 / 照片 / 结论；以最近一次为准，首台设备上线须通过。
+
+权限码 `location:poi:update` · `SiteController#recordSurvey`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `siteNo` | `String` | 是 |
+
+**请求体** [`SurveyReq`](#surveyreq)
+
+**出参** [`SiteSurvey`](#sitesurvey)
+
+### `POST /api/ops/sites/{siteNo}/unarchive`
+
+权限码 `location:site:update` · `SiteController#unarchive`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `siteNo` | `String` | 是 |
+
+**出参** [`Site`](#site)
+
+### `POST /api/ops/sites/{siteNo}/withdraw`
+
+权限码 `location:poi:update` · `SiteController#withdraw`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `siteNo` | `String` | 是 |
+
+**请求体** [`WithdrawReq`](#withdrawreq)
+
+**出参** [`Site`](#site)
+
 ### `GET /api/ops/sla-rules`
 
 权限码 `workorder:wo:read` · `WoExtController#slaRules`
@@ -1629,7 +3248,7 @@
 
 权限码 `workorder:sla:update` · `WoExtController#createSlaRule`
 
-**请求体** `WoSlaRule`
+**请求体** [`WoSlaRule`](#woslarule)
 
 **出参** [`SlaRule`](#slarule)
 
@@ -1655,7 +3274,7 @@
 |---|---|---|---|
 | 路径 | `slaNo` | `String` | 是 |
 
-**请求体** `WoSlaRule`
+**请求体** [`WoSlaRule`](#woslarule)
 
 **出参** [`SlaRule`](#slarule)
 
@@ -1745,7 +3364,7 @@
 
 权限码 `location:venue:create` · `OpsController#createVenue`
 
-**请求体** `LocVenue`
+**请求体** [`LocVenue`](#locvenue)
 
 **出参** [`Venue`](#venue)
 
@@ -1783,7 +3402,7 @@
 |---|---|---|---|
 | 路径 | `venueNo` | `String` | 是 |
 
-**请求体** `LocVenue`
+**请求体** [`LocVenue`](#locvenue)
 
 **出参** [`Venue`](#venue)
 
@@ -1800,6 +3419,12 @@
 | 查询 | `keyword` | `String` | 否 |
 | 查询 | `status` | `String` | 否 |
 | 查询 | `type` | `String` | 否 |
+| 查询 | `priority` | `String` | 否 |
+| 查询 | `source` | `String` | 否 |
+| 查询 | `siteNo` | `String` | 否 |
+| 查询 | `assigneeNo` | `String` | 否 |
+| 查询 | `slaState` | `String` | 否 |
+| 查询 | `reviewStatus` | `String` | 否 |
 
 **出参** 分页<[`WorkOrder`](#workorder)>
 
@@ -1813,9 +3438,71 @@
 
 **出参** [`WorkOrder`](#workorder)
 
+### `GET /api/ops/work-orders/assignee-candidates`
+
+派单候选人：站点运维责任人置顶，其后是该站点运营代理与 OPS 角色员工。
+
+权限码 `workorder:wo:dispatch` · `WoExtController#assigneeCandidates`
+
+**出参** `List<ai.neargo.sharehub.wo.ext.dto.WoExtDtos.AssigneeCandidate>`
+
+### `GET /api/ops/work-orders/costs`
+
+工单成本汇总（G4）：按承担方（站点效益 / 代理运维）聚合完工工单的配件 + 人工金额。
+
+权限码 `workorder:wo:read` · `WoExtController#costs`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `from` | `.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate` | 否 |
+| 查询 | `to` | `.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate` | 否 |
+| 查询 | `bearerType` | `String` | 否 |
+
+**出参** `List<ai.neargo.sharehub.wo.ext.dto.WoExtDtos.CostRow>`
+
+### `GET /api/ops/work-orders/pool`
+
+抢单池（E3）：未派出的工单，按数据范围 —— 区域员工看到本区域的池。
+
+权限码 `workorder:wo:handle` · `WoExtController#pool`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+| 查询 | `type` | `String` | 否 |
+
+**出参** `ai.neargo.common.core.PageResult<WorkOrder>`
+
+### `GET /api/ops/work-orders/summary`
+
+工单摘要条：待派 · 即将超时（2 小时内）· 已超时 · 复核未通过（2026-09-25）。
+
+权限码 `workorder:wo:read` · `WoExtController#summary`
+
+**出参** [`WoSummary`](#wosummary)
+
+### `GET /api/ops/work-orders/{woNo}`
+
+工单详情：处理时间线（派单 + 现场处理合并）、现场照片、关联的业务告警。
+
+权限码 `workorder:wo:read` · `WoExtController#detail`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `woNo` | `String` | 是 |
+
+**出参** [`WorkOrderDetailView`](#workorderdetailview)
+
 ### `POST /api/ops/work-orders/{woNo}/accept`
 
-权限码 `workorder:wo:process` · `WoExtController#accept`
+权限码 `workorder:wo:handle` · `WoExtController#accept`
 
 **入参**
 
@@ -1831,7 +3518,7 @@
 
 完成 / 审核关单。
 
-权限码 `workorder:wo:audit` · `WoExtController#close`
+权限码 `workorder:wo:close` · `WoExtController#close`
 
 **入参**
 
@@ -1859,6 +3546,22 @@
 
 **出参** [`WorkOrder`](#workorder)
 
+### `POST /api/ops/work-orders/{woNo}/derive`
+
+巡检派生（D4）：巡检现场发现问题直接开维修 / 补宝 / 清洁单，来源挂巡检单号。
+
+权限码 `workorder:wo:handle` · `WoExtController#derive`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `woNo` | `String` | 是 |
+
+**请求体** [`DeriveReq`](#derivereq)
+
+**出参** [`WorkOrder`](#workorder)
+
 ### `POST /api/ops/work-orders/{woNo}/dispatch`
 
 权限码 `workorder:wo:dispatch` · `OpsController#dispatch`
@@ -1873,9 +3576,23 @@
 
 **出参** [`WorkOrder`](#workorder)
 
+### `POST /api/ops/work-orders/{woNo}/grab`
+
+抢单（E3）：派给自己并接单。
+
+权限码 `workorder:wo:handle` · `WoExtController#grab`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `woNo` | `String` | 是 |
+
+**出参** [`WorkOrder`](#workorder)
+
 ### `POST /api/ops/work-orders/{woNo}/handle`
 
-权限码 `workorder:wo:process` · `WoExtController#handle`
+权限码 `workorder:wo:handle` · `WoExtController#handle`
 
 **入参**
 
@@ -1919,10 +3636,67 @@
 
 **出参** [`WorkOrder`](#workorder)
 
+### `POST /api/ops/work-orders/{woNo}/takeover`
+
+平台接管（F4）：代理的单 SLA 超时后改派平台员工；employeeNo 空 = 按站点责任人 / 区域负载选。
+
+权限码 `workorder:wo:dispatch` · `WoExtController#takeover`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `woNo` | `String` | 是 |
+
+**请求体** [`TakeoverReq`](#takeoverreq)
+
+**出参** [`WorkOrder`](#workorder)
+
 
 ## 交易：订单 · 计价 · 支付 · 结算 · 分润 · 发票
 
-72 个端点。
+96 个端点。
+
+### `GET /api/trade/approvals`
+
+权限码 `order:refund:audit` 或 `finance:ledger:create` · `ApprovalController#list`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+| 查询 | `status` | `String` | 否 |
+| 查询 | `kind` | `String` | 否 |
+
+**出参** 分页<[`ApprovalRequest`](#approvalrequest)>
+
+### `POST /api/trade/approvals/{requestNo}/approve`
+
+权限码 `order:refund:audit` 或 `finance:ledger:create` · `ApprovalController#approve`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `requestNo` | `String` | 是 |
+
+**出参** [`ApprovalRequest`](#approvalrequest)
+
+### `POST /api/trade/approvals/{requestNo}/reject`
+
+权限码 `order:refund:audit` 或 `finance:ledger:create` · `ApprovalController#reject`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `requestNo` | `String` | 是 |
+
+**请求体** [`RejectReq`](#rejectreq)
+
+**出参** [`ApprovalRequest`](#approvalrequest)
 
 ### `GET /api/trade/complaints`
 
@@ -1997,7 +3771,7 @@
 
 押金转买断：用户不还了，押金抵购机款，充电宝转 SOLD。
 
-权限码 `order:deposit:update` · `FinanceController#buyoutDeposit`
+权限码 `order:deposit:manage` · `FinanceController#buyoutDeposit`
 
 **入参**
 
@@ -2005,7 +3779,7 @@
 |---|---|---|---|
 | 路径 | `depositNo` | `String` | 是 |
 
-**请求体** `对象（自由键）`
+**请求体** [`DepositBuyoutReq`](#depositbuyoutreq)
 
 **出参** `Object`
 
@@ -2013,7 +3787,7 @@
 
 欠款催缴：**只留痕不改状态** —— 催缴不改变欠款事实，改状态会让「已催缴」被误读成「已解决」。
 
-权限码 `order:deposit:update` · `FinanceController#dunDeposit`
+权限码 `order:arrears:dun` · `FinanceController#dunDeposit`
 
 **入参**
 
@@ -2021,13 +3795,13 @@
 |---|---|---|---|
 | 路径 | `depositNo` | `String` | 是 |
 
-**请求体** `对象（自由键）`
+**请求体** [`DepositDunReq`](#depositdunreq)
 
 **出参** `Object`
 
 ### `POST /api/trade/deposits/{no}/release`
 
-权限码 `order:intervene:execute` · `OrderOpsController#releaseDeposit`
+权限码 `order:deposit:manage` · `OrderOpsController#releaseDeposit`
 
 **入参**
 
@@ -2135,7 +3909,7 @@
 |---|---|---|---|
 | 路径 | `invoiceNo` | `String` | 是 |
 
-**请求体** `对象（自由键）`
+**请求体** [`InvoiceVoidReq`](#invoicevoidreq)
 
 **出参** `Object`
 
@@ -2254,8 +4028,36 @@
 | 查询 | `size` | `Integer` | 否 |
 | 查询 | `keyword` | `String` | 否 |
 | 查询 | `status` | `String` | 否 |
+| 查询 | `payStatus` | `String` | 否 |
+| 查询 | `from` | `String` | 否 |
+| 查询 | `to` | `String` | 否 |
+| 查询 | `agentNo` | `String` | 否 |
+| 查询 | `siteNo` | `String` | 否 |
+| 查询 | `cabinetNo` | `String` | 否 |
 
 **出参** 分页<[`RentOrder`](#rentorder)>
+
+### `GET /api/trade/orders/export`
+
+订单导出（RNT-03 / AC-09）：同列表筛选、全量（上限 `ai.neargo.sharehub.portal.shared.ExportSupport#MAX_ROWS`）， `format=xlsx|pdf`。
+
+权限码 `order:order:export` · `TradeController#exportOrders`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `format` | `String` | 否 |
+| 查询 | `keyword` | `String` | 否 |
+| 查询 | `status` | `String` | 否 |
+| 查询 | `payStatus` | `String` | 否 |
+| 查询 | `from` | `String` | 否 |
+| 查询 | `to` | `String` | 否 |
+| 查询 | `agentNo` | `String` | 否 |
+| 查询 | `siteNo` | `String` | 否 |
+| 查询 | `cabinetNo` | `String` | 否 |
+
+**出参** `void`
 
 ### `GET /api/trade/orders/{orderNo}`
 
@@ -2281,7 +4083,25 @@
 
 **请求体** [`InterveneReq`](#intervenereq)
 
-**出参** [`OrderInterveneResult`](#orderinterveneresult)
+**出参** `Object`
+
+### `GET /api/trade/payables`
+
+权限码 `finance:share_record:read` · `FinanceController#payables`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+| 查询 | `payeeType` | `String` | 否 |
+| 查询 | `payeeNo` | `String` | 否 |
+| 查询 | `fromPeriod` | `String` | 否 |
+| 查询 | `toPeriod` | `String` | 否 |
+| 查询 | `onlyOutstanding` | `Boolean` | 否 |
+
+**出参** 分页<[`PayableRow`](#payablerow)>
 
 ### `GET /api/trade/payee-sharing`
 
@@ -2339,6 +4159,96 @@
 | 路径 | `accountNo` | `String` | 是 |
 
 **出参** [`PayoutAccount`](#payoutaccount)
+
+### `GET /api/trade/payout-tasks`
+
+权限码 `finance:withdrawal:read` · `PayoutTaskController#page`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+| 查询 | `status` | `String` | 否 |
+
+**出参** 分页<[`PayoutTask`](#payouttask)>
+
+### `POST /api/trade/payout-tasks`
+
+权限码 `finance:withdrawal:create` · `PayoutTaskController#create`
+
+**请求体** [`PayoutTaskCreateReq`](#payouttaskcreatereq)
+
+**出参** [`PayoutTask`](#payouttask)
+
+### `GET /api/trade/payout-tasks/preview`
+
+付款任务（商家一期 B4，需求方案 §八）：平台向商家付款，财务在运营端手动执行。
+
+权限码 `finance:withdrawal:read` · `PayoutTaskController#preview`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `cutoffDate` | `String` | 是 |
+
+**出参** [`PayoutPreview`](#payoutpreview)
+
+### `GET /api/trade/payout-tasks/{taskNo}`
+
+权限码 `finance:withdrawal:read` · `PayoutTaskController#detail`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `taskNo` | `String` | 是 |
+
+**出参** [`PayoutTask`](#payouttask)
+
+### `POST /api/trade/payout-tasks/{taskNo}/audit`
+
+权限码 `finance:withdrawal:audit` · `PayoutTaskController#audit`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `taskNo` | `String` | 是 |
+
+**请求体** [`PayoutTaskAuditReq`](#payouttaskauditreq)
+
+**出参** [`PayoutTask`](#payouttask)
+
+### `POST /api/trade/payout-tasks/{taskNo}/confirm`
+
+权限码 `finance:withdrawal:pay` · `PayoutTaskController#confirm`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `taskNo` | `String` | 是 |
+
+**请求体** [`PayoutConfirmReq`](#payoutconfirmreq)
+
+**出参** [`PayoutTask`](#payouttask)
+
+### `GET /api/trade/payout-tasks/{taskNo}/export`
+
+转账文件下载。
+
+权限码 `finance:withdrawal:export` · `PayoutTaskController#export`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `taskNo` | `String` | 是 |
+
+**出参** `void`
 
 ### `GET /api/trade/price-adjustments`
 
@@ -2625,7 +4535,7 @@
 |---|---|---|---|
 | 路径 | `batchNo` | `String` | 是 |
 
-**请求体** `对象（自由键）`
+**请求体** [`ReconResolveReq`](#reconresolvereq)
 
 **出参** [`Reconcile`](#reconcile)
 
@@ -2700,6 +4610,43 @@
 
 **出参** [`OkResult`](#okresult)
 
+### `GET /api/trade/self-bills`
+
+权限码 `finance:invoice:read` · `FinanceController#selfBills`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+| 查询 | `agentNo` | `String` | 否 |
+| 查询 | `keyword` | `String` | 否 |
+
+**出参** 分页<[`SelfBillView`](#selfbillview)>
+
+### `POST /api/trade/self-bills/issue`
+
+补出：开关当时关着、商家后补了税号、或自动出单失败时，对一笔已到账的提现补一张。
+
+权限码 `finance:invoice:issue` · `FinanceController#issueSelfBill`
+
+**请求体** [`SelfBillIssueReq`](#selfbillissuereq)
+
+**出参** [`SelfBillView`](#selfbillview)
+
+### `GET /api/trade/self-bills/{billNo}/pdf`
+
+权限码 `finance:invoice:read` · `FinanceController#selfBillPdf`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `billNo` | `String` | 是 |
+
+**出参** `void`
+
 ### `GET /api/trade/settlements`
 
 结算单列表（自 `TradeController` SeedData 骨架迁入，走 `stl_settlement` 表）。
@@ -2723,7 +4670,7 @@
 
 权限码 `finance:settlement:generate` · `FinanceController#generateSettlementsPublic`
 
-**请求体** `对象（字符串值）`
+**请求体** [`SettlementGenerateReq`](#settlementgeneratereq)
 
 **出参** `List<String>`
 
@@ -2766,6 +4713,35 @@
 | 查询 | `size` | `Integer` | 否 |
 
 **出参** `Object`
+
+### `GET /api/trade/settlements/{settleNo}/statement`
+
+场地方对账单（运营核心流程 G3，裁决 #2）：结算单导出对账单线下发给场地方，首版不做场地方门户。
+
+权限码 `finance:settlement:read` 或 `agent:settlement:read` · `StatementController#statement`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `settleNo` | `String` | 是 |
+
+**出参** [`Statement`](#statement)
+
+### `GET /api/trade/settlements/{settleNo}/statement.html`
+
+可打印对账单：浏览器打开后「打印 → 存为 PDF」。
+
+权限码 `finance:settlement:read` 或 `agent:settlement:read` · `StatementController#printable`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `settleNo` | `String` | 是 |
+| 查询 | `lang` | `String` | 否 |
+
+**出参** `void`
 
 ### `GET /api/trade/share-records`
 
@@ -2861,6 +4837,81 @@
 
 **出参** [`SharingStats`](#sharingstats)
 
+### `GET /api/trade/tax-invoices`
+
+权限码 `finance:invoice:read` · `FinanceController#taxInvoices`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+| 查询 | `orderNo` | `String` | 否 |
+| 查询 | `kind` | `String` | 否 |
+| 查询 | `status` | `String` | 否 |
+
+**出参** 分页<[`TaxInvoiceView`](#taxinvoiceview)>
+
+### `GET /api/trade/tax-invoices/export`
+
+导出（K8 / RQ-INV-07~08）：`format=xlsx|pdf` 出登记表，`format=zip` 把区间内已开出的票逐张出 PDF 打包。
+
+权限码 `finance:invoice:read` · `FinanceController#exportTaxInvoices`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `format` | `String` | 否 |
+| 查询 | `orderNo` | `String` | 否 |
+| 查询 | `kind` | `String` | 否 |
+| 查询 | `status` | `String` | 否 |
+| 查询 | `from` | `String` | 否 |
+| 查询 | `to` | `String` | 否 |
+
+**出参** `void`
+
+### `GET /api/trade/tax-invoices/{invoiceNo}`
+
+权限码 `finance:invoice:read` · `FinanceController#taxInvoice`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `invoiceNo` | `String` | 是 |
+
+**出参** [`TaxInvoiceView`](#taxinvoiceview)
+
+### `GET /api/trade/tax-invoices/{invoiceNo}/pdf`
+
+单张票 PDF（RQ-INV-06）。
+
+权限码 `finance:invoice:read` · `FinanceController#taxInvoicePdf`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `invoiceNo` | `String` | 是 |
+
+**出参** `void`
+
+### `POST /api/trade/tax-invoices/{invoiceNo}/retry`
+
+BLOCKED（开票主体不全）的票在补齐主体后重开；ISSUED 的不可动。
+
+权限码 `finance:invoice:issue` · `FinanceController#retryTaxInvoice`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `invoiceNo` | `String` | 是 |
+
+**出参** [`TaxInvoiceView`](#taxinvoiceview)
+
 ### `GET /api/trade/withdrawals`
 
 提现审核队列（菜单叶：财务管理 › 提现审核）。
@@ -2875,6 +4926,7 @@
 | 查询 | `size` | `Integer` | 否 |
 | 查询 | `keyword` | `String` | 否 |
 | 查询 | `status` | `String` | 否 |
+| 查询 | `payeeNo` | `String` | 否 |
 
 **出参** 分页<[`Withdrawal`](#withdrawal)>
 
@@ -2885,6 +4937,34 @@
 权限码 `finance:withdrawal:apply` · `FinanceController#applyWithdrawal`
 
 **请求体** [`WithdrawApplyReq`](#withdrawapplyreq)
+
+**出参** [`Withdrawal`](#withdrawal)
+
+### `POST /api/trade/withdrawals/{withdrawNo}/approval/resubmit`
+
+OpsKit 送审失败（死信）后重新送审（M5-1）。
+
+权限码 `finance:withdrawal:audit` · `FinanceController#resubmitWithdrawalApproval`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `withdrawNo` | `String` | 是 |
+
+**出参** [`Withdrawal`](#withdrawal)
+
+### `POST /api/trade/withdrawals/{withdrawNo}/approval/retry-effect`
+
+OpsKit 已通过但业务检查没过（如收款账户缺失），补齐后重试生效（M5-1）。
+
+权限码 `finance:withdrawal:audit` · `FinanceController#retryWithdrawalApprovalEffect`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `withdrawNo` | `String` | 是 |
 
 **出参** [`Withdrawal`](#withdrawal)
 
@@ -2923,7 +5003,7 @@
 
 ## 用户：账号 · 钱包 · 券 · 会员 · 客服
 
-58 个端点。
+62 个端点。
 
 ### `GET /api/user/ad-campaigns`
 
@@ -3157,9 +5237,9 @@
 |---|---|---|---|
 | 路径 | `tplNo` | `String` | 是 |
 
-**请求体** `对象（自由键）`
+**请求体** [`CouponIssueReq`](#couponissuereq)
 
-**出参** 数组<[`UserCouponVO`](#usercouponvo)>
+**出参** [`CouponIssueResultVO`](#couponissueresultvo)
 
 ### `GET /api/user/credit-score-changes`
 
@@ -3206,7 +5286,7 @@ C 端开票申请队列。
 |---|---|---|---|
 | 路径 | `invoiceNo` | `String` | 是 |
 
-**请求体** `对象（字符串值）`
+**请求体** [`InvoiceIssueReq`](#invoiceissuereq)
 
 **出参** [`CUserInvoiceRow`](#cuserinvoicerow)
 
@@ -3222,7 +5302,7 @@ C 端开票申请队列。
 |---|---|---|---|
 | 路径 | `invoiceNo` | `String` | 是 |
 
-**请求体** `对象（字符串值）`
+**请求体** [`InvoiceRejectReq`](#invoicerejectreq)
 
 **出参** [`CUserInvoiceRow`](#cuserinvoicerow)
 
@@ -3246,7 +5326,7 @@ C 端开票申请队列。
 
 权限码 `user:risk:update` · `UserOpsController#grantWhitelist`
 
-**请求体** `UsrFreeWhitelist`
+**请求体** [`UsrFreeWhitelist`](#usrfreewhitelist)
 
 **出参** [`FreeUserWhitelist`](#freeuserwhitelist)
 
@@ -3260,7 +5340,7 @@ C 端开票申请队列。
 |---|---|---|---|
 | 路径 | `userNo` | `String` | 是 |
 
-**请求体** `UsrFreeWhitelist`
+**请求体** [`UsrFreeWhitelist`](#usrfreewhitelist)
 
 **出参** [`FreeUserWhitelist`](#freeuserwhitelist)
 
@@ -3359,6 +5439,61 @@ C 端开票申请队列。
 
 **出参** `Object`
 
+### `GET /api/user/member-plans`
+
+会员方案列表（`mbr_plan`）。
+
+权限码 `user:member:read` · `UserOpsController#memberPlans`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+| 查询 | `keyword` | `String` | 否 |
+| 查询 | `status` | `String` | 否 |
+
+**出参** `Object`
+
+### `POST /api/user/member-plans`
+
+新建 / 修改会员方案。
+
+权限码 `user:member:update` · `UserOpsController#saveMemberPlan`
+
+**请求体** [`MemberPlanReq`](#memberplanreq)
+
+**出参** `Object`
+
+### `POST /api/user/member-plans/{no}/disable`
+
+下架。
+
+权限码 `user:member:update` · `UserOpsController#disableMemberPlan`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `no` | `String` | 是 |
+
+**出参** `Object`
+
+### `POST /api/user/member-plans/{no}/enable`
+
+上架：对 C 端可见可买。
+
+权限码 `user:member:update` · `UserOpsController#enableMemberPlan`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `no` | `String` | 是 |
+
+**出参** `Object`
+
 ### `GET /api/user/members`
 
 权限码 `user:member:read` · `UserOpsController#members`
@@ -3378,7 +5513,7 @@ C 端开票申请队列。
 
 权限码 `user:member:update` · `UserOpsController#createMember`
 
-**请求体** `UsrMembership`
+**请求体** [`UsrMembership`](#usrmembership)
 
 **出参** [`MemberRow`](#memberrow)
 
@@ -3392,7 +5527,7 @@ C 端开票申请队列。
 |---|---|---|---|
 | 路径 | `userNo` | `String` | 是 |
 
-**请求体** `UsrMembership`
+**请求体** [`UsrMembership`](#usrmembership)
 
 **出参** [`MemberRow`](#memberrow)
 
@@ -3426,7 +5561,7 @@ C 端开票申请队列。
 
 权限码 `marketing:push:update` · `MarketingController#sweepDuePushMessages`
 
-**请求体** `对象（自由键）`
+**请求体** [`PushSweepReq`](#pushsweepreq)
 
 **出参** `Object`
 
@@ -3456,7 +5591,7 @@ C 端开票申请队列。
 |---|---|---|---|
 | 路径 | `pushNo` | `String` | 是 |
 
-**请求体** `对象（自由键）`
+**请求体** [`PushFinishReq`](#pushfinishreq)
 
 **出参** `Object`
 
@@ -3472,7 +5607,7 @@ C 端开票申请队列。
 |---|---|---|---|
 | 路径 | `pushNo` | `String` | 是 |
 
-**请求体** `对象（自由键）`
+**请求体** [`PushSendReq`](#pushsendreq)
 
 **出参** `Object`
 
@@ -3728,7 +5863,7 @@ C 端开票申请队列。
 
 ## 代理商
 
-25 个端点。
+37 个端点。
 
 ### `GET /api/agent/accounts`
 
@@ -3782,8 +5917,6 @@ C 端开票申请队列。
 
 ### `GET /api/agent/agents`
 
-agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
-
 权限码 `agent:agent:read` · `AgentController#agents`
 
 **入参**
@@ -3796,23 +5929,11 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 **出参** 分页<[`Agent`](#agent)>
 
-### `POST /api/agent/agents`
-
-权限码 `agent:agent:update` · `AgentController#save`
-
-**入参**
-
-| 位置 | 名 | 类型 | 必填 |
-|---|---|---|---|
-| 路径 | `agentNo` | `String` | 是 |
-
-**请求体** [`Agent`](#agent)
-
-**出参** [`Agent`](#agent)
-
 ### `POST /api/agent/agents/{agentNo}`
 
-权限码 `agent:agent:update` · `AgentController#save`
+修改代理商档案。
+
+权限码 `agent:agent:update` · `AgentController#update`
 
 **入参**
 
@@ -3823,10 +5944,82 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 **请求体** [`Agent`](#agent)
 
 **出参** [`Agent`](#agent)
+
+### `GET /api/agent/agents/{agentNo}/exit`
+
+该代理**当前在途的**清退单；没有则返回 null（不是 404 —— 「没有在清退」是正常状态，不是错误）。
+
+权限码 `agent:agent:read` · `AgentExitController#openExit`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `agentNo` | `String` | 是 |
+
+**出参** [`AgentExit`](#agentexit)
+
+### `POST /api/agent/agents/{agentNo}/exit`
+
+权限码 `agent:agent:update` · `AgentExitController#start`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `agentNo` | `String` | 是 |
+
+**请求体** [`ExitReq`](#exitreq)
+
+**出参** [`AgentExit`](#agentexit)
+
+### `POST /api/agent/agents/{agentNo}/invite`
+
+重发开通邀请：作废旧口令、发新的一次性口令（首登强制改）并重寄邀请邮件。
+
+权限码 `agent:apply:approve` · `AgentApplyController#resendInvite`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `agentNo` | `String` | 是 |
+
+**出参** `对象（自由键）`
+
+### `POST /api/agent/agents/{agentNo}/login-account`
+
+给代理商开通代理端登录。
+
+权限码 `agent:account:manage` · `AgentController#grantLogin`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `agentNo` | `String` | 是 |
+
+**请求体** [`GrantLoginReq`](#grantloginreq)
+
+**出参** [`GrantLoginResult`](#grantloginresult)
+
+### `GET /api/agent/agents/{agentNo}/ops-assessments`
+
+运维月度考核历史（F5）：达成率、在线率、客诉、被接管数与由此定出的运维分成系数。
+
+权限码 `agent:performance:read` · `AgentExitController#assessments`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `agentNo` | `String` | 是 |
+
+**出参** `List<ai.neargo.sharehub.agent.ext.entity.AgtOpsAssessment>`
 
 ### `POST /api/agent/agents/{no}/archive`
 
-归档Agent。
+开通结果：成员关系号（`agt_account.account_no`）。
 
 权限码 `agent:agent:update` · `AgentController#archiveAgent`
 
@@ -3938,7 +6131,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 ### `POST /api/agent/apply/otp`
 
-提交入驻申请 —— **自助与代建共用同一个端点**。
+自助入口关闭时三个免鉴权端点一律 404。
 
 **无权限码** · `AgentApplyController#applyOtp`
 
@@ -3959,9 +6152,11 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | 查询 | `keyword` | `String` | 否 |
 | 查询 | `agentNo` | `String` | 否 |
 | 查询 | `assetType` | `String` | 否 |
-| 查询 | `limit` | `Integer` | 否 |
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+| 查询 | `excludeAgentNo` | `String` | 否 |
 
-**出参** `List<AssignableAsset>`
+**出参** 分页<[`AssignableAsset`](#assignableasset)>
 
 ### `GET /api/agent/assignments`
 
@@ -3993,9 +6188,17 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 **出参** [`AssignmentLog`](#assignmentlog)
 
-### `POST /api/agent/assignments/reclaim`
+### `POST /api/agent/assignments/batch`
 
 批量回收到平台直营。
+
+权限码 `agent:scope:assign` · `AgentExtController#assignBatch`
+
+**请求体** [`AssignBatchReq`](#assignbatchreq)
+
+**出参** `List<AssignmentLog>`
+
+### `POST /api/agent/assignments/reclaim`
 
 权限码 `agent:scope:assign` · `AgentExtController#reclaim`
 
@@ -4054,6 +6257,83 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 **出参** [`AgentCommission`](#agentcommission)
 
+### `GET /api/agent/exits/{exitNo}`
+
+权限码 `agent:agent:read` · `AgentExitController#get`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `exitNo` | `String` | 是 |
+
+**出参** [`AgentExit`](#agentexit)
+
+### `POST /api/agent/exits/{exitNo}/advance`
+
+权限码 `agent:agent:update` · `AgentExitController#advance`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `exitNo` | `String` | 是 |
+
+**出参** [`AgentExit`](#agentexit)
+
+### `GET /api/agent/exits/{exitNo}/gate`
+
+权限码 `agent:agent:read` · `AgentExitController#gate`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `exitNo` | `String` | 是 |
+
+**出参** [`Checklist`](#checklist)
+
+### `POST /api/agent/me/contact`
+
+只改联系人（姓名、电话、邮箱）；名称、位置、行业由运营维护。
+
+权限码 `agent:profile:update` · `MerchantProfileController#updateContact`
+
+**请求体** [`ContactReq`](#contactreq)
+
+**出参** [`MerchantProfile`](#merchantprofile)
+
+### `GET /api/agent/me/profile`
+
+权限码 `agent:profile:read` · `MerchantProfileController#profile`
+
+**出参** [`MerchantProfile`](#merchantprofile)
+
+### `GET /api/agent/me/self-bills`
+
+权限码 `finance:withdrawal:read` · `MerchantSelfBillController#mine`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+
+**出参** 分页<[`SelfBillView`](#selfbillview)>
+
+### `GET /api/agent/me/self-bills/{billNo}/pdf`
+
+权限码 `finance:withdrawal:read` · `MerchantSelfBillController#pdf`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `billNo` | `String` | 是 |
+
+**出参** `void`
+
 ### `GET /api/agent/performance`
 
 读模型：`agt_agent ⋈ ord_order`/`dev_cabinet` 聚合，不落表。
@@ -4075,7 +6355,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 ## 平台：组织 · 权限 · 主数据 · 系统设置 · 通知
 
-80 个端点。
+86 个端点。
 
 ### `GET /api/platform/app-versions`
 
@@ -4180,7 +6460,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 权限码 `system:bank:update` · `SysDictController#createBank`
 
-**请求体** `MdBank`
+**请求体** [`MdBank`](#mdbank)
 
 **出参** [`BankEntry`](#bankentry)
 
@@ -4194,7 +6474,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|---|---|
 | 路径 | `bankCode` | `String` | 是 |
 
-**请求体** `MdBank`
+**请求体** [`MdBank`](#mdbank)
 
 **出参** [`BankEntry`](#bankentry)
 
@@ -4356,7 +6636,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 权限码 `org:dept:create` · `OrgController#createDepartment`
 
-**请求体** `IamDept`
+**请求体** [`IamDept`](#iamdept)
 
 **出参** [`Department`](#department)
 
@@ -4370,7 +6650,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|---|---|
 | 路径 | `deptNo` | `String` | 是 |
 
-**请求体** `IamDept`
+**请求体** [`IamDept`](#iamdept)
 
 **出参** [`Department`](#department)
 
@@ -4394,7 +6674,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 权限码 `system:dict:update` · `SysConfigController#createDictEntry`
 
-**请求体** `DictItem`
+**请求体** [`DictEntry`](#dictentry)
 
 **出参** [`DictEntry`](#dictentry)
 
@@ -4408,7 +6688,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|---|---|
 | 路径 | `dictNo` | `String` | 是 |
 
-**请求体** `DictItem`
+**请求体** [`DictEntry`](#dictentry)
 
 **出参** [`DictEntry`](#dictentry)
 
@@ -4447,6 +6727,74 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 **请求体** [`EmployeeSaveReq`](#employeesavereq)
 
 **出参** [`Employee`](#employee)
+
+### `POST /api/platform/employees/{employeeNo}/credential`
+
+给员工建登录号 / 重置口令，返回**一次性初始口令**。
+
+权限码 `org:employee:update` · `OrgController#resetEmployeeCredential`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `employeeNo` | `String` | 是 |
+
+**出参** `对象（自由键）`
+
+### `POST /api/platform/files`
+
+**无权限码** · `FileController#upload`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `file` | `MultipartFile` | 是 |
+| 查询 | `category` | `String` | 是 |
+
+**出参** [`FileRef`](#fileref)
+
+### `GET /api/platform/files/raw/{fileNo}`
+
+本地存储的限时签名链接（生产走 COS 预签名，不经过这里）。
+
+**无权限码** · `FileController#raw`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `fileNo` | `String` | 是 |
+| 查询 | `exp` | `long` | 是 |
+| 查询 | `sig` | `String` | 是 |
+
+**出参** `ResponseEntity<StreamingResponseBody>`
+
+### `GET /api/platform/files/{fileNo}`
+
+**无权限码** · `FileController#download`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `fileNo` | `String` | 是 |
+| 查询 | `inline` | `boolean` | 是 |
+
+**出参** `ResponseEntity<StreamingResponseBody>`
+
+### `GET /api/platform/files/{fileNo}/url`
+
+**无权限码** · `FileController#url`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `fileNo` | `String` | 是 |
+
+**出参** [`SignedUrl`](#signedurl)
 
 ### `GET /api/platform/iam/menus`
 
@@ -4529,7 +6877,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 权限码 `system:login_setting:update` · `SysSettingController#createLoginSetting`
 
-**请求体** `SysLoginSetting`
+**请求体** [`SysLoginSetting`](#sysloginsetting)
 
 **出参** [`LoginSetting`](#loginsetting)
 
@@ -4543,7 +6891,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|---|---|
 | 路径 | `country` | `String` | 是 |
 
-**请求体** `SysLoginSetting`
+**请求体** [`SysLoginSetting`](#sysloginsetting)
 
 **出参** [`LoginSetting`](#loginsetting)
 
@@ -4567,7 +6915,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 权限码 `system:market:update` · `SysSettingController#createMarket`
 
-**请求体** `MdMarketCountry`
+**请求体** [`MdMarketCountry`](#mdmarketcountry)
 
 **出参** [`MarketCountry`](#marketcountry)
 
@@ -4581,7 +6929,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|---|---|
 | 路径 | `countryCode` | `String` | 是 |
 
-**请求体** `MdMarketCountry`
+**请求体** [`MdMarketCountry`](#mdmarketcountry)
 
 **出参** [`MarketCountry`](#marketcountry)
 
@@ -4606,7 +6954,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 权限码 `system:notify_blacklist:update` · `NotifyController#block`
 
-**请求体** `NotifyBlacklist`
+**请求体** [`NotifyBlacklist`](#notifyblacklist)
 
 **出参** [`NotifyBlacklistVO`](#notifyblacklistvo)
 
@@ -4622,7 +6970,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|---|---|
 | 路径 | `blockNo` | `String` | 是 |
 
-**请求体** `NotifyBlacklist`
+**请求体** [`NotifyBlacklist`](#notifyblacklist)
 
 **出参** [`NotifyBlacklistVO`](#notifyblacklistvo)
 
@@ -4707,7 +7055,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 权限码 `system:notify_template:update` · `NotifyController#createTemplate`
 
-**请求体** `NotifyTemplate`
+**请求体** [`NotifyTemplate`](#notifytemplate)
 
 **出参** [`NotifyTemplateVO`](#notifytemplatevo)
 
@@ -4723,7 +7071,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|---|---|
 | 路径 | `no` | `String` | 是 |
 
-**请求体** `对象（自由键）`
+**请求体** [`NotifyTemplatePreviewReq`](#notifytemplatepreviewreq)
 
 **出参** `Object`
 
@@ -4753,7 +7101,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|---|---|
 | 路径 | `templateNo` | `String` | 是 |
 
-**请求体** `NotifyTemplate`
+**请求体** [`NotifyTemplate`](#notifytemplate)
 
 **出参** [`NotifyTemplateVO`](#notifytemplatevo)
 
@@ -4828,7 +7176,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 权限码 `system:payment_channel:update` · `PaymentChannelController#createChannel`
 
-**请求体** `ChannelBody`
+**请求体** [`ChannelBody`](#channelbody)
 
 **出参** [`PaymentChannelEntry`](#paymentchannelentry)
 
@@ -4842,7 +7190,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|---|---|
 | 路径 | `channelCode` | `String` | 是 |
 
-**请求体** `ChannelBody`
+**请求体** [`ChannelBody`](#channelbody)
 
 **出参** [`PaymentChannelEntry`](#paymentchannelentry)
 
@@ -4867,7 +7215,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 权限码 `system:problem:update` · `SysConfigController#createProblem`
 
-**请求体** `MdProblem`
+**请求体** [`MdProblem`](#mdproblem)
 
 **出参** [`ProblemEntry`](#problementry)
 
@@ -4909,7 +7257,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|---|---|
 | 路径 | `problemNo` | `String` | 是 |
 
-**请求体** `MdProblem`
+**请求体** [`MdProblem`](#mdproblem)
 
 **出参** [`ProblemEntry`](#problementry)
 
@@ -4933,7 +7281,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 权限码 `system:dict:update` · `SysConfigController#createRegion`
 
-**请求体** `MdRegion`
+**请求体** [`MdRegion`](#mdregion)
 
 **出参** [`Region`](#region)
 
@@ -4955,7 +7303,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|---|---|
 | 路径 | `regionId` | `String` | 是 |
 
-**请求体** `MdRegion`
+**请求体** [`MdRegion`](#mdregion)
 
 **出参** [`Region`](#region)
 
@@ -5049,6 +7397,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | 查询 | `size` | `Integer` | 否 |
 | 查询 | `keyword` | `String` | 否 |
 | 查询 | `groupName` | `String` | 否 |
+| 查询 | `pendingDecision` | `String` | 否 |
 
 **出参** 分页<[`SysParamEntry`](#sysparamentry)>
 
@@ -5056,9 +7405,17 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 权限码 `system:param:update` · `SysConfigController#createSysParam`
 
-**请求体** `SysParam`
+**请求体** [`SysParam`](#sysparam)
 
 **出参** [`SysParamEntry`](#sysparamentry)
+
+### `GET /api/platform/sys-params/timezones`
+
+业务时区的候选与当前值。
+
+权限码 `system:param:read` · `SysConfigController#timezoneOptions`
+
+**出参** `对象（自由键）`
 
 ### `POST /api/platform/sys-params/{paramKey}`
 
@@ -5070,7 +7427,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|---|---|
 | 路径 | `paramKey` | `String` | 是 |
 
-**请求体** `SysParam`
+**请求体** [`SysParam`](#sysparam)
 
 **出参** [`SysParamEntry`](#sysparamentry)
 
@@ -5093,7 +7450,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 权限码 `system:tax:update` · `SysSettingController#createTaxSetting`
 
-**请求体** `SysTaxSetting`
+**请求体** [`SysTaxSetting`](#systaxsetting)
 
 **出参** [`TaxSetting`](#taxsetting)
 
@@ -5107,14 +7464,14 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|---|---|
 | 路径 | `country` | `String` | 是 |
 
-**请求体** `SysTaxSetting`
+**请求体** [`SysTaxSetting`](#systaxsetting)
 
 **出参** [`TaxSetting`](#taxsetting)
 
 
 ## C 端（`/mp`，消费者会话）
 
-42 个端点。
+51 个端点。
 
 ### `GET /mp/app/version`
 
@@ -5153,23 +7510,37 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 **出参** `对象（自由键）`
 
+### `GET /mp/auth/methods`
+
+可用登录方式（需求 OPS-SYS-07，`sys_login_setting`）。
+
+**无权限码** · `ConsumerAuthController#methods`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `country` | `String` | 否 |
+
+**出参** `对象（自由键）`
+
 ### `POST /mp/auth/otp`
 
 发送 OTP。
 
 **无权限码** · `ConsumerAuthController#otp`
 
-**请求体** `对象（字符串值）`
+**请求体** [`OtpReq`](#otpreq)
 
 **出参** `对象（自由键）`
 
 ### `POST /mp/auth/password/reset`
 
-密码重置：**能力未开通**（凭据库 pb_auth 未建，[未完成清单 B6]）——如实 400，不假 ok。
+忘记密码：**验 OTP → 用户自设新口令**。
 
 **无权限码** · `ConsumerAuthController#resetPassword`
 
-**请求体** `对象（字符串值）`
+**请求体** [`ResetPwdReq`](#resetpwdreq)
 
 **出参** `对象（自由键）`
 
@@ -5179,7 +7550,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 **无权限码** · `ConsumerAuthController#register`
 
-**请求体** `对象（字符串值）`
+**请求体** [`RegisterReq`](#registerreq)
 
 **出参** `对象（自由键）`
 
@@ -5197,6 +7568,34 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | 查询 | `lang` | `String` | 否 |
 
 **出参** 数组<[`FaqItem`](#faqitem)>
+
+### `POST /mp/files`
+
+报障截图。
+
+**无权限码** · `MpFileController#uploadEvidence`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `file` | `MultipartFile` | 是 |
+
+**出参** [`FileRef`](#fileref)
+
+### `GET /mp/files/{fileNo}`
+
+C 端上传（`/mp/files`）—— 目前只有报障截图一种用途。
+
+**无权限码** · `MpFileController#get`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `fileNo` | `String` | 是 |
+
+**出参** `ResponseEntity<StreamingResponseBody>`
 
 ### `GET /mp/nearby/cabinets`
 
@@ -5265,7 +7664,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 **无权限码** · `RentController#depositFree`
 
-**请求体** `对象（字符串值）`
+**请求体** [`DepositFreeReq`](#depositfreereq)
 
 **出参** `对象（自由键）`
 
@@ -5294,11 +7693,11 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 ### `POST /mp/trade/orders/rent`
 
-扫码借出：`{cabinetNo`} → 创单（免押/弹仓骨架），返回订单号 + 充电宝 + 指令号。
+扫码借出：`{cabinetNo, useFreeDeposit, couponNo`} → 创单，返回订单号 + 充电宝 + 指令号。
 
 **无权限码** · `RentController#rent`
 
-**请求体** `对象（字符串值）`
+**请求体** [`RentReq`](#rentreq)
 
 **出参** [`RentResult`](#rentresult)
 
@@ -5318,8 +7717,6 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 ### `POST /mp/trade/orders/{orderNo}/buyout`
 
-买断：不还了，按 `sys_biz_rule` 计费兜底分区的买断价结单（属主鉴权）。
-
 **无权限码** · `RentController#buyout`
 
 **入参**
@@ -5330,13 +7727,42 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 **出参** [`ConsumerOrderVO`](#consumerordervo)
 
+### `GET /mp/trade/orders/{orderNo}/invoices`
+
+买断：不还了，按 `sys_biz_rule` 计费兜底分区的买断价结单（属主鉴权）。
+
+**无权限码** · `RentController#invoices`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `orderNo` | `String` | 是 |
+
+**出参** 数组<[`TaxInvoiceView`](#taxinvoiceview)>
+
+### `GET /mp/trade/orders/{orderNo}/invoices/{invoiceNo}/pdf`
+
+下载本人某张税务票据的 PDF（K8 / RQ-APP-05）。
+
+**无权限码** · `RentController#invoicePdf`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `orderNo` | `String` | 是 |
+| 路径 | `invoiceNo` | `String` | 是 |
+
+**出参** `void`
+
 ### `POST /mp/trade/pay`
 
-支付（`scene`=ORDER/…）。
+补缴欠费单（`scene`=RENT/BUYOUT/…）。
 
 **无权限码** · `RentController#pay`
 
-**请求体** `对象（自由键）`
+**请求体** [`PayReq`](#payreq)
 
 **出参** `对象（自由键）`
 
@@ -5377,6 +7803,45 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | 路径 | `couponNo` | `String` | 是 |
 
 **出参** [`UserCouponVO`](#usercouponvo)
+
+### `GET /mp/user/cs-session`
+
+我的人工会话。
+
+**无权限码** · `MpSupportController#mySession`
+
+**出参** [`CsSessionVO`](#cssessionvo)
+
+### `GET /mp/user/cs-sessions/{sessionNo}/messages`
+
+会话消息（正序）。
+
+**无权限码** · `MpSupportController#myMessages`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `sessionNo` | `String` | 是 |
+| 查询 | `limit` | `Integer` | 否 |
+
+**出参** 数组<[`CsMessageVO`](#csmessagevo)>
+
+### `POST /mp/user/cs-sessions/{sessionNo}/messages`
+
+我在会话里说一句。
+
+**无权限码** · `MpSupportController#sendMessage`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `sessionNo` | `String` | 是 |
+
+**请求体** [`SendMessageReq`](#sendmessagereq)
+
+**出参** [`CsMessageVO`](#csmessagevo)
 
 ### `GET /mp/user/favorites`
 
@@ -5424,7 +7889,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 **无权限码** · `MpUserController#saveInvoiceTitle`
 
-**请求体** `UsrInvoiceTitle`
+**请求体** [`UsrInvoiceTitle`](#usrinvoicetitle)
 
 **出参** [`InvoiceTitleItem`](#invoicetitleitem)
 
@@ -5509,6 +7974,16 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 **出参** [`MessageItem`](#messageitem)
 
+### `POST /mp/user/password`
+
+本人改密。
+
+**无权限码** · `MpUserController#changePassword`
+
+**请求体** [`ChangePwdReq`](#changepwdreq)
+
+**出参** `对象（自由键）`
+
 ### `GET /mp/user/profile`
 
 我的资料（镜像 c-app `UserProfile`）。
@@ -5523,7 +7998,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 **无权限码** · `MpUserController#updateProfile`
 
-**请求体** `对象（字符串值）`
+**请求体** [`ProfilePatchReq`](#profilepatchreq)
 
 **出参** `对象（自由键）`
 
@@ -5533,7 +8008,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 **无权限码** · `MpUserController#recharge`
 
-**请求体** `对象（字符串值）`
+**请求体** [`RechargeReq`](#rechargereq)
 
 **出参** [`RechargeResultVO`](#rechargeresultvo)
 
@@ -5616,7 +8091,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 ## 内部（`/internal`，服务间与批处理，不对外暴露）
 
-15 个端点。
+21 个端点。
 
 ### `GET /internal/dev/cabinets/assignable`
 
@@ -5641,6 +8116,19 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 **请求体** `List<String>`
 
 **出参** 数组<[`CabinetBrief`](#cabinetbrief)>
+
+### `GET /internal/dev/cabinets/installation-candidate`
+
+**无权限码** · `CabinetQueryInternalController#installationCandidate`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `cabinetNo` | `String` | 是 |
+| 查询 | `agentNo` | `String` | 否 |
+
+**出参** [`CabinetBrief`](#cabinetbrief)
 
 ### `POST /internal/dev/ownership/by-locations`
 
@@ -5671,6 +8159,14 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | 查询 | `cabinetNo` | `String` | 是 |
 
 **出参** `boolean`
+
+### `POST /internal/events/device`
+
+**无权限码** · `DeviceEventInternalController#device`
+
+**请求体** [`DeviceEventBatch`](#deviceeventbatch)
+
+**出参** [`IngestResult`](#ingestresult)
 
 ### `GET /internal/gw/heartbeats`
 
@@ -5721,6 +8217,52 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 **出参** [`VendorProbeResult`](#vendorproberesult)
 
+### `GET /internal/job/declarations`
+
+全部任务声明（调度器接入后由它拉取；现在供运维核对 cron 清单）。
+
+**无权限码** · `InternalJobController#declarations`
+
+**出参** 数组<[`JobDeclaration`](#jobdeclaration)>
+
+### `POST /internal/job/{name}/trigger`
+
+触发一个任务。
+
+**无权限码** · `InternalJobController#trigger`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `name` | `String` | 是 |
+| 查询 | `type` | `JobInvocation.Type` | 否 |
+| 查询 | `bizDate` | `LocalDate` | 否 |
+
+**出参** [`JobResult`](#jobresult)
+
+### `POST /internal/opskit/introspect`
+
+测试用：不展开通配码
+
+**无权限码** · `OpsKitIntrospectController#introspect`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `token` | `String` | 否 |
+
+**出参** `void`
+
+### `POST /internal/opskit/webhook`
+
+**无权限码** · `OpsKitWebhookController#receive`
+
+**请求体** `String`
+
+**出参** `void`
+
 ### `POST /internal/platform/notify/send`
 
 **无权限码** · `NotifyController#send`
@@ -5769,7 +8311,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 **无权限码** · `FinanceController#generateSettlements`
 
-**请求体** `对象（字符串值）`
+**请求体** [`SettlementGenerateReq`](#settlementgeneratereq)
 
 **出参** `List<String>`
 
@@ -5779,7 +8321,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 权限码 `user:risk:update` · `UserController#blacklist`
 
-**请求体** `对象（自由键）`
+**请求体** [`BlacklistReq`](#blacklistreq)
 
 **出参** [`OkResult`](#okresult)
 
@@ -5788,7 +8330,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 ## 数据结构
 
-共 241 个。同一结构常被多个端点复用，故在此定义一次、上文引用。
+共 437 个。同一结构常被多个端点复用，故在此定义一次、上文引用。
 
 ### AcceptReq
 
@@ -5844,6 +8386,24 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `plays` | `Integer` |
 | `date` | `String` |
 
+### AdSlot
+
+| 字段 | 类型 |
+|---|---|
+| `slotNo` | `String` |
+| `cabinetNo` | `String` |
+| `position` | `String` |
+| `size` | `String` |
+| `status` | `String` |
+| `id` | `?` |
+| `tenantId` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
+
 ### AdSlotVO
 
 | 字段 | 类型 |
@@ -5855,6 +8415,41 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `status` | `String` |
 | `createdAt` | `String` |
 
+### AdjustLine
+
+| 字段 | 类型 |
+|---|---|
+| `adjNo` | `String` |
+| `kind` | `String` |
+| `contractNo` | `String` |
+| `siteNo` | `String` |
+| `period` | `String` |
+| `amount` | `BigDecimal` |
+| `note` | `String` |
+
+### Adjustment
+
+| 字段 | 类型 |
+|---|---|
+| `adjNo` | `String` |
+| `payeeType` | `String` |
+| `payeeNo` | `String` |
+| `payeeName` | `String` |
+| `kind` | `String` |
+| `siteNo` | `String` |
+| `contractNo` | `String` |
+| `amount` | `BigDecimal` |
+| `suggestedAmount` | `BigDecimal` |
+| `currency` | `String` |
+| `status` | `String` |
+| `settleNo` | `String` |
+| `source` | `String` |
+| `note` | `String` |
+| `confirmedBy` | `String` |
+| `confirmedAt` | `LocalDateTime` |
+| `createdAt` | `LocalDateTime` |
+| `period` | `String` |
+
 ### Agent
 
 | 字段 | 类型 |
@@ -5864,10 +8459,20 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `contact` | `String` |
 | `regionScope` | `String` |
 | `agentType` | `String` |
-| `shareRate` | `double` |
-| `cabinetCount` | `int` |
+| `shareRate` | `Double` |
+| `cabinetCount` | `Integer` |
 | `status` | `String` |
 | `archivedAt` | `String` |
+| `contactName` | `String` |
+| `phone` | `String` |
+| `email` | `String` |
+| `address` | `String` |
+| `lng` | `BigDecimal` |
+| `lat` | `BigDecimal` |
+| `industry` | `String` |
+| `defaultSiteNo` | `String` |
+| `vatTrn` | `String` |
+| `licenseNo` | `String` |
 
 ### AgentAccount
 
@@ -5914,12 +8519,27 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|
 | `ruleNo` | `String` |
 | `agentNo` | `String` |
-| `dimension` | `String` |
+| `basis` | `String` |
 | `rate` | `BigDecimal` |
 | `fixedAmount` | `BigDecimal` |
 | `currency` | `String` |
 | `mode` | `String` |
 | `effectiveAt` | `String` |
+
+### AgentExit
+
+| 字段 | 类型 |
+|---|---|
+| `exitNo` | `String` |
+| `agentNo` | `String` |
+| `status` | `String` |
+| `reason` | `String` |
+| `startedBy` | `String` |
+| `startedAt` | `LocalDateTime` |
+| `reclaimedAt` | `LocalDateTime` |
+| `settledAt` | `LocalDateTime` |
+| `closedAt` | `LocalDateTime` |
+| `closedBy` | `String` |
 
 ### AgentPerformance
 
@@ -5945,6 +8565,18 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `suggestion` | `String` |
 | `autoWorkOrder` | `boolean` |
 | `archivedAt` | `String` |
+| `business` | [`BusinessCode`](#businesscode) |
+
+### AlarmDetail
+
+| 字段 | 类型 |
+|---|---|
+| `record` | [`AlarmRecord`](#alarmrecord) |
+| `codeName` | `String` |
+| `suggestion` | `String` |
+| `evidence` | `String` |
+| `timeline` | `List<AlarmLogItem>` |
+| `recentSameSubject` | `List<AlarmRecord>` |
 
 ### AlarmNotice
 
@@ -5984,6 +8616,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `closeNote` | `String` |
 | `closedBy` | `String` |
 | `closedAt` | `String` |
+| `business` | [`BusinessInfo`](#businessinfo) |
 
 ### AlarmRule
 
@@ -5999,6 +8632,31 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `escalateMinutes` | `Integer` |
 | `status` | `String` |
 | `archivedAt` | `String` |
+
+### AlarmSummary
+
+| 字段 | 类型 |
+|---|---|
+| `byDomain` | `Map<String, DomainCount>` |
+| `disposedOpen` | `long` |
+| `autoRecoveredToday` | `long` |
+
+### AlarmTodo
+
+| 字段 | 类型 |
+|---|---|
+| `todoNo` | `String` |
+| `alarmNo` | `String` |
+| `alarmCode` | `String` |
+| `roleCode` | `String` |
+| `assigneeNo` | `String` |
+| `title` | `String` |
+| `status` | `String` |
+| `siteNo` | `String` |
+| `createdAt` | `LocalDateTime` |
+| `doneAt` | `LocalDateTime` |
+| `doneBy` | `String` |
+| `doneNote` | `String` |
 
 ### AppVersion
 
@@ -6054,6 +8712,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `applyNo` | `String` |
 | `status` | `String` |
 | `operatorNo` | `String` |
+| `initialPassword` | `String` |
 
 ### ApplyView
 
@@ -6066,6 +8725,9 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `operatorType` | `String` |
 | `phoneMask` | `String` |
 | `emailMask` | `String` |
+| `contactName` | `String` |
+| `contactPhone` | `String` |
+| `contactEmail` | `String` |
 | `regionScope` | `String` |
 | `shareRate` | `BigDecimal` |
 | `payload` | `String` |
@@ -6079,6 +8741,53 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `phoneAlreadyKnown` | `boolean` |
 | `knownEmailMask` | `String` |
 
+### ApprovalRequest
+
+| 字段 | 类型 |
+|---|---|
+| `requestNo` | `String` |
+| `kind` | `String` |
+| `refNo` | `String` |
+| `amount` | `BigDecimal` |
+| `currency` | `String` |
+| `reason` | `String` |
+| `status` | `String` |
+| `applicantName` | `String` |
+| `approverName` | `String` |
+| `decidedAt` | `LocalDateTime` |
+| `decideNote` | `String` |
+| `resultRef` | `String` |
+| `createdAt` | `LocalDateTime` |
+
+### AssetDiff
+
+| 字段 | 类型 |
+|---|---|
+| `diffNo` | `String` |
+| `sourceType` | `String` |
+| `sourceRef` | `String` |
+| `kind` | `String` |
+| `itemType` | `String` |
+| `itemNo` | `String` |
+| `siteNo` | `String` |
+| `cabinetNo` | `String` |
+| `expectedQty` | `Integer` |
+| `actualQty` | `Integer` |
+| `status` | `String` |
+| `resolveNote` | `String` |
+| `resolvedBy` | `String` |
+| `resolvedAt` | `LocalDateTime` |
+| `createdAt` | `LocalDateTime` |
+
+### AssignBatchReq
+
+| 字段 | 类型 |
+|---|---|
+| `agentNo` | `String` |
+| `siteNos` | `List<String>` |
+| `action` | `String` |
+| `operator` | `String` |
+
 ### AssignReq
 
 | 字段 | 类型 |
@@ -6088,6 +8797,16 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `targetNo` | `String` |
 | `action` | `String` |
 | `operator` | `String` |
+
+### AssignableAsset
+
+| 字段 | 类型 |
+|---|---|
+| `assetType` | `String` |
+| `assetNo` | `String` |
+| `name` | `String` |
+| `currentAgentNo` | `String` |
+| `currentAgentName` | `String` |
 
 ### AssignmentLog
 
@@ -6100,6 +8819,12 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `action` | `String` |
 | `operator` | `String` |
 | `createdAt` | `String` |
+
+### AttachReq
+
+| 字段 | 类型 |
+|---|---|
+| `fileNos` | `List<String>` |
 
 ### AttentionItem
 
@@ -6183,6 +8908,31 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `buyoutPrice` | `BigDecimal` |
 | `overdueHours` | `Integer` |
 
+### BindBatchReq
+
+| 字段 | 类型 |
+|---|---|
+| `agentNo` | `String` |
+| `locationNo` | `String` |
+| `deviceNos` | `List<String>` |
+| `openInstallWo` | `Boolean` |
+| `expectedAt` | `String` |
+
+### BindReq
+
+| 字段 | 类型 |
+|---|---|
+| `locationNo` | `String` |
+| `openInstallWo` | `Boolean` |
+| `expectedAt` | `String` |
+
+### BindResult
+
+| 字段 | 类型 |
+|---|---|
+| `cabinet` | [`Cabinet`](#cabinet) |
+| `woNo` | `String` |
+
 ### BizRules
 
 | 字段 | 类型 |
@@ -6192,6 +8942,14 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `billing` | [`BillingDefaultRule`](#billingdefaultrule) |
 | `currency` | `String` |
 | `updatedAt` | `String` |
+
+### BlacklistReq
+
+| 字段 | 类型 |
+|---|---|
+| `cUserNo` | `String` |
+| `blacklisted` | `Boolean` |
+| `reason` | `String` |
 
 ### BrandEntry
 
@@ -6206,6 +8964,50 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `marketCode` | `String` |
 | `status` | `String` |
 | `archivedAt` | `String` |
+
+### BusinessCode
+
+| 字段 | 类型 |
+|---|---|
+| `domain` | `String` |
+| `subjectType` | `String` |
+| `evalType` | `String` |
+| `holdMinutes` | `Integer` |
+| `windowMinutes` | `Integer` |
+| `threshold` | `BigDecimal` |
+| `businessHoursOnly` | `boolean` |
+| `basePriority` | `String` |
+| `impactAdjust` | `boolean` |
+| `disposition` | `String` |
+| `ownerRole` | `String` |
+| `woDelayMinutes` | `Integer` |
+| `mergeScope` | `String` |
+| `recoverRule` | `String` |
+| `recoverHoldMinutes` | `Integer` |
+| `supersedes` | `String` |
+| `enabled` | `boolean` |
+| `builtin` | `boolean` |
+
+### BusinessInfo
+
+| 字段 | 类型 |
+|---|---|
+| `domain` | `String` |
+| `subjectType` | `String` |
+| `subjectNo` | `String` |
+| `cause` | `String` |
+| `priority` | `String` |
+| `impactScope` | `String` |
+| `impactPeriod` | `String` |
+| `siteTier` | `String` |
+| `inFlightOrders` | `Integer` |
+| `dispositionType` | `String` |
+| `dispositionRef` | `String` |
+| `firstOccurredAt` | `LocalDateTime` |
+| `lastOccurredAt` | `LocalDateTime` |
+| `dueAt` | `LocalDateTime` |
+| `recoveredAt` | `LocalDateTime` |
+| `parentAlarmNo` | `String` |
 
 ### CUserInvoiceRow
 
@@ -6258,6 +9060,13 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `siteNo` | `String` |
 | `agentNo` | `String` |
 | `archivedAt` | `String` |
+| `qcStatus` | `String` |
+| `warehouseNo` | `String` |
+| `issuedAgentNo` | `String` |
+| `issuedAt` | `String` |
+| `issuedSiteNo` | `String` |
+| `issueReceiverNo` | `String` |
+| `issueClaimedAt` | `String` |
 
 ### CabinetBrief
 
@@ -6311,6 +9120,43 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `startAt` | `String` |
 | `endAt` | `String` |
 
+### ChangePwdReq
+
+| 字段 | 类型 |
+|---|---|
+| `country` | `String` |
+| `oldPassword` | `String` |
+| `newPassword` | `String` |
+
+### ChannelBody
+
+| 字段 | 类型 |
+|---|---|
+| `channelCode` | `String` |
+| `channelName` | `String` |
+| `channelNameEn` | `String` |
+| `channelNameAr` | `String` |
+| `mode` | `String` |
+| `status` | `String` |
+| `apiBase` | `String` |
+| `merchantId` | `String` |
+| `countries` | `String` |
+| `currencies` | `String` |
+| `capabilities` | `String` |
+
+### Checklist
+
+| 字段 | 类型 |
+|---|---|
+| `allPassed` | `boolean` |
+| `items` | 数组<[`Item`](#item)> |
+
+### ClaimReq
+
+| 字段 | 类型 |
+|---|---|
+| `cabinetNos` | `List<String>` |
+
 ### ClaimableCouponVO
 
 | 字段 | 类型 |
@@ -6328,10 +9174,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 | 字段 | 类型 |
 |---|---|
-| `closeReason` | `String` |
-| `auditResult` | `String` |
-| `auditNote` | `String` |
-| `auditorNo` | `String` |
+| `note` | `String` |
 
 ### CodeBatchRow
 
@@ -6364,6 +9207,13 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `confirmedAt` | `String` |
 | `createdAt` | `String` |
 
+### CommandReq
+
+| 字段 | 类型 |
+|---|---|
+| `type` | `String` |
+| `params` | `对象（自由键）` |
+
 ### CommandResult
 
 | 字段 | 类型 |
@@ -6386,6 +9236,13 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|
 | `resolution` | `String` |
 | `resolutionNote` | `String` |
+
+### ConfirmReq
+
+| 字段 | 类型 |
+|---|---|
+| `amount` | `BigDecimal` |
+| `note` | `String` |
 
 ### ConsumerFunnelStage
 
@@ -6412,7 +9269,8 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `tenantNo` | `String` |
 | `phone` | `String` |
 | `otp` | `String` |
-| `regionCode` | `String` |
+| `password` | `String` |
+| `country` | `String` |
 | `jsCode` | `String` |
 | `code` | `String` |
 | `unionid` | `String` |
@@ -6420,6 +9278,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `idToken` | `String` |
 | `nickname` | `String` |
 | `avatar` | `String` |
+| `countryCode` | `String` |
 
 ### ConsumerLoginVO
 
@@ -6451,6 +9310,10 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `currency` | `String` |
 | `fees` | 数组<[`FeeItemVO`](#feeitemvo)> |
 | `timeline` | 数组<[`OrderStepVO`](#orderstepvo)> |
+| `estimatedFee` | `BigDecimal` |
+| `estimatedDurationMin` | `Integer` |
+| `capped` | `Boolean` |
+| `payStatus` | `String` |
 
 ### ConsumerProfileSlice
 
@@ -6473,6 +9336,14 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `avgOrderValue` | `BigDecimal` |
 | `currency` | `String` |
 
+### ContactReq
+
+| 字段 | 类型 |
+|---|---|
+| `contactName` | `String` |
+| `phone` | `String` |
+| `email` | `String` |
+
 ### Contract
 
 | 字段 | 类型 |
@@ -6488,6 +9359,149 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `endAt` | `String` |
 | `status` | `String` |
 | `attachments` | `List<ContractAttachment>` |
+| `terms` | [`ContractTerms`](#contractterms) |
+| `flow` | [`ContractFlow`](#contractflow) |
+| `remainingDays` | `Integer` |
+
+### ContractFlow
+
+| 字段 | 类型 |
+|---|---|
+| `signedAt` | `LocalDate` |
+| `submittedBy` | `String` |
+| `submittedAt` | `LocalDateTime` |
+| `auditedBy` | `String` |
+| `auditedAt` | `LocalDateTime` |
+| `auditNote` | `String` |
+| `activatedAt` | `LocalDateTime` |
+| `endedAt` | `LocalDateTime` |
+| `endReason` | `String` |
+| `prevContractNo` | `String` |
+| `sourceLeadNo` | `String` |
+| `contractKind` | `String` |
+| `parentContractNo` | `String` |
+| `auditStage` | `String` |
+| `financeAuditedBy` | `String` |
+| `financeAuditedAt` | `LocalDateTime` |
+| `financeAuditNote` | `String` |
+| `termination` | [`TerminationRequest`](#terminationrequest) |
+
+### ContractLogItem
+
+| 字段 | 类型 |
+|---|---|
+| `event` | `String` |
+| `fromStatus` | `String` |
+| `toStatus` | `String` |
+| `operator` | `String` |
+| `note` | `String` |
+| `at` | `LocalDateTime` |
+
+### ContractReq
+
+| 字段 | 类型 |
+|---|---|
+| `venueNo` | `String` |
+| `siteNo` | `String` |
+| `shareMode` | `String` |
+| `shareBase` | `String` |
+| `shareRate` | `BigDecimal` |
+| `guaranteeAmount` | `BigDecimal` |
+| `entryFee` | `BigDecimal` |
+| `currency` | `String` |
+| `settlePeriod` | `String` |
+| `startAt` | `LocalDate` |
+| `endAt` | `LocalDate` |
+| `autoRenew` | `Boolean` |
+| `exclusive` | `Boolean` |
+| `deviceQuota` | `Integer` |
+| `placementNote` | `String` |
+| `depositAmount` | `BigDecimal` |
+| `depositTerms` | `String` |
+| `signerName` | `String` |
+| `remark` | `String` |
+
+### ContractSummary
+
+| 字段 | 类型 |
+|---|---|
+| `pendingMine` | `long` |
+| `pendingCosign` | `long` |
+| `terminationPending` | `long` |
+| `expiring60` | `long` |
+| `expiredNotRenewed` | `long` |
+| `missingScan` | `long` |
+
+### ContractTerms
+
+| 字段 | 类型 |
+|---|---|
+| `shareMode` | `String` |
+| `shareBase` | `String` |
+| `guaranteeAmount` | `BigDecimal` |
+| `currency` | `String` |
+| `settlePeriod` | `String` |
+| `depositAmount` | `BigDecimal` |
+| `depositTerms` | `String` |
+| `exclusive` | `Boolean` |
+| `deviceQuota` | `Integer` |
+| `placementNote` | `String` |
+| `autoRenew` | `Boolean` |
+| `signerName` | `String` |
+| `remark` | `String` |
+
+### CountNoteReq
+
+| 字段 | 类型 |
+|---|---|
+| `note` | `String` |
+
+### CountReview
+
+| 字段 | 类型 |
+|---|---|
+| `state` | `String` |
+| `approvalNo` | `String` |
+| `round` | `int` |
+| `submitterNo` | `String` |
+| `decision` | `String` |
+| `deciderName` | `String` |
+| `lastError` | `String` |
+| `configured` | `boolean` |
+
+### CountScanReq
+
+| 字段 | 类型 |
+|---|---|
+| `serialNos` | `List<String>` |
+
+### CouponIssueRecord
+
+| 字段 | 类型 |
+|---|---|
+| `issueNo` | `String` |
+| `couponNo` | `String` |
+| `couponName` | `String` |
+| `targetType` | `String` |
+| `targetDesc` | `String` |
+| `quantity` | `Integer` |
+| `operatorName` | `String` |
+| `createdAt` | `String` |
+
+### CouponIssueReq
+
+| 字段 | 类型 |
+|---|---|
+| `targetType` | `String` |
+| `targetValue` | `String` |
+| `quantity` | `Integer` |
+
+### CouponIssueResultVO
+
+| 字段 | 类型 |
+|---|---|
+| `coupon` | [`CouponTplVO`](#coupontplvo) |
+| `record` | [`CouponIssueRecord`](#couponissuerecord) |
 
 ### CouponTplReq
 
@@ -6517,6 +9531,21 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `issued` | `Integer` |
 | `status` | `String` |
 | `archivedAt` | `String` |
+
+### CreateReq
+
+| 字段 | 类型 |
+|---|---|
+| `kind` | `String` |
+| `warehouseNo` | `String` |
+| `supplierNo` | `String` |
+| `sourceRef` | `String` |
+| `arrivedAt` | `String` |
+| `note` | `String` |
+| `currency` | `String` |
+| `unitCosts` | `Map<String, BigDecimal>` |
+| `cabinetNos` | `List<String>` |
+| `powerbankNos` | `List<String>` |
 
 ### CreditScoreAdjustReq
 
@@ -6577,6 +9606,8 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `woNo` | `String` |
 | `refundNo` | `String` |
 | `createdAt` | `String` |
+| `photos` | `List<FileRef>` |
+| `photoCount` | `Integer` |
 
 ### DashboardAlert
 
@@ -6658,6 +9689,25 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `sort` | `Integer` |
 | `status` | `String` |
 
+### DepositBuyoutReq
+
+| 字段 | 类型 |
+|---|---|
+| `reason` | `String` |
+
+### DepositDunReq
+
+| 字段 | 类型 |
+|---|---|
+| `channel` | `String` |
+| `note` | `String` |
+
+### DepositFreeReq
+
+| 字段 | 类型 |
+|---|---|
+| `cabinetNo` | `String` |
+
 ### DepositRecord
 
 | 字段 | 类型 |
@@ -6679,6 +9729,166 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `operatorName` | `String` |
 | `note` | `String` |
 
+### DeriveReq
+
+| 字段 | 类型 |
+|---|---|
+| `type` | `String` |
+| `priority` | `String` |
+| `cabinetNo` | `String` |
+| `description` | `String` |
+
+### DevAlarmCode
+
+| 字段 | 类型 |
+|---|---|
+| `code` | `String` |
+| `message` | `String` |
+| `messageEn` | `String` |
+| `messageAr` | `String` |
+| `level` | `String` |
+| `suggestion` | `String` |
+| `autoWorkOrder` | `Integer` |
+| `archivedAt` | `LocalDateTime` |
+| `domain` | `String` |
+| `subjectType` | `String` |
+| `evalType` | `String` |
+| `holdMinutes` | `Integer` |
+| `windowMinutes` | `Integer` |
+| `threshold` | `BigDecimal` |
+| `businessHoursOnly` | `Integer` |
+| `basePriority` | `String` |
+| `impactAdjust` | `Integer` |
+| `disposition` | `String` |
+| `ownerRole` | `String` |
+| `woDelayMinutes` | `Integer` |
+| `mergeScope` | `String` |
+| `recoverRule` | `String` |
+| `recoverHoldMinutes` | `Integer` |
+| `supersedes` | `String` |
+| `enabled` | `Integer` |
+| `builtin` | `Integer` |
+| `id` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
+
+### DevAlarmRule
+
+| 字段 | 类型 |
+|---|---|
+| `ruleNo` | `String` |
+| `alarmCode` | `String` |
+| `target` | `String` |
+| `channel` | `String` |
+| `method` | `String` |
+| `quietStart` | `String` |
+| `quietEnd` | `String` |
+| `escalateMinutes` | `Integer` |
+| `status` | `String` |
+| `archivedAt` | `LocalDateTime` |
+| `id` | `?` |
+| `tenantId` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
+
+### DevCodeBatch
+
+| 字段 | 类型 |
+|---|---|
+| `batchNo` | `String` |
+| `vendorCode` | `String` |
+| `codeType` | `String` |
+| `rangeStart` | `String` |
+| `rangeEnd` | `String` |
+| `total` | `Integer` |
+| `bound` | `Integer` |
+| `producedAt` | `String` |
+| `status` | `String` |
+| `id` | `?` |
+| `tenantId` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
+
+### DevOtaRelease
+
+| 字段 | 类型 |
+|---|---|
+| `id` | `Long` |
+| `releaseNo` | `String` |
+| `tenantId` | `String` |
+| `fwType` | `String` |
+| `vendorCode` | `String` |
+| `version` | `String` |
+| `versionCode` | `Integer` |
+| `artifactUrl` | `String` |
+| `checksum` | `String` |
+| `mandatory` | `Integer` |
+| `status` | `String` |
+| `releaseNotes` | `String` |
+| `createdAt` | `String` |
+| `updatedAt` | `String` |
+| `lockVersion` | `Long` |
+| `deleted` | `Integer` |
+
+### DevOtaRollout
+
+| 字段 | 类型 |
+|---|---|
+| `id` | `Long` |
+| `rolloutNo` | `String` |
+| `releaseNo` | `String` |
+| `fwVersion` | `String` |
+| `vendorCode` | `String` |
+| `strategy` | `String` |
+| `scope` | `String` |
+| `targetRef` | `String` |
+| `progress` | `Integer` |
+| `status` | `String` |
+| `createdAt` | `String` |
+| `updatedAt` | `String` |
+
+### DeviceAlerts
+
+| 字段 | 类型 |
+|---|---|
+| `deployed` | `long` |
+| `offline` | `long` |
+| `noBorrowable` | `long` |
+| `offlineSample` | `List<String>` |
+| `noBorrowableSample` | `List<String>` |
+
+### DeviceEvent
+
+| 字段 | 类型 |
+|---|---|
+| `eventId` | `String` |
+| `type` | `String` |
+| `deviceNo` | `String` |
+| `slotIndex` | `Integer` |
+| `powerbankNo` | `String` |
+| `vendorCode` | `String` |
+| `vendorErrorCode` | `String` |
+| `occurredAt` | `LocalDateTime` |
+| `attrs` | `对象（字符串值）` |
+
+### DeviceEventBatch
+
+| 字段 | 类型 |
+|---|---|
+| `events` | 数组<[`DeviceEvent`](#deviceevent)> |
+
 ### DeviceLogRow
 
 | 字段 | 类型 |
@@ -6693,6 +9903,23 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `occurredAt` | `String` |
 | `result` | `String` |
 
+### DeviceMovement
+
+| 字段 | 类型 |
+|---|---|
+| `id` | `Long` |
+| `itemType` | `String` |
+| `itemNo` | `String` |
+| `event` | `String` |
+| `fromRef` | `String` |
+| `toRef` | `String` |
+| `agentBefore` | `String` |
+| `agentAfter` | `String` |
+| `reason` | `String` |
+| `sourceRef` | `String` |
+| `operatorNo` | `String` |
+| `occurredAt` | `LocalDateTime` |
+
 ### DictEntry
 
 | 字段 | 类型 |
@@ -6704,6 +9931,71 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `sort` | `Integer` |
 | `enabled` | `Boolean` |
 
+### Disposal
+
+| 字段 | 类型 |
+|---|---|
+| `disposalNo` | `String` |
+| `kind` | `String` |
+| `warehouseNo` | `String` |
+| `warehouseName` | `String` |
+| `supplierNo` | `String` |
+| `supplierName` | `String` |
+| `reasonCode` | `String` |
+| `note` | `String` |
+| `itemCount` | `int` |
+| `createdBy` | `String` |
+| `createdAt` | `LocalDateTime` |
+
+### DisposalDetail
+
+| 字段 | 类型 |
+|---|---|
+| `disposal` | [`Disposal`](#disposal) |
+| `items` | 数组<[`DisposalItem`](#disposalitem)> |
+
+### DisposalItem
+
+| 字段 | 类型 |
+|---|---|
+| `itemType` | `String` |
+| `itemNo` | `String` |
+
+### DisposalReq
+
+| 字段 | 类型 |
+|---|---|
+| `kind` | `String` |
+| `warehouseNo` | `String` |
+| `supplierNo` | `String` |
+| `reasonCode` | `String` |
+| `note` | `String` |
+| `cabinetNos` | `List<String>` |
+| `powerbankNos` | `List<String>` |
+| `carrier` | `String` |
+| `trackingNo` | `String` |
+
+### DisposeReq
+
+| 字段 | 类型 |
+|---|---|
+| `items` | 数组<[`ItemRef`](#itemref)> |
+| `disposition` | `String` |
+| `note` | `String` |
+
+### DispositionPreview
+
+| 字段 | 类型 |
+|---|---|
+| `type` | `String` |
+| `woType` | `String` |
+| `priority` | `String` |
+| `assigneeType` | `String` |
+| `assigneeNo` | `String` |
+| `mergeIntoWoNo` | `String` |
+| `todoRole` | `String` |
+| `fallback` | `String` |
+
 ### Employee
 
 | 字段 | 类型 |
@@ -6712,6 +10004,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `name` | `String` |
 | `phone` | `String` |
 | `email` | `String` |
+| `deptNo` | `String` |
 | `deptName` | `String` |
 | `roleNo` | `String` |
 | `roleName` | `String` |
@@ -6741,6 +10034,12 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `refundNo` | `String` |
 | `workOrderNo` | `String` |
 
+### ExitReq
+
+| 字段 | 类型 |
+|---|---|
+| `reason` | `String` |
+
 ### FaqItem
 
 | 字段 | 类型 |
@@ -6758,6 +10057,21 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|
 | `type` | `String` |
 | `amount` | `BigDecimal` |
+
+### FileRef
+
+| 字段 | 类型 |
+|---|---|
+| `fileNo` | `String` |
+| `category` | `String` |
+| `status` | `String` |
+| `originalName` | `String` |
+| `contentType` | `String` |
+| `sizeBytes` | `long` |
+| `previewable` | `boolean` |
+| `imageWidth` | `Integer` |
+| `imageHeight` | `Integer` |
+| `uploadedAt` | `LocalDateTime` |
 
 ### FreeOrder
 
@@ -6801,12 +10115,36 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `grantedBy` | `String` |
 | `status` | `String` |
 
+### FunnelStage
+
+| 字段 | 类型 |
+|---|---|
+| `kind` | `String` |
+| `phase` | `String` |
+| `count` | `long` |
+| `avgDaysInPhase` | `Double` |
+
 ### GeoReady
 
 | 字段 | 类型 |
 |---|---|
 | `withGeo` | `int` |
 | `total` | `int` |
+
+### GrantLoginReq
+
+| 字段 | 类型 |
+|---|---|
+| `phone` | `String` |
+| `email` | `String` |
+| `displayName` | `String` |
+
+### GrantLoginResult
+
+| 字段 | 类型 |
+|---|---|
+| `agentNo` | `String` |
+| `accountNo` | `String` |
 
 ### HandleReq
 
@@ -6817,6 +10155,12 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `handleNote` | `String` |
 | `partChanged` | `Boolean` |
 | `deviceChanged` | `Boolean` |
+| `faultReasonCode` | `String` |
+| `fileNos` | `List<String>` |
+| `locationNo` | `String` |
+| `countedQty` | `Integer` |
+| `partCost` | `BigDecimal` |
+| `laborCost` | `BigDecimal` |
 
 ### HeartbeatRecord
 
@@ -6825,6 +10169,37 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `cabinetNo` | `String` |
 | `beatAt` | `String` |
 | `metrics` | `String` |
+
+### IamDept
+
+| 字段 | 类型 |
+|---|---|
+| `deptNo` | `String` |
+| `parentNo` | `String` |
+| `name` | `String` |
+| `nameEn` | `String` |
+| `nameAr` | `String` |
+| `leaderNo` | `String` |
+| `leaderName` | `String` |
+| `path` | `String` |
+| `sort` | `Integer` |
+| `status` | `String` |
+| `id` | `?` |
+| `tenantId` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
+
+### IngestResult
+
+| 字段 | 类型 |
+|---|---|
+| `accepted` | `int` |
+| `duplicated` | `int` |
+| `unknownCode` | `int` |
 
 ### InspectionPlan
 
@@ -6841,6 +10216,66 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `lastRunPeriod` | `String` |
 | `lastRunWoNos` | `List<String>` |
 
+### InspectionPlanReq
+
+| 字段 | 类型 |
+|---|---|
+| `planNo` | `String` |
+| `route` | `String` |
+| `frequency` | `String` |
+| `cron` | `String` |
+| `nextAt` | `String` |
+| `assignee` | `String` |
+| `active` | `Boolean` |
+
+### Intake
+
+| 字段 | 类型 |
+|---|---|
+| `intakeNo` | `String` |
+| `kind` | `String` |
+| `warehouseNo` | `String` |
+| `warehouseName` | `String` |
+| `sourceRef` | `String` |
+| `supplierNo` | `String` |
+| `supplierName` | `String` |
+| `currency` | `String` |
+| `totalCost` | `BigDecimal` |
+| `arrivedAt` | `LocalDateTime` |
+| `status` | `String` |
+| `note` | `String` |
+| `total` | `int` |
+| `pending` | `int` |
+| `passed` | `int` |
+| `failed` | `int` |
+| `inbound` | `int` |
+| `disposed` | `int` |
+| `createdBy` | `String` |
+| `createdAt` | `LocalDateTime` |
+
+### IntakeDetail
+
+| 字段 | 类型 |
+|---|---|
+| `intake` | [`Intake`](#intake) |
+| `items` | 数组<[`IntakeItem`](#intakeitem)> |
+
+### IntakeItem
+
+| 字段 | 类型 |
+|---|---|
+| `itemType` | `String` |
+| `itemNo` | `String` |
+| `unitCost` | `BigDecimal` |
+| `sn` | `String` |
+| `model` | `String` |
+| `qcNo` | `String` |
+| `qcResult` | `String` |
+| `disposition` | `String` |
+| `dispositionNote` | `String` |
+| `handledBy` | `String` |
+| `handledAt` | `LocalDateTime` |
+
 ### InterveneReq
 
 | 字段 | 类型 |
@@ -6849,6 +10284,61 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `reason` | `String` |
 | `amount` | `BigDecimal` |
 | `operatorName` | `String` |
+
+### InvTransferReq
+
+| 字段 | 类型 |
+|---|---|
+| `fromType` | `String` |
+| `fromRef` | `String` |
+| `fromName` | `String` |
+| `toType` | `String` |
+| `toRef` | `String` |
+| `toName` | `String` |
+| `itemType` | `String` |
+| `powerbankCount` | `Integer` |
+| `status` | `String` |
+
+### InventoryEngine
+
+| 字段 | 类型 |
+|---|---|
+| `engine` | `String` |
+| `configured` | `boolean` |
+| `endpointMode` | `String` |
+| `reachable` | `Boolean` |
+| `failure` | `String` |
+
+### InventoryMigrationPlan
+
+| 字段 | 类型 |
+|---|---|
+| `configured` | `boolean` |
+| `toInbound` | `int` |
+| `toIssue` | `int` |
+| `skipped` | `int` |
+| `done` | `int` |
+| `skippedItems` | 数组<[`MigrationCandidate`](#migrationcandidate)> |
+
+### InventoryMigrationResult
+
+| 字段 | 类型 |
+|---|---|
+| `processed` | `int` |
+| `failed` | `int` |
+| `remaining` | `int` |
+| `failures` | 数组<[`MigrationFailure`](#migrationfailure)> |
+
+### InventoryReport
+
+| 字段 | 类型 |
+|---|---|
+| `from` | `String` |
+| `to` | `String` |
+| `stages` | 数组<[`StockStage`](#stockstage)> |
+| `rows` | 数组<[`WarehouseRow`](#warehouserow)> |
+| `disposals` | `Map<String, Long>` |
+| `purchases` | 数组<[`PurchaseRow`](#purchaserow)> |
 
 ### InventoryTransfer
 
@@ -6905,6 +10395,12 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `amount` | `BigDecimal` |
 | `currency` | `String` |
 
+### InvoiceIssueReq
+
+| 字段 | 类型 |
+|---|---|
+| `fileUrl` | `String` |
+
 ### InvoiceItem
 
 | 字段 | 类型 |
@@ -6918,6 +10414,12 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `fileUrl` | `String` |
 | `appliedAt` | `String` |
 | `issuedAt` | `String` |
+
+### InvoiceRejectReq
+
+| 字段 | 类型 |
+|---|---|
+| `reason` | `String` |
 
 ### InvoiceSaveReq
 
@@ -6950,6 +10452,77 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `invoice` | [`Invoice`](#invoice) |
 | `orderNos` | `List<String>` |
 
+### InvoiceVoidReq
+
+| 字段 | 类型 |
+|---|---|
+| `voidReason` | `String` |
+
+### IssueReq
+
+| 字段 | 类型 |
+|---|---|
+| `agentNo` | `String` |
+| `siteNo` | `String` |
+| `receiverNo` | `String` |
+| `cabinetNos` | `List<String>` |
+| `carrier` | `String` |
+| `trackingNo` | `String` |
+
+### IssuedSummary
+
+| 字段 | 类型 |
+|---|---|
+| `agentNo` | `String` |
+| `agentName` | `String` |
+| `unbound` | `int` |
+| `bound` | `int` |
+| `live` | `int` |
+
+### Item
+
+| 字段 | 类型 |
+|---|---|
+| `key` | `String` |
+| `label` | `String` |
+| `passed` | `boolean` |
+| `detail` | `String` |
+| `fixHref` | `String` |
+
+### ItemRef
+
+| 字段 | 类型 |
+|---|---|
+| `itemType` | `String` |
+| `itemNo` | `String` |
+
+### ItemsReq
+
+| 字段 | 类型 |
+|---|---|
+| `itemNos` | `List<String>` |
+
+### JobDeclaration
+
+| 字段 | 类型 |
+|---|---|
+| `name` | `String` |
+| `title` | `String` |
+| `ownerModule` | `String` |
+| `defaultCron` | `String` |
+| `timeoutSec` | `int` |
+| `lockAtMostSec` | `int` |
+| `manualTrigger` | `boolean` |
+| `logEveryRun` | `boolean` |
+
+### JobResult
+
+| 字段 | 类型 |
+|---|---|
+| `status` | `Status` |
+| `detail` | `String` |
+| `error` | `String` |
+
 ### Lead
 
 | 字段 | 类型 |
@@ -6964,6 +10537,49 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `expectSites` | `Integer` |
 | `nextFollowAt` | `String` |
 | `updatedAt` | `String` |
+| `address` | `String` |
+| `venueNo` | `String` |
+| `contractNo` | `String` |
+| `lostReason` | `String` |
+| `lostAt` | `LocalDateTime` |
+| `lastFollowAt` | `LocalDateTime` |
+| `inPool` | `boolean` |
+| `prevOwner` | `String` |
+| `competitorName` | `String` |
+| `competitorExclusiveUntil` | `LocalDate` |
+| `reactivatedAt` | `LocalDateTime` |
+| `terms` | [`LeadTerms`](#leadterms) |
+| `lng` | `BigDecimal` |
+| `lat` | `BigDecimal` |
+
+### LeadConversion
+
+| 字段 | 类型 |
+|---|---|
+| `leadNo` | `String` |
+| `venueNo` | `String` |
+| `venueCreated` | `boolean` |
+| `siteNo` | `String` |
+| `siteCreated` | `boolean` |
+| `contractNo` | `String` |
+
+### LeadConvertReq
+
+| 字段 | 类型 |
+|---|---|
+| `venueNo` | `String` |
+| `siteNo` | `String` |
+| `siteName` | `String` |
+| `regionId` | `String` |
+| `address` | `String` |
+| `openHours` | `String` |
+| `shareMode` | `String` |
+| `shareRate` | `BigDecimal` |
+| `entryFee` | `BigDecimal` |
+| `guaranteeAmount` | `BigDecimal` |
+| `startAt` | `LocalDate` |
+| `termMonths` | `Integer` |
+| `exclusive` | `Boolean` |
 
 ### LeadFollowUpReq
 
@@ -6973,6 +10589,17 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `toStage` | `String` |
 | `content` | `String` |
 | `nextAt` | `String` |
+
+### LeadTerms
+
+| 字段 | 类型 |
+|---|---|
+| `shareMode` | `String` |
+| `shareRate` | `BigDecimal` |
+| `entryFee` | `BigDecimal` |
+| `guaranteeAmount` | `BigDecimal` |
+| `termMonths` | `Integer` |
+| `exclusive` | `Boolean` |
 
 ### LedgerEntry
 
@@ -7012,6 +10639,81 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `summary` | `String` |
 | `lines` | 数组<[`LedgerLine`](#ledgerline)> |
 
+### LifecycleRow
+
+| 字段 | 类型 |
+|---|---|
+| `kind` | `String` |
+| `no` | `String` |
+| `name` | `String` |
+| `phase` | `String` |
+| `phaseSince` | `LocalDateTime` |
+| `daysInPhase` | `Long` |
+| `owner` | `String` |
+
+### LocLead
+
+| 字段 | 类型 |
+|---|---|
+| `leadNo` | `String` |
+| `regionId` | `String` |
+| `venueName` | `String` |
+| `contact` | `String` |
+| `stage` | `String` |
+| `owner` | `String` |
+| `ownerType` | `String` |
+| `siteNo` | `String` |
+| `expectSites` | `Integer` |
+| `nextFollowAt` | `String` |
+| `address` | `String` |
+| `lng` | `BigDecimal` |
+| `lat` | `BigDecimal` |
+| `venueNo` | `String` |
+| `contractNo` | `String` |
+| `lostReason` | `String` |
+| `lostAt` | `LocalDateTime` |
+| `lastFollowAt` | `LocalDateTime` |
+| `remindAt` | `LocalDateTime` |
+| `inPool` | `Integer` |
+| `pooledAt` | `LocalDateTime` |
+| `prevOwner` | `String` |
+| `competitorName` | `String` |
+| `competitorExclusiveUntil` | `LocalDate` |
+| `reactivatedAt` | `LocalDateTime` |
+| `shareMode` | `String` |
+| `shareRate` | `BigDecimal` |
+| `entryFee` | `BigDecimal` |
+| `guaranteeAmount` | `BigDecimal` |
+| `termMonths` | `Integer` |
+| `exclusiveFlag` | `Boolean` |
+| `id` | `?` |
+| `tenantId` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
+
+### LocVenue
+
+| 字段 | 类型 |
+|---|---|
+| `id` | `Long` |
+| `venueNo` | `String` |
+| `tenantId` | `String` |
+| `name` | `String` |
+| `contact` | `String` |
+| `industry` | `String` |
+| `address` | `String` |
+| `lng` | `BigDecimal` |
+| `lat` | `BigDecimal` |
+| `createdAt` | `LocalDateTime` |
+| `updatedAt` | `LocalDateTime` |
+| `version` | `Long` |
+| `deleted` | `Integer` |
+| `archivedAt` | `LocalDateTime` |
+
 ### Location
 
 | 字段 | 类型 |
@@ -7023,6 +10725,8 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `spotDesc` | `String` |
 | `cabinetCount` | `Integer` |
 | `status` | `String` |
+| `isDefault` | `Boolean` |
+| `agentNo` | `String` |
 
 ### LoginReq
 
@@ -7034,6 +10738,8 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `agentNo` | `String` |
 | `phone` | `String` |
 | `otp` | `String` |
+| `identifier` | `String` |
+| `realm` | `String` |
 
 ### LoginResp
 
@@ -7046,6 +10752,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `perms` | `List<String>` |
 | `principalNo` | `String` |
 | `operators` | 数组<[`OperatorMembership`](#operatormembership)> |
+| `mustChange` | `boolean` |
 
 ### LoginSetting
 
@@ -7071,6 +10778,12 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `status` | `String` |
 | `purgedAt` | `String` |
 
+### LostVerdictReq
+
+| 字段 | 类型 |
+|---|---|
+| `note` | `String` |
+
 ### MarketCountry
 
 | 字段 | 类型 |
@@ -7082,6 +10795,194 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `compliance` | `String` |
 | `cityCount` | `Integer` |
 | `status` | `String` |
+
+### Material
+
+| 字段 | 类型 |
+|---|---|
+| `materialNo` | `String` |
+| `name` | `String` |
+| `category` | `String` |
+| `trackingMode` | `String` |
+| `uom` | `String` |
+| `spec` | `String` |
+| `vendorCode` | `String` |
+| `defaultSupplierNo` | `String` |
+| `builtin` | `boolean` |
+| `hasMovements` | `boolean` |
+| `archivedAt` | `LocalDateTime` |
+| `createdAt` | `LocalDateTime` |
+
+### MaterialBalance
+
+| 字段 | 类型 |
+|---|---|
+| `warehouseNo` | `String` |
+| `warehouseName` | `String` |
+| `materialNo` | `String` |
+| `materialName` | `String` |
+| `category` | `String` |
+| `trackingMode` | `String` |
+| `uom` | `String` |
+| `onHand` | `int` |
+| `minQty` | `int` |
+| `low` | `boolean` |
+| `serialNos` | `List<String>` |
+
+### MaterialDoc
+
+| 字段 | 类型 |
+|---|---|
+| `docNo` | `String` |
+| `kind` | `String` |
+| `purpose` | `String` |
+| `warehouseNo` | `String` |
+| `warehouseName` | `String` |
+| `toWarehouseNo` | `String` |
+| `toWarehouseName` | `String` |
+| `supplierNo` | `String` |
+| `supplierName` | `String` |
+| `reasonCode` | `String` |
+| `receiverNo` | `String` |
+| `woNo` | `String` |
+| `currency` | `String` |
+| `note` | `String` |
+| `totalQty` | `int` |
+| `lines` | 数组<[`MaterialDocLine`](#materialdocline)> |
+| `createdBy` | `String` |
+| `createdAt` | `LocalDateTime` |
+
+### MaterialDocLine
+
+| 字段 | 类型 |
+|---|---|
+| `materialNo` | `String` |
+| `materialName` | `String` |
+| `qty` | `Integer` |
+| `serialNos` | `List<String>` |
+| `unitCost` | `BigDecimal` |
+
+### MaterialDocReq
+
+| 字段 | 类型 |
+|---|---|
+| `purpose` | `String` |
+| `warehouseNo` | `String` |
+| `toWarehouseNo` | `String` |
+| `supplierNo` | `String` |
+| `reasonCode` | `String` |
+| `receiverNo` | `String` |
+| `woNo` | `String` |
+| `currency` | `String` |
+| `note` | `String` |
+| `lines` | 数组<[`MaterialDocLine`](#materialdocline)> |
+| `requestKey` | `String` |
+
+### MaterialMinQtyReq
+
+| 字段 | 类型 |
+|---|---|
+| `warehouseNo` | `String` |
+| `materialNo` | `String` |
+| `minQty` | `Integer` |
+
+### MaterialReq
+
+| 字段 | 类型 |
+|---|---|
+| `name` | `String` |
+| `category` | `String` |
+| `trackingMode` | `String` |
+| `uom` | `String` |
+| `spec` | `String` |
+| `vendorCode` | `String` |
+| `defaultSupplierNo` | `String` |
+
+### MdBank
+
+| 字段 | 类型 |
+|---|---|
+| `bankCode` | `String` |
+| `bankName` | `String` |
+| `bankNameEn` | `String` |
+| `bankNameAr` | `String` |
+| `country` | `String` |
+| `currency` | `String` |
+| `swiftPrefix` | `String` |
+| `ibanLength` | `Integer` |
+| `status` | `String` |
+| `archivedAt` | `LocalDateTime` |
+| `id` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
+
+### MdMarketCountry
+
+| 字段 | 类型 |
+|---|---|
+| `countryCode` | `String` |
+| `name` | `String` |
+| `nameEn` | `String` |
+| `nameAr` | `String` |
+| `currency` | `String` |
+| `timezone` | `String` |
+| `compliance` | `String` |
+| `status` | `String` |
+| `id` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
+
+### MdProblem
+
+| 字段 | 类型 |
+|---|---|
+| `problemNo` | `String` |
+| `category` | `String` |
+| `title` | `String` |
+| `titleEn` | `String` |
+| `titleAr` | `String` |
+| `answer` | `String` |
+| `answerEn` | `String` |
+| `answerAr` | `String` |
+| `suggestedAction` | `String` |
+| `sortNo` | `Integer` |
+| `status` | `String` |
+| `archivedAt` | `LocalDateTime` |
+| `id` | `?` |
+| `tenantId` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
+
+### MdRegion
+
+| 字段 | 类型 |
+|---|---|
+| `regionId` | `String` |
+| `name` | `String` |
+| `nameEn` | `String` |
+| `nameAr` | `String` |
+| `parentId` | `String` |
+| `level` | `Integer` |
+| `cityCount` | `Integer` |
+| `id` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
 
 ### MemberBenefit
 
@@ -7122,6 +11023,23 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `level` | `String` |
 | `months` | `Integer` |
 
+### MemberPlanReq
+
+| 字段 | 类型 |
+|---|---|
+| `planNo` | `String` |
+| `name` | `String` |
+| `nameEn` | `String` |
+| `nameAr` | `String` |
+| `cardType` | `String` |
+| `price` | `BigDecimal` |
+| `currency` | `String` |
+| `periodDays` | `Integer` |
+| `timesTotal` | `Integer` |
+| `rights` | [`PlanRightsVO`](#planrightsvo) |
+| `autoRenew` | `Boolean` |
+| `sortNo` | `Integer` |
+
 ### MemberRow
 
 | 字段 | 类型 |
@@ -7142,7 +11060,9 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `planNo` | `String` |
 | `name` | `String` |
 | `price` | `BigDecimal` |
-| `benefits` | `List<String>` |
+| `currency` | `String` |
+| `cardType` | `String` |
+| `rights` | [`PlanRightsVO`](#planrightsvo) |
 | `active` | `Boolean` |
 | `expireAt` | `String` |
 
@@ -7182,6 +11102,22 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `visible` | `Integer` |
 | `perm` | `String` |
 
+### MerchantProfile
+
+| 字段 | 类型 |
+|---|---|
+| `agentNo` | `String` |
+| `name` | `String` |
+| `address` | `String` |
+| `lng` | `BigDecimal` |
+| `lat` | `BigDecimal` |
+| `industry` | `String` |
+| `contactName` | `String` |
+| `phone` | `String` |
+| `email` | `String` |
+| `defaultSiteNo` | `String` |
+| `status` | `String` |
+
 ### MessageItem
 
 | 字段 | 类型 |
@@ -7189,10 +11125,42 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `messageNo` | `String` |
 | `type` | `String` |
 | `title` | `String` |
+| `titleEn` | `String` |
+| `titleAr` | `String` |
 | `body` | `String` |
+| `bodyEn` | `String` |
+| `bodyAr` | `String` |
 | `read` | `boolean` |
 | `readAt` | `String` |
 | `createdAt` | `String` |
+
+### MigrationCandidate
+
+| 字段 | 类型 |
+|---|---|
+| `itemType` | `String` |
+| `itemNo` | `String` |
+| `kind` | `String` |
+| `warehouseNo` | `String` |
+| `agentNo` | `String` |
+| `siteNo` | `String` |
+| `claimed` | `boolean` |
+| `reason` | `String` |
+
+### MigrationFailure
+
+| 字段 | 类型 |
+|---|---|
+| `itemType` | `String` |
+| `itemNo` | `String` |
+| `code` | `String` |
+| `detail` | `String` |
+
+### MigrationRunReq
+
+| 字段 | 类型 |
+|---|---|
+| `limit` | `Integer` |
 
 ### MyApplyView
 
@@ -7223,6 +11191,28 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `currency` | `String` |
 | `status` | `String` |
 
+### NoteReq
+
+| 字段 | 类型 |
+|---|---|
+| `note` | `String` |
+
+### NoticeReq
+
+| 字段 | 类型 |
+|---|---|
+| `noticeNo` | `String` |
+| `title` | `String` |
+| `titleEn` | `String` |
+| `titleAr` | `String` |
+| `content` | `String` |
+| `contentEn` | `String` |
+| `contentAr` | `String` |
+| `type` | `String` |
+| `pinned` | `Boolean` |
+| `startAt` | `String` |
+| `endAt` | `String` |
+
 ### NoticeVO
 
 | 字段 | 类型 |
@@ -7242,6 +11232,29 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `publishedBy` | `String` |
 | `createdAt` | `String` |
 | `archivedAt` | `String` |
+
+### NotifyBlacklist
+
+| 字段 | 类型 |
+|---|---|
+| `blockNo` | `String` |
+| `target` | `String` |
+| `channel` | `String` |
+| `reason` | `String` |
+| `blockedAt` | `String` |
+| `blockedBy` | `String` |
+| `expireAt` | `String` |
+| `releasedAt` | `String` |
+| `releasedBy` | `String` |
+| `status` | `String` |
+| `id` | `?` |
+| `tenantId` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
 
 ### NotifyBlacklistVO
 
@@ -7290,6 +11303,33 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | 字段 | 类型 |
 |---|---|
 | `idempotencyKey` | `String` |
+
+### NotifyTemplate
+
+| 字段 | 类型 |
+|---|---|
+| `templateNo` | `String` |
+| `name` | `String` |
+| `channel` | `String` |
+| `lang` | `String` |
+| `scene` | `String` |
+| `content` | `String` |
+| `params` | `String` |
+| `status` | `String` |
+| `id` | `?` |
+| `tenantId` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
+
+### NotifyTemplatePreviewReq
+
+| 字段 | 类型 |
+|---|---|
+| `vars` | `对象（字符串值）` |
 
 ### NotifyTemplateVO
 
@@ -7350,6 +11390,12 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `rateLimit` | `Integer` |
 | `status` | `String` |
 
+### OpenCountReq
+
+| 字段 | 类型 |
+|---|---|
+| `warehouseNo` | `String` |
+
 ### OperationOverview
 
 | 字段 | 类型 |
@@ -7373,6 +11419,32 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `isOwner` | `Boolean` |
 | `isPrimary` | `Boolean` |
 | `status` | `String` |
+
+### OpsFlowMetrics
+
+| 字段 | 类型 |
+|---|---|
+| `from` | `LocalDate` |
+| `to` | `LocalDate` |
+| `woWithSla` | `long` |
+| `woSlaRate` | `BigDecimal` |
+| `faultResolved` | `long` |
+| `mttrMinutes` | `Long` |
+| `contractsEnded` | `long` |
+| `contractsRenewed` | `long` |
+| `renewalRate` | `BigDecimal` |
+| `expiredNotRenewedRatio` | `BigDecimal` |
+| `sitesWentLive` | `long` |
+| `installLeadDaysAvg` | `BigDecimal` |
+| `firstTrials` | `long` |
+| `firstTrialPassRate` | `BigDecimal` |
+| `leadsCreated` | `long` |
+| `leadsSigned` | `long` |
+| `leadConversionRate` | `BigDecimal` |
+| `signingCycleDaysAvg` | `BigDecimal` |
+| `removalCounted` | `long` |
+| `removalExpected` | `long` |
+| `removalRecoveryRate` | `BigDecimal` |
 
 ### OrderComplaint
 
@@ -7422,13 +11494,6 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `handleResult` | `String` |
 | `refundNo` | `String` |
 | `workOrderNo` | `String` |
-
-### OrderInterveneResult
-
-| 字段 | 类型 |
-|---|---|
-| `order` | [`RentOrder`](#rentorder) |
-| `intervention` | [`OrderIntervention`](#orderintervention) |
 
 ### OrderIntervention
 
@@ -7502,6 +11567,14 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `previousVersion` | `String` |
 | `error` | `String` |
 
+### OtpReq
+
+| 字段 | 类型 |
+|---|---|
+| `countryCode` | `String` |
+| `phone` | `String` |
+| `scene` | `String` |
+
 ### OverviewBusiness
 
 | 字段 | 类型 |
@@ -7527,6 +11600,23 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `powerbankInCabinet` | `int` |
 | `powerbankRented` | `int` |
 | `powerbankFault` | `int` |
+| `sitePreparing` | `int` |
+| `siteWithdrawing` | `int` |
+| `siteClosed` | `int` |
+
+### ParamOption
+
+| 字段 | 类型 |
+|---|---|
+| `value` | `String` |
+| `label` | `String` |
+
+### PauseReq
+
+| 字段 | 类型 |
+|---|---|
+| `reason` | `String` |
+| `pauseUntil` | `LocalDate` |
 
 ### PayReceiptReq
 
@@ -7536,6 +11626,27 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `channel` | `String` |
 | `payRef` | `String` |
 | `failReason` | `String` |
+
+### PayReq
+
+| 字段 | 类型 |
+|---|---|
+| `orderNo` | `String` |
+| `scene` | `String` |
+
+### PayableRow
+
+| 字段 | 类型 |
+|---|---|
+| `payeeType` | `String` |
+| `payeeNo` | `String` |
+| `payeeName` | `String` |
+| `period` | `String` |
+| `currency` | `String` |
+| `earned` | `BigDecimal` |
+| `settled` | `BigDecimal` |
+| `paid` | `BigDecimal` |
+| `outstanding` | `BigDecimal` |
 
 ### PayeeSharingRow
 
@@ -7604,6 +11715,107 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `currency` | `String` |
 | `makeDefault` | `Boolean` |
 
+### PayoutConfirmItem
+
+| 字段 | 类型 |
+|---|---|
+| `withdrawNo` | `String` |
+| `success` | `Boolean` |
+| `payRef` | `String` |
+| `failReason` | `String` |
+
+### PayoutConfirmReq
+
+| 字段 | 类型 |
+|---|---|
+| `bankBatchRef` | `String` |
+| `transferDate` | `String` |
+| `results` | 数组<[`PayoutConfirmItem`](#payoutconfirmitem)> |
+
+### PayoutPreview
+
+| 字段 | 类型 |
+|---|---|
+| `cutoffDate` | `String` |
+| `currency` | `String` |
+| `payableCount` | `int` |
+| `payableTotal` | `BigDecimal` |
+| `items` | 数组<[`PayoutPreviewItem`](#payoutpreviewitem)> |
+
+### PayoutPreviewItem
+
+| 字段 | 类型 |
+|---|---|
+| `payeeNo` | `String` |
+| `payeeName` | `String` |
+| `settleNos` | `List<String>` |
+| `periods` | `List<String>` |
+| `amount` | `BigDecimal` |
+| `currency` | `String` |
+| `accountMasked` | `String` |
+| `blockedReason` | `String` |
+
+### PayoutTask
+
+| 字段 | 类型 |
+|---|---|
+| `taskNo` | `String` |
+| `cutoffDate` | `String` |
+| `currency` | `String` |
+| `itemCount` | `int` |
+| `totalAmount` | `BigDecimal` |
+| `status` | `String` |
+| `createdBy` | `String` |
+| `createdName` | `String` |
+| `createdAt` | `String` |
+| `reviewedName` | `String` |
+| `reviewedAt` | `String` |
+| `rejectReason` | `String` |
+| `bankBatchRef` | `String` |
+| `transferDate` | `String` |
+| `confirmedAt` | `String` |
+| `exportCount` | `int` |
+| `items` | 数组<[`PayoutTaskItem`](#payouttaskitem)> |
+
+### PayoutTaskAuditReq
+
+| 字段 | 类型 |
+|---|---|
+| `approve` | `Boolean` |
+| `rejectReason` | `String` |
+
+### PayoutTaskCreateReq
+
+| 字段 | 类型 |
+|---|---|
+| `cutoffDate` | `String` |
+
+### PayoutTaskItem
+
+| 字段 | 类型 |
+|---|---|
+| `seq` | `int` |
+| `withdrawNo` | `String` |
+| `payeeNo` | `String` |
+| `payeeName` | `String` |
+| `amount` | `BigDecimal` |
+| `currency` | `String` |
+| `accountName` | `String` |
+| `accountMasked` | `String` |
+| `status` | `String` |
+| `settleNos` | `List<String>` |
+| `payRef` | `String` |
+| `paidAt` | `String` |
+| `failReason` | `String` |
+
+### PlanRightsVO
+
+| 字段 | 类型 |
+|---|---|
+| `rentDiscount` | `BigDecimal` |
+| `freeMinutes` | `Integer` |
+| `depositFree` | `Boolean` |
+
 ### PlanScopeEntry
 
 | 字段 | 类型 |
@@ -7630,6 +11842,14 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `orders` | `int` |
 | `gmv` | `BigDecimal` |
 | `perCabinet` | `double` |
+
+### PoolReturnReq
+
+| 字段 | 类型 |
+|---|---|
+| `cabinetNos` | `List<String>` |
+| `warehouseNo` | `String` |
+| `reason` | `String` |
 
 ### PowerbankCmd
 
@@ -7660,6 +11880,9 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `health` | `String` |
 | `status` | `String` |
 | `archivedAt` | `String` |
+| `suspectedLostAt` | `String` |
+| `qcStatus` | `String` |
+| `warehouseNo` | `String` |
 
 ### PricePlanEntry
 
@@ -7676,6 +11899,8 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `scope` | `String` |
 | `status` | `String` |
 | `archivedAt` | `String` |
+| `lostFee` | `BigDecimal` |
+| `unitRounding` | `String` |
 
 ### PricePlanReq
 
@@ -7687,10 +11912,12 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `unitMinutes` | `Integer` |
 | `unitPrice` | `BigDecimal` |
 | `capDaily` | `BigDecimal` |
-| `capTotal` | `BigDecimal` |
+| `buyoutPrice` | `BigDecimal` |
 | `currency` | `String` |
 | `scope` | `String` |
 | `deviceType` | `String` |
+| `lostFee` | `BigDecimal` |
+| `unitRounding` | `String` |
 
 ### PricingSchedule
 
@@ -7738,6 +11965,53 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `status` | `String` |
 | `archivedAt` | `String` |
 
+### ProfilePatchReq
+
+| 字段 | 类型 |
+|---|---|
+| `nickname` | `String` |
+| `avatar` | `String` |
+| `email` | `String` |
+
+### Protection
+
+| 字段 | 类型 |
+|---|---|
+| `protectionNo` | `String` |
+| `cabinetNo` | `String` |
+| `slotIndex` | `Integer` |
+| `action` | `String` |
+| `holderType` | `String` |
+| `holderRef` | `String` |
+| `reason` | `String` |
+| `active` | `boolean` |
+| `createdAt` | `LocalDateTime` |
+| `releasedAt` | `LocalDateTime` |
+| `releaseReason` | `String` |
+
+### ProtectionReq
+
+| 字段 | 类型 |
+|---|---|
+| `action` | `String` |
+| `slotIndex` | `Integer` |
+| `reason` | `String` |
+
+### PurchaseRow
+
+| 字段 | 类型 |
+|---|---|
+| `currency` | `String` |
+| `qty` | `long` |
+| `amount` | `BigDecimal` |
+
+### PushFinishReq
+
+| 字段 | 类型 |
+|---|---|
+| `targetCount` | `Integer` |
+| `successCount` | `Integer` |
+
 ### PushMessageVO
 
 | 字段 | 类型 |
@@ -7771,6 +12045,73 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `audienceValue` | `String` |
 | `scheduledAt` | `String` |
 
+### PushSendReq
+
+| 字段 | 类型 |
+|---|---|
+| `idempotencyKey` | `String` |
+| `scheduledAt` | `String` |
+
+### PushSweepReq
+
+| 字段 | 类型 |
+|---|---|
+| `now` | `String` |
+
+### QcRecord
+
+| 字段 | 类型 |
+|---|---|
+| `qcNo` | `String` |
+| `itemType` | `String` |
+| `itemNo` | `String` |
+| `powerOn` | `Boolean` |
+| `slotsOk` | `Boolean` |
+| `battery` | `Integer` |
+| `cycles` | `Integer` |
+| `result` | `String` |
+| `note` | `String` |
+| `inspectedBy` | `String` |
+| `inspectedAt` | `LocalDateTime` |
+| `ruleSnapshot` | `String` |
+| `intakeNo` | `String` |
+| `consumedBy` | `String` |
+
+### QcReq
+
+| 字段 | 类型 |
+|---|---|
+| `powerOn` | `Boolean` |
+| `slotsOk` | `Boolean` |
+| `battery` | `Integer` |
+| `cycles` | `Integer` |
+| `result` | `String` |
+| `note` | `String` |
+
+### ReasonReq
+
+| 字段 | 类型 |
+|---|---|
+| `reason` | `String` |
+
+### ReceiveReq
+
+| 字段 | 类型 |
+|---|---|
+| `receivedNos` | `List<String>` |
+| `note` | `String` |
+
+### ReceiveResult
+
+| 字段 | 类型 |
+|---|---|
+| `transferNo` | `String` |
+| `status` | `String` |
+| `received` | `int` |
+| `missing` | `List<String>` |
+| `extra` | `List<String>` |
+| `diffs` | 数组<[`AssetDiff`](#assetdiff)> |
+
 ### RechargeOrderRow
 
 | 字段 | 类型 |
@@ -7802,6 +12143,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `validDays` | `Integer` |
 | `sortNo` | `Integer` |
 | `status` | `String` |
+| `markets` | `String` |
 
 ### RechargePackageRow
 
@@ -7817,6 +12159,12 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `sortNo` | `Integer` |
 | `status` | `String` |
 | `archivedAt` | `String` |
+
+### RechargeReq
+
+| 字段 | 类型 |
+|---|---|
+| `packageNo` | `String` |
 
 ### RechargeResultVO
 
@@ -7850,6 +12198,18 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `diffType` | `String` |
 | `detail` | `String` |
 | `resolved` | `Boolean` |
+| `handleResult` | `String` |
+| `handleNote` | `String` |
+| `handledBy` | `String` |
+| `handledAt` | `String` |
+
+### ReconResolveReq
+
+| 字段 | 类型 |
+|---|---|
+| `diffId` | `Long` |
+| `action` | `String` |
+| `handleNote` | `String` |
 
 ### Reconcile
 
@@ -7870,6 +12230,16 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `handleNote` | `String` |
 | `handledBy` | `String` |
 | `handledAt` | `String` |
+
+### RedirectReq
+
+| 字段 | 类型 |
+|---|---|
+| `cabinetNos` | `List<String>` |
+| `agentNo` | `String` |
+| `siteNo` | `String` |
+| `receiverNo` | `String` |
+| `reason` | `String` |
 
 ### ReferralRuleVO
 
@@ -7946,6 +12316,17 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `level` | `Integer` |
 | `cityCount` | `Integer` |
 
+### RegisterReq
+
+| 字段 | 类型 |
+|---|---|
+| `countryCode` | `String` |
+| `country` | `String` |
+| `phone` | `String` |
+| `otp` | `String` |
+| `nickname` | `String` |
+| `password` | `String` |
+
 ### RejectReq
 
 | 字段 | 类型 |
@@ -7973,6 +12354,25 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `compensateAmount` | `BigDecimal` |
 | `ejectCount` | `Integer` |
 | `lastEjectAt` | `String` |
+| `couponAmount` | `BigDecimal` |
+| `memberDiscountAmount` | `BigDecimal` |
+| `payStatus` | `String` |
+| `agentNo` | `String` |
+| `agentName` | `String` |
+| `siteNo` | `String` |
+| `maxCharge` | `BigDecimal` |
+| `liveDurationMin` | `Integer` |
+| `accruedFee` | `BigDecimal` |
+| `payNo` | `String` |
+| `payChannel` | `String` |
+
+### RentReq
+
+| 字段 | 类型 |
+|---|---|
+| `cabinetNo` | `String` |
+| `useFreeDeposit` | `Boolean` |
+| `couponNo` | `String` |
 
 ### RentResult
 
@@ -8048,6 +12448,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `cabinetNo` | `String` |
 | `issue` | `String` |
 | `channel` | `String` |
+| `fileNos` | `List<String>` |
 
 ### ReportResultVO
 
@@ -8128,6 +12529,57 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `holdFeePerMin` | `BigDecimal` |
 | `maxConcurrent` | `Integer` |
 
+### ResetPwdReq
+
+| 字段 | 类型 |
+|---|---|
+| `countryCode` | `String` |
+| `country` | `String` |
+| `phone` | `String` |
+| `otp` | `String` |
+| `password` | `String` |
+
+### ResolveReq
+
+| 字段 | 类型 |
+|---|---|
+| `note` | `String` |
+
+### RevenueByDevice
+
+| 字段 | 类型 |
+|---|---|
+| `cabinetNo` | `String` |
+| `orderCount` | `int` |
+| `gross` | `BigDecimal` |
+
+### RevenueDay
+
+| 字段 | 类型 |
+|---|---|
+| `date` | `String` |
+| `orderCount` | `int` |
+| `gross` | `BigDecimal` |
+
+### RevenueSummary
+
+| 字段 | 类型 |
+|---|---|
+| `from` | `String` |
+| `to` | `String` |
+| `orderCount` | `int` |
+| `gross` | `BigDecimal` |
+| `refund` | `BigDecimal` |
+| `net` | `BigDecimal` |
+| `preTax` | `BigDecimal` |
+| `myShare` | `BigDecimal` |
+| `pending` | `BigDecimal` |
+| `settledUnpaid` | `BigDecimal` |
+| `paid` | `BigDecimal` |
+| `prevOrderCount` | `int` |
+| `prevGross` | `BigDecimal` |
+| `prevMyShare` | `BigDecimal` |
+
 ### RoleRowVO
 
 | 字段 | 类型 |
@@ -8186,6 +12638,38 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `label` | `String` |
 | `value` | `Long` |
 
+### SelfBillIssueReq
+
+| 字段 | 类型 |
+|---|---|
+| `withdrawNo` | `String` |
+
+### SelfBillView
+
+| 字段 | 类型 |
+|---|---|
+| `billNo` | `String` |
+| `withdrawNo` | `String` |
+| `agentNo` | `String` |
+| `supplierName` | `String` |
+| `supplierAddress` | `String` |
+| `supplierTrn` | `String` |
+| `recipientName` | `String` |
+| `recipientTrn` | `String` |
+| `taxRatePercent` | `BigDecimal` |
+| `netAmount` | `BigDecimal` |
+| `taxAmount` | `BigDecimal` |
+| `grossAmount` | `BigDecimal` |
+| `currency` | `String` |
+| `payRef` | `String` |
+| `issuedAt` | `LocalDateTime` |
+
+### SendMessageReq
+
+| 字段 | 类型 |
+|---|---|
+| `content` | `String` |
+
 ### SendReq
 
 | 字段 | 类型 |
@@ -8232,12 +12716,30 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `refNo` | `String` |
 | `amount` | `BigDecimal` |
 
+### SettlementGenerateReq
+
+| 字段 | 类型 |
+|---|---|
+| `period` | `String` |
+| `payeeType` | `String` |
+| `payeeNos` | `List<String>` |
+
 ### SettlementView
 
 | 字段 | 类型 |
 |---|---|
 | `settlement` | [`Settlement`](#settlement) |
 | `details` | 数组<[`SettlementDetail`](#settlementdetail)> |
+
+### ShareLine
+
+| 字段 | 类型 |
+|---|---|
+| `contractNo` | `String` |
+| `rate` | `BigDecimal` |
+| `orders` | `long` |
+| `gross` | `BigDecimal` |
+| `amount` | `BigDecimal` |
 
 ### ShareRecord
 
@@ -8258,6 +12760,10 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `createdAt` | `String` |
 | `period` | `String` |
 | `grossAmount` | `BigDecimal` |
+| `baseMode` | `String` |
+| `taxRate` | `BigDecimal` |
+| `baseAmount` | `BigDecimal` |
+| `refundNo` | `String` |
 
 ### ShareRule
 
@@ -8313,6 +12819,42 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `missing` | `int` |
 | `invalid` | `int` |
 
+### ShipInfo
+
+| 字段 | 类型 |
+|---|---|
+| `carrier` | `String` |
+| `trackingNo` | `String` |
+| `shippedAt` | `String` |
+| `note` | `String` |
+
+### SignReq
+
+| 字段 | 类型 |
+|---|---|
+| `signedAt` | `LocalDate` |
+| `fileNos` | `List<String>` |
+
+### SignalCode
+
+| 字段 | 类型 |
+|---|---|
+| `code` | `String` |
+| `name` | `String` |
+| `nameEn` | `String` |
+| `category` | `String` |
+| `scope` | `String` |
+| `protectiveAction` | `String` |
+| `clearsCode` | `String` |
+| `feeds` | `String` |
+
+### SignedUrl
+
+| 字段 | 类型 |
+|---|---|
+| `url` | `String` |
+| `expiresAt` | `LocalDateTime` |
+
 ### Site
 
 | 字段 | 类型 |
@@ -8335,6 +12877,9 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `archivedAt` | `String` |
 | `nameAr` | `String` |
 | `openHours` | `String` |
+| `ops` | [`SiteOps`](#siteops) |
+| `opsEmployeeNo` | `String` |
+| `defaultLocationNo` | `String` |
 
 ### SiteAgentRow
 
@@ -8375,18 +12920,27 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `venueNo` | `String` |
 | `sceneType` | `String` |
 | `brandNo` | `String` |
+| `status` | `String` |
+| `openHours` | `String` |
+| `operateAgentNo` | `String` |
+| `opsEmployeeNo` | `String` |
+| `agentNo` | `String` |
+| `surveyPassed` | `Boolean` |
+| `firstLiveOn` | `LocalDate` |
 
-### SiteLifecycle
+### SiteOps
 
 | 字段 | 类型 |
 |---|---|
-| `siteNo` | `String` |
-| `siteName` | `String` |
-| `stage` | `String` |
-| `stageAt` | `String` |
-| `owner` | `String` |
-| `currency` | `String` |
-| `gmvLtm` | `BigDecimal` |
+| `opsEmployeeNo` | `String` |
+| `operateAgentNo` | `String` |
+| `firstLiveAt` | `LocalDateTime` |
+| `pauseReason` | `String` |
+| `pauseUntil` | `LocalDate` |
+| `withdrawReason` | `String` |
+| `withdrawPlannedAt` | `LocalDate` |
+| `closedAt` | `LocalDateTime` |
+| `activeContractNo` | `String` |
 
 ### SitePayee
 
@@ -8412,6 +12966,23 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `orders` | `int` |
 | `perCabinet` | `double` |
 | `onlineRate` | `double` |
+
+### SiteReq
+
+| 字段 | 类型 |
+|---|---|
+| `name` | `String` |
+| `nameAr` | `String` |
+| `venueNo` | `String` |
+| `brandNo` | `String` |
+| `regionId` | `String` |
+| `address` | `String` |
+| `lng` | `BigDecimal` |
+| `lat` | `BigDecimal` |
+| `sceneType` | `String` |
+| `openHours` | `String` |
+| `opsEmployeeNo` | `String` |
+| `agentNo` | `String` |
 
 ### SiteSharingRow
 
@@ -8446,6 +13017,44 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `trend` | 数组<[`TrendPoint`](#trendpoint)> |
 | `byPoint` | 数组<[`PointStat`](#pointstat)> |
 
+### SiteStatusLogItem
+
+| 字段 | 类型 |
+|---|---|
+| `event` | `String` |
+| `fromStatus` | `String` |
+| `toStatus` | `String` |
+| `operator` | `String` |
+| `reason` | `String` |
+| `at` | `LocalDateTime` |
+
+### SiteSummary
+
+| 字段 | 类型 |
+|---|---|
+| `preparing` | `long` |
+| `active` | `long` |
+| `paused` | `long` |
+| `withdrawing` | `long` |
+| `closed` | `long` |
+| `missingOwner` | `long` |
+| `missingOpenHours` | `long` |
+
+### SiteSurvey
+
+| 字段 | 类型 |
+|---|---|
+| `surveyNo` | `String` |
+| `siteNo` | `String` |
+| `signalLevel` | `String` |
+| `powerOk` | `boolean` |
+| `placementNote` | `String` |
+| `fileNos` | `List<String>` |
+| `result` | `String` |
+| `note` | `String` |
+| `surveyedBy` | `String` |
+| `surveyedAt` | `LocalDateTime` |
+
 ### SlaRule
 
 | 字段 | 类型 |
@@ -8479,15 +13088,109 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `avgResolveMins` | `Integer` |
 | `score` | `BigDecimal` |
 
-### StageChangeReq
+### StageItems
 
 | 字段 | 类型 |
 |---|---|
 | `stage` | `String` |
-| `reason` | `String` |
-| `operator` | `String` |
-| `gmvLtm` | `BigDecimal` |
+| `itemType` | `String` |
+| `total` | `long` |
+| `items` | `List<StageItem>` |
+
+### Statement
+
+| 字段 | 类型 |
+|---|---|
+| `settleNo` | `String` |
+| `payeeType` | `String` |
+| `payeeNo` | `String` |
+| `payeeName` | `String` |
+| `period` | `String` |
 | `currency` | `String` |
+| `status` | `String` |
+| `orderCount` | `long` |
+| `grossTotal` | `BigDecimal` |
+| `shareTotal` | `BigDecimal` |
+| `shares` | 数组<[`ShareLine`](#shareline)> |
+| `adjustTotal` | `BigDecimal` |
+| `adjustments` | 数组<[`AdjustLine`](#adjustline)> |
+| `total` | `BigDecimal` |
+
+### StockCount
+
+| 字段 | 类型 |
+|---|---|
+| `countNo` | `String` |
+| `warehouseNo` | `String` |
+| `status` | `String` |
+| `openedAt` | `LocalDateTime` |
+
+### StockCountDetail
+
+| 字段 | 类型 |
+|---|---|
+| `count` | [`StockCount`](#stockcount) |
+| `lines` | 数组<[`StockCountLine`](#stockcountline)> |
+| `exceptions` | 数组<[`StockCountScan`](#stockcountscan)> |
+| `missingSerials` | `List<String>` |
+| `review` | [`CountReview`](#countreview) |
+
+### StockCountLine
+
+| 字段 | 类型 |
+|---|---|
+| `itemType` | `String` |
+| `bookQty` | `int` |
+| `countedQty` | `Integer` |
+| `diffQty` | `Integer` |
+
+### StockCountScan
+
+| 字段 | 类型 |
+|---|---|
+| `serialNo` | `String` |
+| `verdict` | `String` |
+
+### StockLedgerRow
+
+| 字段 | 类型 |
+|---|---|
+| `id` | `String` |
+| `warehouseNo` | `String` |
+| `itemType` | `String` |
+| `itemNo` | `String` |
+| `docKind` | `String` |
+| `docNo` | `String` |
+| `qtyDelta` | `int` |
+| `occurredAt` | `LocalDateTime` |
+| `operator` | `String` |
+
+### StockStage
+
+| 字段 | 类型 |
+|---|---|
+| `stage` | `String` |
+| `cabinets` | `long` |
+| `powerbanks` | `long` |
+
+### StockThreshold
+
+| 字段 | 类型 |
+|---|---|
+| `warehouseNo` | `String` |
+| `warehouseName` | `String` |
+| `itemType` | `String` |
+| `minQty` | `int` |
+| `available` | `int` |
+| `low` | `boolean` |
+
+### StockThresholdReq
+
+| 字段 | 类型 |
+|---|---|
+| `warehouseNo` | `String` |
+| `itemType` | `String` |
+| `minQty` | `Integer` |
 
 ### SubmitReq
 
@@ -8498,9 +13201,100 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `otp` | `String` |
 | `operatorName` | `String` |
 | `operatorType` | `String` |
+| `contactName` | `String` |
 | `regionScope` | `String` |
 | `shareRate` | `BigDecimal` |
 | `payload` | `String` |
+
+### SupplementReq
+
+| 字段 | 类型 |
+|---|---|
+| `startAt` | `LocalDate` |
+
+### Supplier
+
+| 字段 | 类型 |
+|---|---|
+| `supplierNo` | `String` |
+| `name` | `String` |
+| `vendorCode` | `String` |
+| `contactName` | `String` |
+| `phone` | `String` |
+| `email` | `String` |
+| `address` | `String` |
+| `note` | `String` |
+| `archivedAt` | `String` |
+
+### SupplierReq
+
+| 字段 | 类型 |
+|---|---|
+| `name` | `String` |
+| `vendorCode` | `String` |
+| `contactName` | `String` |
+| `phone` | `String` |
+| `email` | `String` |
+| `address` | `String` |
+| `note` | `String` |
+
+### SurveyReq
+
+| 字段 | 类型 |
+|---|---|
+| `signalLevel` | `String` |
+| `powerOk` | `Boolean` |
+| `placementNote` | `String` |
+| `fileNos` | `List<String>` |
+| `result` | `String` |
+| `note` | `String` |
+
+### SysLoginSetting
+
+| 字段 | 类型 |
+|---|---|
+| `country` | `String` |
+| `countryName` | `String` |
+| `otpEnabled` | `Integer` |
+| `passwordEnabled` | `Integer` |
+| `appleEnabled` | `Integer` |
+| `googleEnabled` | `Integer` |
+| `otpExpireSec` | `Integer` |
+| `otpDailyLimit` | `Integer` |
+| `forceRealName` | `Integer` |
+| `id` | `?` |
+| `tenantId` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
+
+### SysParam
+
+| 字段 | 类型 |
+|---|---|
+| `paramKey` | `String` |
+| `label` | `String` |
+| `value` | `String` |
+| `groupName` | `String` |
+| `valueType` | `String` |
+| `valueOptions` | `String` |
+| `minValue` | `BigDecimal` |
+| `maxValue` | `BigDecimal` |
+| `pattern` | `String` |
+| `nullable` | `Integer` |
+| `hint` | `String` |
+| `pendingDecision` | `Integer` |
+| `id` | `?` |
+| `tenantId` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
 
 ### SysParamEntry
 
@@ -8511,6 +13305,72 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `value` | `String` |
 | `groupName` | `String` |
 | `updatedAt` | `String` |
+| `valueType` | `String` |
+| `options` | 数组<[`ParamOption`](#paramoption)> |
+| `minValue` | `BigDecimal` |
+| `maxValue` | `BigDecimal` |
+| `pattern` | `String` |
+| `nullable` | `Boolean` |
+| `hint` | `String` |
+| `pendingDecision` | `Boolean` |
+
+### SysTaxSetting
+
+| 字段 | 类型 |
+|---|---|
+| `country` | `String` |
+| `countryName` | `String` |
+| `taxName` | `String` |
+| `ratePercent` | `BigDecimal` |
+| `trn` | `String` |
+| `invoiceTitle` | `String` |
+| `issuerLegalName` | `String` |
+| `issuerAddress` | `String` |
+| `includedInPrice` | `Integer` |
+| `effectiveFrom` | `String` |
+| `id` | `?` |
+| `tenantId` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
+
+### TakeoverReq
+
+| 字段 | 类型 |
+|---|---|
+| `employeeNo` | `String` |
+| `reason` | `String` |
+
+### TaxInvoiceView
+
+| 字段 | 类型 |
+|---|---|
+| `invoiceNo` | `String` |
+| `kind` | `String` |
+| `refInvoiceNo` | `String` |
+| `orderNo` | `String` |
+| `cUserNo` | `String` |
+| `payNo` | `String` |
+| `refundNo` | `String` |
+| `issuerCountry` | `String` |
+| `issuerLegalName` | `String` |
+| `issuerAddress` | `String` |
+| `issuerTrn` | `String` |
+| `issuerTitle` | `String` |
+| `taxRatePercent` | `BigDecimal` |
+| `taxIncluded` | `boolean` |
+| `netAmount` | `BigDecimal` |
+| `taxAmount` | `BigDecimal` |
+| `grossAmount` | `BigDecimal` |
+| `currency` | `String` |
+| `lineDesc` | `String` |
+| `status` | `String` |
+| `failReason` | `String` |
+| `issuedAt` | `LocalDateTime` |
+| `createdAt` | `LocalDateTime` |
 
 ### TaxSetting
 
@@ -8524,13 +13384,35 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `invoiceTitle` | `String` |
 | `includedInPrice` | `Boolean` |
 | `effectiveFrom` | `String` |
+| `issuerLegalName` | `String` |
+| `issuerAddress` | `String` |
+
+### TerminateReq
+
+| 字段 | 类型 |
+|---|---|
+| `reason` | `String` |
+| `effectiveAt` | `LocalDate` |
+
+### TerminationRequest
+
+| 字段 | 类型 |
+|---|---|
+| `status` | `String` |
+| `reason` | `String` |
+| `effectiveAt` | `LocalDate` |
+| `requestedBy` | `String` |
+| `requestedAt` | `LocalDateTime` |
+| `auditedBy` | `String` |
+| `auditedAt` | `LocalDateTime` |
+| `auditNote` | `String` |
 
 ### TicketCreateReq
 
 | 字段 | 类型 |
 |---|---|
 | `ticketNo` | `String` |
-| `cUserNo` | `String` |
+| `userNo` | `String` |
 | `orderNo` | `String` |
 | `cabinetNo` | `String` |
 | `problemNo` | `String` |
@@ -8545,6 +13427,18 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `status` | `String` |
 | `handlerNo` | `String` |
 | `issue` | `String` |
+
+### TimelineItem
+
+| 字段 | 类型 |
+|---|---|
+| `kind` | `String` |
+| `action` | `String` |
+| `actor` | `String` |
+| `note` | `String` |
+| `faultReasonCode` | `String` |
+| `fileNos` | `List<String>` |
+| `at` | `String` |
 
 ### TransferItem
 
@@ -8561,6 +13455,27 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `day` | `String` |
 | `orders` | `int` |
 | `gmv` | `BigDecimal` |
+
+### TrialRent
+
+| 字段 | 类型 |
+|---|---|
+| `trialNo` | `String` |
+| `cabinetNo` | `String` |
+| `slotIndex` | `Integer` |
+| `powerbankNo` | `String` |
+| `status` | `String` |
+| `ejectedAt` | `LocalDateTime` |
+| `returnedAt` | `LocalDateTime` |
+| `failReason` | `String` |
+| `operator` | `String` |
+| `createdAt` | `LocalDateTime` |
+
+### UnbindReq
+
+| 字段 | 类型 |
+|---|---|
+| `reason` | `String` |
 
 ### UserBlacklist
 
@@ -8622,6 +13537,68 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `reason` | `String` |
 | `flaggedAt` | `String` |
 
+### UsrFreeWhitelist
+
+| 字段 | 类型 |
+|---|---|
+| `whitelistNo` | `String` |
+| `regionId` | `String` |
+| `cUserNo` | `String` |
+| `reason` | `String` |
+| `quotaType` | `String` |
+| `quotaValue` | `BigDecimal` |
+| `usedValue` | `BigDecimal` |
+| `currency` | `String` |
+| `validFrom` | `String` |
+| `validTo` | `String` |
+| `grantedBy` | `String` |
+| `status` | `String` |
+| `id` | `?` |
+| `tenantId` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
+
+### UsrInvoiceTitle
+
+| 字段 | 类型 |
+|---|---|
+| `titleNo` | `String` |
+| `cUserNo` | `String` |
+| `type` | `String` |
+| `title` | `String` |
+| `vatTrn` | `String` |
+| `isDefault` | `Integer` |
+| `id` | `?` |
+| `tenantId` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
+
+### UsrMembership
+
+| 字段 | 类型 |
+|---|---|
+| `id` | `Long` |
+| `mbrNo` | `String` |
+| `tenantId` | `String` |
+| `cUserNo` | `String` |
+| `planNo` | `String` |
+| `level` | `String` |
+| `points` | `Integer` |
+| `startAt` | `String` |
+| `endAt` | `String` |
+| `autoRenew` | `Integer` |
+| `status` | `String` |
+| `createdAt` | `String` |
+| `updatedAt` | `String` |
+
 ### VendorProbeResult
 
 | 字段 | 类型 |
@@ -8655,6 +13632,9 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `industry` | `String` |
 | `locationCount` | `int` |
 | `archivedAt` | `String` |
+| `address` | `String` |
+| `lng` | `BigDecimal` |
+| `lat` | `BigDecimal` |
 
 ### VenueOnboarding
 
@@ -8669,6 +13649,12 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `reviewAt` | `String` |
 | `reviewNote` | `String` |
 | `venueNo` | `String` |
+
+### VoidReq
+
+| 字段 | 类型 |
+|---|---|
+| `reason` | `String` |
 
 ### WalletAdjustReq
 
@@ -8718,6 +13704,40 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `bizNo` | `String` |
 | `createdAt` | `String` |
 
+### WarehouseItem
+
+| 字段 | 类型 |
+|---|---|
+| `warehouseNo` | `String` |
+| `name` | `String` |
+| `regionId` | `String` |
+| `address` | `String` |
+| `isDefault` | `boolean` |
+| `archivedAt` | `String` |
+
+### WarehouseReq
+
+| 字段 | 类型 |
+|---|---|
+| `name` | `String` |
+| `regionId` | `String` |
+| `address` | `String` |
+
+### WarehouseRow
+
+| 字段 | 类型 |
+|---|---|
+| `warehouseNo` | `String` |
+| `warehouseName` | `String` |
+| `itemType` | `String` |
+| `opening` | `long` |
+| `inQty` | `long` |
+| `outQty` | `long` |
+| `closing` | `long` |
+| `available` | `int` |
+| `minQty` | `int` |
+| `low` | `boolean` |
+
 ### WithdrawApplyReq
 
 | 字段 | 类型 |
@@ -8736,6 +13756,13 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|
 | `approve` | `Boolean` |
 | `rejectReason` | `String` |
+
+### WithdrawReq
+
+| 字段 | 类型 |
+|---|---|
+| `reason` | `String` |
+| `plannedAt` | `LocalDate` |
 
 ### WithdrawRule
 
@@ -8773,6 +13800,54 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `payRef` | `String` |
 | `payerName` | `String` |
 | `failReason` | `String` |
+| `sameOperator` | `boolean` |
+| `approvalState` | `String` |
+| `approvalNo` | `String` |
+| `approvalNote` | `String` |
+
+### WoOps
+
+| 字段 | 类型 |
+|---|---|
+| `siteNo` | `String` |
+| `assigneeType` | `String` |
+| `slaRemainMinutes` | `Long` |
+| `reviewStatus` | `String` |
+| `faultReasonCode` | `String` |
+| `closeReason` | `String` |
+| `mergedIntoWoNo` | `String` |
+| `alarmRecoveredAt` | `String` |
+| `alarmCount` | `int` |
+
+### WoSlaRule
+
+| 字段 | 类型 |
+|---|---|
+| `slaNo` | `String` |
+| `woType` | `String` |
+| `responseMins` | `Integer` |
+| `resolveMins` | `Integer` |
+| `escalateTo` | `String` |
+| `resolveEscalateTo` | `String` |
+| `active` | `Integer` |
+| `priority` | `String` |
+| `id` | `?` |
+| `tenantId` | `?` |
+| `createdAt` | `?` |
+| `createdBy` | `?` |
+| `updatedAt` | `?` |
+| `updatedBy` | `?` |
+| `version` | `?` |
+| `deleted` | `?` |
+
+### WoSummary
+
+| 字段 | 类型 |
+|---|---|
+| `toDispatch` | `long` |
+| `dueSoon` | `long` |
+| `overdue` | `long` |
+| `reviewFailed` | `long` |
 
 ### WorkOrder
 
@@ -8804,6 +13879,16 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `auditNote` | `String` |
 | `rejectReason` | `String` |
 | `rejectCount` | `Integer` |
+| `ops` | [`WoOps`](#woops) |
+
+### WorkOrderDetailView
+
+| 字段 | 类型 |
+|---|---|
+| `order` | [`WorkOrder`](#workorder) |
+| `timeline` | 数组<[`TimelineItem`](#timelineitem)> |
+| `photos` | 数组<[`FileRef`](#fileref)> |
+| `alarms` | 数组<[`AlarmRecord`](#alarmrecord)> |
 
 ### WorkOrderDraft
 
@@ -8820,6 +13905,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `siteNo` | `String` |
 | `description` | `String` |
 | `expectedAt` | `String` |
+| `disposition` | `String` |
 
 ### WorkOrderRef
 
@@ -8834,64 +13920,152 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 - **AccountStatus** — `ACTIVE`
 - **AdSlotStatus** — `IDLE`
+- **AdjustmentKind** — `DEPOSIT_REFUND` `ENTRY_FEE_SETTLE` `GUARANTEE_TOPUP`
+- **AdjustmentStatus** — `PENDING` `CONFIRMED` `SETTLED` `VOID`
+- **AgentAccountStatus** — `ACTIVE`
+- **AgentExitStatus** — `RECLAIMING` `SETTLING` `CLOSING` `CLOSED`
 - **AgentStatus** — `ENABLED`
 - **AgentType** — `AGENT`
-- **AlarmCloseReason** — `RESOLVED` `FALSE_ALARM`
+- **AlarmCause** — `OFFLINE` `UNSTABLE` `NO_STOCK` `FULL` `FAULT` `MIXED` `NO_CONTRACT` `EXPIRING` `LOW_BATTERY` `AGED` `MISSING` `SLA_BELOW` `LOW_YIELD` `CANCEL_FAILED` `SN_SEEN` `HAZARD`
+- **AlarmCloseReason** — `RESOLVED` `FALSE_ALARM` `SELF_HEALED` `AUTO_FIXED`
+- **AlarmDisposition** — `AUTO_FIX` `WORK_ORDER` `CS_CASE` `TODO`
+- **AlarmDomain** — `AVAILABILITY` `RETURNABILITY` `TRANSACTION` `SAFETY` `ASSET` `REVENUE` `SERVICE` `PARTNER`
+- **AlarmEvalType** — `EVENT` `STATE` `COUNT`
 - **AlarmLevel** — `INFO` `WARN`
 - **AlarmNoticeStatus** — `SENT`
+- **AlarmNotifyChannel** — `EMAIL` `PUSH` `SMS`
+- **AlarmNotifyMethod** — `INSTANT`
 - **AlarmRuleStatus** — `ACTIVE`
 - **AlarmStatus** — `OPEN` `ACKED`
+- **AlarmSubjectType** — `SITE` `CABINET` `SLOT` `ORDER` `USER` `POWERBANK` `CONTRACT` `PAYEE` `AGENT` `WORK_ORDER` `PAYMENT` `INTAKE`
+- **AlarmTodoStatus** — `OPEN` `DONE`
+- **AppPlatform** — `IOS` `ANDROID`
 - **ApplyStatus** — `DRAFT` `SUBMITTED` `REVIEWING` `APPROVED` `SUBMITTED`
+- **AssetDiffKind** — `MISSING` `EXTRA` `COUNT_MISMATCH`
+- **AssetDiffStatus** — `OPEN` `RESOLVED`
 - **AssignTargetType** — `CABINET` `LOCATION`
 - **AudienceType** — `ALL` `MEMBER_LEVEL` `SEGMENT`
 - **AuditOutcome** — `SUCCESS` `DENIED`
-- **CabinetStatus** — `IN_STOCK` `DEPLOYED` `FAULT`
+- **CabinetStatus** — `IN_STOCK` `IN_TRANSIT` `DEPLOYED` `FAULT`
+- **CampaignKind** — `NEW_USER` `RECHARGE_GIFT` `COUPON_PUSH` `REFERRAL`
 - **CampaignStatus** — `DRAFT` `RUNNING` `PAUSED`
 - **ClientCode** — `OPS` `AGENT`
 - **CodeBatchStatus** — `PENDING` `PARTIAL` `BOUND`
+- **CommissionDimension** — `GMV`
+- **ContractAuditStage** — `OPS` `FINANCE`
+- **ContractKind** — `MAIN` `SUPPLEMENT`
+- **ContractSettlePeriod** — `MONTH`
+- **ContractShareBase** — `NET`
+- **ContractShareMode** — `SHARE` `ENTRY_FEE` `GUARANTEE`
+- **ContractStatus** — `DRAFT` `PENDING` `SIGNED` `ACTIVE` `EXPIRED`
+- **ContractTermReqStatus** — `PENDING` `APPROVED` `REJECTED`
+- **CountReviewDecision** — `APPROVED` `REJECTED` `WITHDRAWN`
+- **CountReviewState** — `DRAFT` `PREPARING` `SUBMITTING` `IN_REVIEW` `SUBMIT_FAILED` `DECIDED` `APPLY_FAILED` `APPLIED`
+- **CountStatus** — `OPEN` `SUBMITTED` `APPROVED` `POSTED` `CANCELLED`
+- **CouponAudience** — `ALL` `SEGMENT`
+- **CouponTplStatus** — `ACTIVE`
+- **CouponType** — `CUT`
+- **CredentialStatus** — `ACTIVE`
 - **CsSenderType** — `USER`
 - **CsSessionStatus** — `ACTIVE`
+- **CsTicketChannel** — `APP` `MP` `H5` `PHONE` `EMAIL` `MANUAL`
 - **CsTicketStatus** — `OPEN` `PROCESSING`
 - **DataScopeSubject** — `ROLE`
 - **DataScopeType** — `ALL` `REGION` `SITE` `LOCATION` `VENUE` `AGENT`
 - **DepositStatus** — `HELD` `RELEASED` `BOUGHT_OUT`
+- **DeptStatus** — `ACTIVE`
 - **DeviceCodeType** — `QR`
 - **DeviceKind** — `POWERBANK` `EV_PILE` `LOCKER`
+- **DisposalKind** — `SCRAP` `RETURN_SUPPLIER`
+- **DisposalReason** — `BROKEN` `OBSOLETE` `OTHER`
+- **DunChannel** — `SMS` `PUSH`
 - **EmployeeStatus** — `ACTIVE`
+- **ExportFormat** — `XLSX`
+- **FileCategory** — `CONTRACT_SCAN` `JPEG` `WO_PHOTO` `SURVEY_PHOTO` `LEAD_PHOTO` `AGENT_QUALIFICATION` `JPEG` `CS_EVIDENCE` `PUBLIC_IMAGE` `PNG` `PII` `PUBLIC`
+- **FileStatus** — `TEMP` `BOUND` `REMOVED` `PURGED`
+- **ImpactPeriod** — `PEAK` `OPEN`
+- **ImpactScope** — `SITE` `CABINET` `SLOT` `ORDER`
+- **InboxStatus** — `DONE` `FAILED`
+- **IntakeStatus** — `OPEN` `DONE`
 - **InvTransferStatus** — `DRAFT` `IN_TRANSIT`
 - **InvoiceStatus** — `DRAFT` `ISSUED`
+- **InvoiceTitleType** — `PERSONAL`
 - **LeadOwnerType** — `STAFF`
+- **LeadStatus** — `NEW` `CONTACTED` `NEGOTIATING` `SIGNED`
+- **LocationStatus** — `ACTIVE`
+- **MaterialCategory** — `DEVICE` `SPARE_PART` `CONSUMABLE`
+- **MaterialDocKind** — `INBOUND` `OUTBOUND` `TRANSFER`
+- **MaterialDocPurpose** — `PURCHASE` `OPENING` `RETURN` `REQUISITION` `SCRAP` `RETURN_SUPPLIER` `TRANSFER`
+- **MaterialTracking** — `SERIAL` `QUANTITY`
+- **MediaKind** — `PDF` `JPEG` `PNG` `WEBP`
+- **MergeScope** — `DEVICE` `SITE`
+- **MovementEvent** — `ISSUE` `CLAIM` `REDIRECT` `POOL_RETURN` `BIND` `UNBIND` `SHIP` `RECEIVE` `UNDEPLOY` `RETURN_INTAKE` `INBOUND` `REASSIGN` `RETIRE` `LOST`
+- **NotifyBlacklistChannel** — `ALL` `EMAIL` `PUSH` `SMS`
+- **NotifyBlacklistReason** — `USER_OPT_OUT` `HARD_BOUNCE` `ABUSE`
 - **NotifyLogStatus** — `SENT`
+- **NotifyTemplateChannel** — `INAPP` `PUSH` `SMS`
 - **NotifyTemplateStatus** — `ENABLED`
 - **OnlineStatus** — `ONLINE`
-- **OrderStatus** — `CREATED` `DISPENSING` `IN_USE` `RETURNED` `SETTLED` `CLOSED`
+- **OrderStatus** — `CREATED` `DISPENSING` `IN_USE` `OVERDUE_CHARGED` `RETURNED` `SETTLED` `CLOSED`
 - **OtaReleaseStatus** — `DRAFT` `PUBLISHED` `PAUSED` `COMPLETED`
+- **OtaRolloutScope** — `DEVICE` `LOCATION`
 - **OtaRolloutStatus** — `PENDING` `RUNNING` `DONE`
+- **OtaRolloutStrategy** — `GRAY`
 - **OutboxStatus** — `PENDING` `SENT` `FAILED`
 - **Outcome** — `OK` `NOT_CONFIGURED` `UNREACHABLE` `REMOTE_ERROR`
 - **PayAuthStatus** — `FROZEN` `CAPTURED`
+- **PayChannelMode** — `DELEGATED`
 - **PayOrderStatus** — `INIT` `PAYING` `PAID` `FAILED`
 - **PayRefundStatus** — `INIT` `SUCCESS`
+- **PayoutTaskStatus** — `PENDING_REVIEW` `PENDING_TRANSFER` `DONE`
 - **Period** — `LAST_7D` `LAST_30D` `LAST_13W` `LAST_12M`
+- **PowerbankHealth** — `OK` `FAULT`
 - **PowerbankStatus** — `IN_STOCK` `IN_CABINET` `RENTED` `FAULT` `LOST` `SOLD`
 - **PriceAdjustmentStatus** — `SCHEDULED` `APPLIED` `CANCELLED` `REVERTED`
 - **PricePlanStatus** — `ACTIVE`
+- **ProblemCategory** — `ACCOUNT` `BILLING` `DEVICE` `RENT` `RETURN`
+- **ProblemStatus** — `ENABLED`
+- **ProblemSuggestedAction** — `SELF_SERVICE` `TO_CS` `TO_REFUND`
+- **ProtectionAction** — `STOP_RENT` `SLOT_DISABLE` `SLOT_LOCK`
+- **ProtectionHolder** — `SIGNAL` `ALARM` `MANUAL`
 - **Provider** — `WECHAT_MP` `WECHAT_OA` `APPLE` `GOOGLE` `PHONE`
+- **PushChannel** — `APP_PUSH`
 - **PushStatus** — `DRAFT` `SCHEDULED` `SENDING`
+- **QcStatus** — `PENDING` `PASSED`
 - **Realm** — `STAFF` `AGENT` `CONSUMER`
 - **RechargeOrderStatus** — `PENDING` `PAID` `FAILED`
 - **ReconTaskStatus** — `MATCHED`
+- **RecoverRule** — `SIGNAL_CLEAR` `DISPOSITION_DONE`
+- **RemovalDisposition** — `RETURN_TO_POOL`
 - **ScopeLevel** — `DEVICE` `LOCATION` `SITE` `VENUE` `AGENT` `SCENE` `REGION`
-- **SettlementRefType** — `ORDER`
+- **SettlementRefType** — `ORDER` `SHARE`
 - **SettlementStatus** — `GEN` `CONFIRMED`
+- **ShareBaseMode** — `PRE_TAX`
+- **ShareBasis** — `INVEST` `DEVELOP` `OPERATE`
+- **ShareDimension** — `VENUE`
 - **ShareMode** — `CHANNEL_SPLIT`
 - **ShareRecordStatus** — `PENDING`
+- **ShipmentDocType** — `TRANSFER` `ISSUE` `DISPOSAL`
+- **SignalLevel** — `STRONG` `GOOD` `WEAK`
 - **SiteAgentRole** — `INVEST` `DEVELOP` `OPERATE`
+- **SiteStatus** — `PREPARING` `ACTIVE` `PAUSED` `WITHDRAWING`
 - **Status** — `SUCCESS` `FAILED` `SKIPPED`
+- **SurveyResult** — `PASS`
+- **TransferEndpointType** — `WAREHOUSE` `SITE` `LOCATION`
+- **TransferSource** — `MANUAL` `REMOVAL`
+- **TrialRentStatus** — `EJECTING` `WAIT_RETURN` `PASSED` `FAILED`
 - **Type** — `SCHEDULED` `MANUAL`
 - **VendorStatus** — `ENABLED`
+- **VenueIndustry** — `SHOPPING_MALL` `COMMERCIAL_RE` `AIRPORT` `TRANSPORT_HUB` `F_AND_B` `HOTEL` `MEDICAL` `EDUCATION` `OFFICE` `ENTERTAINMENT` `RETAIL` `SCENIC`
+- **WithdrawalApprovalState** — `SUBMITTING` `IN_REVIEW` `SUBMIT_FAILED` `APPROVED_BLOCKED`
+- **WithdrawalOrigin** — `APPLY` `PAYOUT_TASK`
+- **WithdrawalSeparation** — `REQUIRE` `WARN`
 - **WithdrawalStatus** — `APPLY` `AUDIT` `PAYING` `PAID`
-- **WoDispatchAction** — `DISPATCH`
+- **WoAuditResult** — `PASS` `PASS_WITH_ISSUE`
+- **WoDispatchAction** — `DISPATCH` `ACCEPT` `REASSIGN`
+- **WoFaultReason** — `NETWORK` `POWER` `SLOT_MECH` `LOCK` `BATTERY` `SCREEN` `DAMAGE`
+- **WoPriority** — `LOW` `MEDIUM` `HIGH`
+- **WoReviewStatus** — `PASSED` `FAILED`
 - **WorkOrderStatus** — `CREATED` `DISPATCHED` `ACCEPTED` `PROCESSING` `DONE` `AUDITED`
 - **WorkOrderType** — `FAULT` `REFILL` `INSPECT` `INSTALL` `REMOVE` `COMPLAINT`
 

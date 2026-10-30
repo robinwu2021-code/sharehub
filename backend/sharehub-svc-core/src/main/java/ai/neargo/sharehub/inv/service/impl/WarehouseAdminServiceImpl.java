@@ -31,6 +31,7 @@ public class WarehouseAdminServiceImpl implements WarehouseAdminService {
 
     private static final Logger log = LoggerFactory.getLogger(WarehouseAdminServiceImpl.class);
 
+    private final ai.neargo.sharehub.inv.service.InventoryOperationJournal journal;
     private final InvWarehouseMapper warehouses;
     private final WarehouseDirectory directory;
     private final CabinetMapper cabinets;
@@ -38,7 +39,8 @@ public class WarehouseAdminServiceImpl implements WarehouseAdminService {
     private final InvIntakeMapper intakes;
 
     public WarehouseAdminServiceImpl(InvWarehouseMapper warehouses, WarehouseDirectory directory, CabinetMapper cabinets,
-                                     PowerbankMapper powerbanks, InvIntakeMapper intakes) {
+                                     PowerbankMapper powerbanks, InvIntakeMapper intakes, ai.neargo.sharehub.inv.service.InventoryOperationJournal journal) {
+        this.journal = journal;
         this.warehouses = warehouses;
         this.directory = directory;
         this.cabinets = cabinets;
@@ -60,6 +62,7 @@ public class WarehouseAdminServiceImpl implements WarehouseAdminService {
     @Override
     @Transactional
     public WarehouseItem update(String warehouseNo, WarehouseReq req) {
+        journal.requireMasterIdle(warehouseNo, "$.warehouseNo", "$.toWarehouseNo");
         InvWarehouse w = require(warehouseNo);
         apply(w, req);
         warehouses.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<InvWarehouse>().eq(InvWarehouse::getWarehouseNo, warehouseNo)
@@ -71,6 +74,7 @@ public class WarehouseAdminServiceImpl implements WarehouseAdminService {
     @Override
     @Transactional
     public WarehouseItem archive(String warehouseNo) {
+        journal.requireMasterIdle(warehouseNo, "$.warehouseNo", "$.toWarehouseNo");
         InvWarehouse w = require(warehouseNo);
         if (w.getArchivedAt() != null) return item(warehouseNo);
         List<String> why = new ArrayList<>();

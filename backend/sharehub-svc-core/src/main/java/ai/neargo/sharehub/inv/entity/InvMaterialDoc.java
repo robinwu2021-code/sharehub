@@ -28,4 +28,5 @@ public class InvMaterialDoc extends BaseEntity {
     private Integer totalQty;
     private String remoteOutNo;
     private String remoteInNo;
+    private String operationNo;
 }

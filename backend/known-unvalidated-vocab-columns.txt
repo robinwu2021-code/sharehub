@@ -432,3 +432,15 @@ usr_push_token.platform
 
 # usr_recharge_pkg（1）
 usr_recharge_pkg.status
+
+# 2026-10-30兼容结构先行：以下新表尚未开放业务写API；V218 CHECK已保护数据库。
+# 启用采购、交付、维修、导出API前，必须接枚举校验与API正反回归，再从本台账移除。
+inv_purchase.status
+inv_purchase_line.item_type
+dev_delivery.status
+dev_delivery.handover_mode
+dev_delivery_item.item_type
+dev_repair_detail.repair_mode
+dev_repair_detail.test_result
+sys_export_task.format
+sys_export_task.status

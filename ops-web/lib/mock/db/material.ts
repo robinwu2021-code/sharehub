@@ -35,6 +35,7 @@ export const materials: Material[] = [
 ];
 
 const docs: MaterialDoc[] = [];
+const docRequests = new Map<string, { payload: string; docNo: string }>();
 /** 仓号:物料号 → 在手数量。 */
 const onHand = new Map<string, number>();
 /** 物料号 → 序列号 → 所在仓。 */
@@ -139,6 +140,19 @@ export function getMaterialDoc(no: string): MaterialDoc {
 
 /** 建单即过账：先全部校验（一次列全不符项），再统一记账 —— 不会出现「过了一半」。 */
 export function createMaterialDoc(x: MaterialDocReq): MaterialDoc {
+  const requestKey = x.requestKey?.trim();
+  // 按契约字段顺序规范化，允许调用方调整对象属性顺序。
+  const payload = JSON.stringify([x.purpose, x.warehouseNo, x.toWarehouseNo ?? null, x.supplierNo ?? null, x.reasonCode ?? null,
+    x.receiverNo ?? null, x.woNo ?? null, x.currency ?? null, x.note,
+    x.lines?.map((l) => [l.materialNo, l.materialName ?? null, l.qty ?? null, l.serialNos ?? null, l.unitCost ?? null])]);
+  if (requestKey) {
+    if (requestKey.length > 128) fail("请求编号过长", "Request key is too long");
+    const old = docRequests.get(requestKey);
+    if (old) {
+      if (old.payload !== payload) fail("请求编号已用于其他内容；请原样重试原单据", "Retry the original document unchanged");
+      return getMaterialDoc(old.docNo);
+    }
+  }
   const kind = KIND_OF[x?.purpose];
   if (!kind) fail("请选择单据用途", "Purpose required");
   if (!x.note?.trim()) fail("请填写说明", "Note required");
@@ -214,6 +228,7 @@ export function createMaterialDoc(x: MaterialDocReq): MaterialDoc {
     lines: lines as MaterialDoc["lines"], createdBy: "mock", createdAt: now(),
   };
   docs.unshift(d);
+  if (requestKey) docRequests.set(requestKey, { payload, docNo: d.docNo });
   return getMaterialDoc(d.docNo);
 }
 

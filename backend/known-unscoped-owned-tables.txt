@@ -40,7 +40,6 @@ agt_commission  # agent_no
 cs_session  # c_user_no region_id
 cs_ticket  # c_user_no region_id
 fin_invoice  # region_id
-inv_warehouse  # region_id
 loc_lead  # region_id site_no
 loc_site_agent  # agent_no site_no
 loc_site_lifecycle  # site_no

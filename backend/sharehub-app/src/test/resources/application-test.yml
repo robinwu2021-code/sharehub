@@ -26,6 +26,8 @@ spring:
     password: ${PB_DB_PASS:powerbank}
 
     hikari:
+      # surefire固定JVM为UTC；serverTimezone只影响驱动解释，不会改变SQL NOW()的会话时钟。
+      connection-init-sql: "SET time_zone = '+00:00'"
       # 全量跑时会起很多个 Spring 上下文（属性集不同就是一个新上下文），**每个各持一个连接池**。
       # 默认 maximumPoolSize=10，二十来个上下文就能把 MariaDB 的 max_connections 吃光 ——
       # 表现是某个测试类报 "Too many connections"，而它自己一点问题都没有，

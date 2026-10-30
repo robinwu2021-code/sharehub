@@ -30,7 +30,8 @@ public final class MaterialDtos {
     }
 
     public record MaterialDocReq(String purpose, String warehouseNo, String toWarehouseNo, String supplierNo, String reasonCode,
-                                 String receiverNo, String woNo, String currency, String note, List<MaterialDocLine> lines) {
+                                 String receiverNo, String woNo, String currency, String note, List<MaterialDocLine> lines,
+                                 String requestKey) {
     }
 
     public record MaterialBalance(String warehouseNo, String warehouseName, String materialNo, String materialName,

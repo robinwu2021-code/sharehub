@@ -39,13 +39,15 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
     private final InvTransferMapper mapper;
     private final InvTransferItemMapper itemMapper;
     private final InvTransferStateMachine stateMachine;
+    private final ai.neargo.sharehub.inv.TransferAccess access;
 
     /** 取号专用 —— 必须绕开逻辑删除过滤，见 nextTransferNo。 */
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     public InventoryTransferServiceImpl(InvTransferMapper mapper, InvTransferItemMapper itemMapper,
                                         InvTransferStateMachine stateMachine,
-                                        org.springframework.jdbc.core.JdbcTemplate jdbc) {
+                                        org.springframework.jdbc.core.JdbcTemplate jdbc, ai.neargo.sharehub.inv.TransferAccess access) {
+        this.access = access;
         this.jdbc = jdbc;
         this.mapper = mapper;
         this.itemMapper = itemMapper;
@@ -56,6 +58,7 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
     public PageResult<InventoryTransfer> page(Integer page, Integer size, String keyword,
                                               String status, String itemType) {
         LambdaQueryWrapper<InvTransfer> w = new LambdaQueryWrapper<>();
+        access.filter(w);
         if (notBlank(keyword)) {
             // 单号 + 两端快照名：现场的人记得住「从三号仓调到万达」，记不住 TR0042
             w.and(q -> q.like(InvTransfer::getTransferNo, keyword)
@@ -76,6 +79,7 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
     public InventoryTransferDetail get(String transferNo) {
         InvTransfer e = selectByNo(transferNo);
         if (e == null) return null;
+        access.read(e);
         List<TransferItem> items = selectItems(transferNo).stream()
                 .map(i -> new TransferItem(i.getTransferNo(), itemNoOf(i),
                         i.getChecked() != null && i.getChecked() == 1))
@@ -99,6 +103,7 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
             e.setItemType(body.itemType());
             e.setPowerbankCount(body.powerbankCount() == null ? 0 : body.powerbankCount());
             validateEndpoints(e);
+            access.edit(e);
             e.setTransferNo(nextTransferNo());
             e.setTenantId(TENANT_MAIN);
             e.setStatus(InvTransferStatus.DRAFT.name()); // 建单一律 DRAFT，不接受调用方直接开在途单
@@ -111,31 +116,17 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
         // —— 更新 ——
         InvTransfer current = selectByNo(no);
         if (current == null) throw BizException.notFound(no);
+        access.edit(current);
+        if (ai.neargo.sharehub.inv.TransferSource.REMOVAL.name().equals(current.getSourceType()))
+            throw BizException.conflict("error.common.state_changed");
         if (stateMachine.isTerminal(current.getStatus())) {
             throw new IllegalArgumentException("调拨单已完成，不可再修改: " + no
                     + "（如需退回请开一张反向调拨单，保留两条痕）");
         }
 
-        String target = body.status();
-        if (notBlank(target) && !target.equals(current.getStatus())) {
-            // 目标状态 → 事件，交状态机裁决；未定义的跃迁（如 DRAFT 直接到 DONE）在这里被拒
-            // switch 改切在枚举上：非法字符串在 of() 就被挡住并说清楚哪个值不合法，
-            // 而不是一路走到 default 报「不支持的目标状态」——后者把「拼错了」
-            // 与「这一步不让走」混成同一句话。
-            String event = switch (InvTransferStatus.of(target)) {
-                case IN_TRANSIT -> "SHIP";
-                case DONE -> "RECEIVE";
-                default -> throw new IllegalArgumentException("不支持的目标状态: " + target);
-            };
-            /*
-             * **发货有两个入口**：专用的 `POST …/{no}/ship` 与这里的「保存时传目标状态」。
-             * 空单校验此前只加在前者，于是这条路照样能把零明细的单推成在途 ——
-             * 「一个动作两个入口，只堵一个」是最典型的漏法，而账面上完全自洽
-             * （应收 0 件、实收 0 件），对账查不出来。
-             */
-            if ("SHIP".equals(event)) requireHasItems(no);
-            if ("RECEIVE".equals(event)) requireAllChecked(no);
-            current.setStatus(stateMachine.next(current.getStatus(), event));
+        // 保存单头不得代替发货／签收，否则只改单据而漏设备位置、差异和库存账。
+        if (notBlank(body.status()) && !body.status().equals(current.getStatus())) {
+            throw BizException.conflict("error.inv_transfer.action_required", no);
         }
 
         // 单头可改字段：只有 DRAFT 期允许改两端与数量，在途单改数量等于事后编账
@@ -149,15 +140,13 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
             if (notBlank(body.itemType())) current.setItemType(body.itemType());
             if (body.powerbankCount() != null) current.setPowerbankCount(body.powerbankCount());
             validateEndpoints(current);
+            access.edit(current);
         }
         // 经办人不在写入面里：建单时落的那个人就是经办人，换人经办得换个人来操作
 
         mapper.updateById(current);
 
-        // TODO(跨分片依赖 · 设备域)：DONE 时应同步 inv_stock 结存与设备归属
-        //   出库仓 qty -= n、入库仓 qty += n（UK(warehouse_no,item_type,model) 定位行）；
-        //   itemType=CABINET 时机柜 status 在 IN_STOCK ↔ DEPLOYED 之间流转（db-design §9A.2）。
-        //   dev_cabinet / dev_powerbank 归其他分片，此处不跨包直写。
+        // 状态与记账只在 TransferOpsService.ship/receive 中执行。
 
         return toVO(selectByNo(no));
     }
@@ -176,23 +165,6 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
                 .orderByAsc(InvTransferItem::getId));
     }
 
-    /** 发货前必须有明细：接收方等着收货，而车上什么都没有。与 {@code TransferOpsServiceImpl#ship} 同一条闸。 */
-    private void requireHasItems(String transferNo) {
-        if (selectItems(transferNo).isEmpty()) {
-            throw BizException.conflict("error.inv_transfer.no_items", transferNo);
-        }
-    }
-
-    /** 收货前逐件核对：有一件没勾就不许结单 —— 这正是「少了一台」当场被发现的地方。 */
-    private void requireAllChecked(String transferNo) {
-        List<InvTransferItem> items = selectItems(transferNo);
-        if (items.isEmpty()) return; // 无明细的单（按件数记账）不做逐件校验
-        long unchecked = items.stream().filter(i -> i.getChecked() == null || i.getChecked() != 1).count();
-        if (unchecked > 0) {
-            throw new IllegalArgumentException("尚有 " + unchecked + " 件未签收核对，不能结单: " + transferNo);
-        }
-    }
-
     private static void validateEndpoints(InvTransfer e) {
         if (!LOCATION_TYPES.contains(e.getFromType()) || !LOCATION_TYPES.contains(e.getToType())) {
             throw new IllegalArgumentException("fromType/toType 必须是 WAREHOUSE/SITE/LOCATION 之一");
@@ -203,9 +175,17 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
         if (e.getFromType().equals(e.getToType()) && e.getFromRef().equals(e.getToRef())) {
             throw new IllegalArgumentException("调出方与调入方不能相同");
         }
+        requireSupportedPowerbankEndpoints(e);
         if (!ITEM_TYPES.contains(e.getItemType())) {
             throw new IllegalArgumentException("itemType 必须是 CABINET/POWERBANK 之一");
         }
+    }
+
+    static void requireSupportedPowerbankEndpoints(InvTransfer t) {
+        if (ai.neargo.sharehub.dev.movement.MovementRecorder.POWERBANK.equals(t.getItemType())
+                && (!ai.neargo.sharehub.inv.TransferEndpointType.WAREHOUSE.name().equals(t.getFromType())
+                || !ai.neargo.sharehub.inv.TransferEndpointType.WAREHOUSE.name().equals(t.getToType())))
+            throw BizException.badRequest("error.common.invalid_value", "POWERBANK transfer endpoints: WAREHOUSE");
     }
 
     /**

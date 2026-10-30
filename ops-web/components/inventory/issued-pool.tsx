@@ -1,10 +1,10 @@
 "use client";
 
-// 出库单（设备管理 › 仓储与出库）—— 开发计划 F3；口径：用户 2026-10-28
+// 出库管理（库存管理 › 出入库）—— 开发计划 F3；口径：用户 2026-10-28
 //   绑定商家先出库，出库必须选商家；绑定的设备只从该商家名下（已出库待绑定）选，
 //   默认绑到商家的默认站点、默认点位；站点与点位由运营代建；绑定在运营端做。
 //
-// 左：按商家汇总（未绑定 / 已绑定 / 已上线）；右：所选商家出库单里的设备。
+// 左：按商家汇总（未绑定 / 已绑定 / 已上线）；右：所选商家的已出库设备。
 // 动作：出库给商家 · 绑定（单台 / 批量）· 解绑 · 退回仓库。规则全在服务端（mock 同口径强制），
 // 这里只做「能点哪些」的提示，违规由接口拒绝并给原因。
 //
@@ -105,7 +105,7 @@ export function IssuedPoolTab() {
   const cols: Column<Cabinet>[] = [
     { header: "柜机号", cell: (c) => <Link href={`/devices/detail?no=${c.cabinetNo}`} className="txt-strong tabular-nums hover:underline">{c.cabinetNo}</Link> },
     { header: "SN / 型号", cell: (c) => <span className="tabular-nums">{c.sn}<span className="text-muted-foreground"> · {c.model}</span></span> },
-    { header: "出库给", cell: (c) => c.issuedAgentNo ? <RefLink kind="agent" no={c.issuedAgentNo} /> : "-" },
+    { header: "目标商家", cell: (c) => c.issuedAgentNo ? <RefLink kind="agent" no={c.issuedAgentNo} /> : "-" },
     { header: "目的站点", cell: (c) => c.issuedSiteNo ? <RefLink kind="site" no={c.issuedSiteNo} /> : <span className="text-muted-foreground">到商家</span> },
     { header: "接收人", cell: (c) => <span className="tabular-nums">{c.issueReceiverNo ?? "-"}</span> },
     { header: "状态", cell: (c) => <StatusBadge map={POOL_STATE_MAP} value={poolStateOf(c)} /> },
@@ -139,14 +139,14 @@ export function IssuedPoolTab() {
   ];
 
   if (!poolReady) {
-    return <Notice>出库单的后端接口尚未上线（商户入驻会话实现中）。上线后此页自动可用。</Notice>;
+    return <Notice>出库服务暂不可用。</Notice>;
   }
 
   return (
     <div className="space-y-4">
       <Notice>
-        绑定商家先出库：出库必须选商家，设备进入该商家名下（已出库待绑定）；绑定只能从出库单里选，
-        默认绑到商家的默认站点、默认点位。出库单里的设备商家端看得到（待安装），但没有点位就不产生营收。
+        出库必须选择商家；安装时按商家选择待安装设备，签收后方可绑定点位。
+        未指定点位时使用商家的默认站点、默认点位。安装验收并通过上线检查后方可营业。
         {!bindReady && " 绑定 / 解绑的后端接口尚未上线，暂时只能出库与退回。"}
       </Notice>
       {!canTransfer && <ReadOnlyNotice what="出库与退回" perm="device:inventory:transfer" />}
@@ -167,11 +167,11 @@ export function IssuedPoolTab() {
         onAdd={canTransfer ? () => setIssueOpen(true) : undefined}
         addLabel="出库给商家"
       >
-        <Select className="w-48" aria-label="出库单商家" value={agentNo} onChange={(e) => { setAgentNo(e.target.value); paging.reset(); }}>
+        <Select className="w-48" aria-label="出库商家" value={agentNo} onChange={(e) => { setAgentNo(e.target.value); paging.reset(); }}>
           <option value="">全部商家</option>
           {(summaryQ.data ?? []).map((r) => <option key={r.agentNo} value={r.agentNo}>{r.agentName}</option>)}
         </Select>
-        <Select className="w-32" aria-label="出库单状态" value={pool} onChange={(e) => { setPool(e.target.value as PoolFilter); paging.reset(); }}>
+        <Select className="w-32" aria-label="交付状态" value={pool} onChange={(e) => { setPool(e.target.value as PoolFilter); paging.reset(); }}>
           {(Object.keys(POOL_FILTER) as PoolFilter[]).map((k) => <option key={k} value={k}>{POOL_FILTER[k]}</option>)}
         </Select>
       </Toolbar>
@@ -200,7 +200,7 @@ export function IssuedPoolTab() {
         selectable={canTransfer || canBind}
         selectedKeys={selected}
         onSelectedChange={setSelected}
-        empty={agentNo ? `${POOL_FILTER[pool]}名下（已出库待绑定）设备为空 —— 换个筛选，或先出库给这个商家` : "出库单为空 —— 先出库给商家"}
+        empty={agentNo ? `${POOL_FILTER[pool]}设备为空，请调整筛选或先办理出库。` : "暂无已出库设备，请先选择商家办理出库。"}
       />
       {listQ.data && <Pagination page={paging.page} size={paging.size} total={listQ.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
 
@@ -238,7 +238,7 @@ function IssueDrawer({ open, onClose, defaultAgent, onDone }: {
     },
   });
   return (
-    <Drawer open={open} onOpenChange={(o) => !o && onClose()} title="出库给商家" desc="设备离开仓库，进入该商家名下（已出库待绑定）；之后从出库单绑定到它的站点点位"
+    <Drawer open={open} onOpenChange={(o) => !o && onClose()} title="出库给商家" desc="选择商家和可出库设备；出库后按商家筛选待安装设备。"
       footer={<Button disabled={!chosen || !!notReady || !picked.length || m.isPending} onClick={() => m.mutate()}>出库 {picked.length || ""} 台</Button>}>
       <Field label="商家（必选）">
         <Select aria-label="商家" value={agentNo || defaultAgent} onChange={(e) => setAgentNo(e.target.value)}>
@@ -339,7 +339,7 @@ function ReasonDrawer({ target, onClose, onDone }: {
       ? api.returnPoolDevices({ cabinetNos: target!.cabinetNos, reason, warehouseNo: warehouseNo || undefined })
       : Promise.all(target!.cabinetNos.map((no) => api.unbindDevice(no, reason))),
     onSuccess: (r) => {
-      notify.success(isReturn ? `已退回仓库 ${r.length} 台` : `已解绑 ${r.length} 台，回到出库单`);
+      notify.success(isReturn ? `已退回仓库 ${r.length} 台` : `已解绑 ${r.length} 台，待重新安装`);
       setReason(""); setWarehouseNo(""); onClose(); onDone();
     },
   });

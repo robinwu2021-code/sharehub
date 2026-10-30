@@ -20,6 +20,7 @@ public class DevCabinet extends BaseEntity implements ai.neargo.sharehub.common.
     private String locationNo;
     /** 归属站点（冗余·随点位级联，数据范围锚点）。 */
     private String siteNo;
+    private String regionId;
     /** 归属代理（冗余·随点位/站点级联，数据范围锚点；空=平台直营）。 */
     private String agentNo;
     private String locationName;

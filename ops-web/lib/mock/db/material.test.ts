@@ -49,4 +49,15 @@ describe("物料（V209 mock）", () => {
     expect(() => mt.createMaterialDoc({ purpose: "PURCHASE", warehouseNo: "WH001", note: "x", lines: [{ materialNo: "MT0301", qty: 1 }] })).toThrow(/供应商/);
     expect(() => mt.createMaterialDoc({ purpose: "OPENING", warehouseNo: "WH001", note: "x", lines: [{ materialNo: "MT0301", qty: 1, unitCost: 2 }] })).toThrow(/币种/);
   });
+
+  it("原请求重试返回原单据，只入库一次；同键修改数量被拒绝", () => {
+    const m = mt.createMaterial({ name: "幂等耗材", category: "CONSUMABLE", trackingMode: "QUANTITY", uom: "个" });
+    const req = { requestKey: "material-replay-1", purpose: "OPENING" as const, warehouseNo: "WH002", note: "期初",
+      lines: [{ materialNo: m.materialNo, qty: 10 }] };
+    const first = mt.createMaterialDoc(req);
+    expect(mt.createMaterialDoc({ ...req }).docNo).toBe(first.docNo);
+    expect(bal("WH002", m.materialNo).onHand).toBe(10);
+    expect(() => mt.createMaterialDoc({ ...req, lines: [{ materialNo: m.materialNo, qty: 11 }] })).toThrow(/原样重试/);
+    expect(bal("WH002", m.materialNo).onHand).toBe(10);
+  });
 });

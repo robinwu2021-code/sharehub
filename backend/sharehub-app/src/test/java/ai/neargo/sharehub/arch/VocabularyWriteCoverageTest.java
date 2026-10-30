@@ -72,6 +72,11 @@ class VocabularyWriteCoverageTest {
      * 解析它等于把断言的可读性和卡口的正确性绑在一起 —— 改个标题就可能让统计变样。
      */
     private static final Set<String> COVERED = new TreeSet<>(Set.of(
+            // V212/V218：技术步骤仅由InventoryOperationJournal固定值写入，不接收客户端phase/status。
+            // engine只在物料编排传SERVICE；数据库CHECK再兜底，InventoryExecutionSchemaTest验证非法值拒绝。
+            // V220: internal enums only; invalid SQL rejected in InventoryUnifiedApprovalTest.
+            "inv_count_review.execution_state", "inv_count_review.decision",
+            "inv_operation.engine", "inv_operation.phase", "inv_operation_step.status",
             "share_rule.dimension", "share_rule.mode", "share_rule.basis",
             "share_record.mode", "mkt_campaign.kind", "pay_channel.mode",
             "agt_commission.mode", "notify_blacklist.reason", "notify_blacklist.channel",

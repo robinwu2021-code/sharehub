@@ -71,6 +71,8 @@ public class TransferOpsServiceImpl implements TransferOpsService {
     private final PowerbankMapper powerbanks;
     private final CabinetLifecycleService lifecycle;
     private final SysParamPort params;
+    private final ai.neargo.sharehub.inv.TransferAccess access;
+    private final ai.neargo.sharehub.dev.movement.MovementRecorder movements;
     /** 默认回仓规则的唯一实现（与出库池退回共用）。 */
     private ai.neargo.sharehub.inv.WarehouseDirectory warehouseDirectory;
 
@@ -97,7 +99,10 @@ public class TransferOpsServiceImpl implements TransferOpsService {
 
     public TransferOpsServiceImpl(InvTransferMapper transfers, InvTransferItemMapper items, InvAssetDiffMapper diffs,
                                   InvWarehouseMapper warehouses, InvTransferStateMachine sm, CabinetMapper cabinets,
-                                  PowerbankMapper powerbanks, CabinetLifecycleService lifecycle, SysParamPort params) {
+                                  PowerbankMapper powerbanks, CabinetLifecycleService lifecycle, SysParamPort params,
+                                  ai.neargo.sharehub.inv.TransferAccess access, ai.neargo.sharehub.dev.movement.MovementRecorder movements) {
+        this.access=access;
+        this.movements=movements;
         this.transfers = transfers;
         this.items = items;
         this.diffs = diffs;
@@ -115,10 +120,12 @@ public class TransferOpsServiceImpl implements TransferOpsService {
     @Transactional
     public InventoryTransferDetail setItems(String transferNo, List<String> itemNos) {
         InvTransfer t = require(transferNo);
+        access.source(t);
+        if (TransferSource.REMOVAL.name().equals(t.getSourceType())) throw BizException.conflict("error.common.state_changed");
         if (!InvTransferStatus.DRAFT.name().equals(t.getStatus())) throw BizException.conflict("error.transfer.draft_only", transferNo);
         List<String> nos = itemNos == null ? List.of() : itemNos.stream().filter(s -> s != null && !s.isBlank()).map(String::trim).distinct().toList();
         if (nos.isEmpty()) throw BizException.badRequest("error.common.missing_parameter", "itemNos");
-        for (String no : nos) checkShippable(t.getItemType(), no);
+        for (String no : nos) checkShippable(t, no);
         items.delete(new LambdaQueryWrapper<InvTransferItem>().eq(InvTransferItem::getTransferNo, transferNo));
         for (String no : nos) {
             InvTransferItem i = new InvTransferItem();
@@ -134,15 +141,18 @@ public class TransferOpsServiceImpl implements TransferOpsService {
     }
 
     /** 能不能装车：存在、在库、质检已过。 */
-    private void checkShippable(String itemType, String no) {
-        if (CABINET.equals(itemType)) {
-            DevCabinet c = cabinets.selectOne(new LambdaQueryWrapper<DevCabinet>().eq(DevCabinet::getCabinetNo, no).last("limit 1"));
+    private void checkShippable(InvTransfer transfer, String no) {
+        if (CABINET.equals(transfer.getItemType())) {
+            DevCabinet c = cabinets.selectOne(new LambdaQueryWrapper<DevCabinet>().eq(DevCabinet::getCabinetNo, no).last("limit 1 for update"));
             if (c == null) throw BizException.notFound(no);
+            requireSource(transfer,c.getWarehouseNo(),c.getSiteNo(),c.getLocationNo(),no);
             if (!CabinetStatus.IN_STOCK.name().equals(c.getStatus())) throw BizException.conflict("error.transfer.item_not_in_stock", no);
             if (!QcStatus.cleared(c.getQcStatus())) throw BizException.conflict("error.device.qc_not_passed", no);
         } else {
-            DevPowerbank p = powerbanks.selectOne(new LambdaQueryWrapper<DevPowerbank>().eq(DevPowerbank::getPowerbankNo, no).last("limit 1"));
+            DevPowerbank p = powerbanks.selectOne(new LambdaQueryWrapper<DevPowerbank>().eq(DevPowerbank::getPowerbankNo, no).last("limit 1 for update"));
             if (p == null) throw BizException.notFound(no);
+            if (p.getCabinetNo()!=null) throw BizException.conflict("error.transfer.item_not_in_stock",no);
+            requireSource(transfer,p.getWarehouseNo(),null,null,no);
             if (!PowerbankStatus.IN_STOCK.name().equals(p.getStatus())) throw BizException.conflict("error.transfer.item_not_in_stock", no);
             if (!QcStatus.cleared(p.getQcStatus())) throw BizException.conflict("error.device.qc_not_passed", no);
         }
@@ -154,6 +164,8 @@ public class TransferOpsServiceImpl implements TransferOpsService {
     @Transactional
     public InventoryTransferDetail ship(String transferNo) {
         InvTransfer t = require(transferNo);
+        access.source(t);
+        InventoryTransferServiceImpl.requireSupportedPowerbankEndpoints(t);
         String to = sm.next(t.getStatus(), "SHIP");
         List<InvTransferItem> list = itemsOf(transferNo);
         /*
@@ -164,12 +176,23 @@ public class TransferOpsServiceImpl implements TransferOpsService {
          */
         if (list.isEmpty()) throw BizException.conflict("error.inv_transfer.no_items", transferNo);
         // 发货这一刻再核一遍：建明细之后到装车之间，柜子可能被别的单调走或质检被判不过
-        for (InvTransferItem i : list) checkShippable(t.getItemType(), itemNo(i));
+        for (InvTransferItem i : list) checkShippable(t, itemNo(i));
         int n = transfers.update(null, new LambdaUpdateWrapper<InvTransfer>().eq(InvTransfer::getTransferNo, transferNo)
                 .eq(InvTransfer::getStatus, t.getStatus()).set(InvTransfer::getStatus, to).set(InvTransfer::getShippedAt, LocalDateTime.now()));
         if (n == 0) throw BizException.conflict("error.common.state_changed");
         if (CABINET.equals(t.getItemType())) {
             for (InvTransferItem i : list) lifecycle.ship(i.getCabinetNo(), transferNo);
+        } else {
+            for(InvTransferItem i:list) {
+                int changed=powerbanks.update(null,new LambdaUpdateWrapper<DevPowerbank>()
+                        .eq(DevPowerbank::getPowerbankNo,i.getPowerbankNo()).eq(DevPowerbank::getStatus,PowerbankStatus.IN_STOCK.name())
+                        .eq(DevPowerbank::getWarehouseNo,t.getFromRef()).isNull(DevPowerbank::getCabinetNo)
+                        .set(DevPowerbank::getWarehouseNo,null));
+                if(changed!=1) throw BizException.conflict("error.common.state_changed");
+                movements.record(new ai.neargo.sharehub.dev.movement.MovementRecorder.Move(POWERBANK,i.getPowerbankNo(),
+                        ai.neargo.sharehub.dev.movement.MovementEvent.SHIP,ai.neargo.sharehub.dev.movement.MovementRecorder.wh(t.getFromRef()),
+                        ai.neargo.sharehub.dev.movement.MovementRecorder.TRANSIT,null,null,null,transferNo));
+            }
         }
         inventory.transferShip(transferNo, t.getItemType(), warehouseOf(t.getFromType(), t.getFromRef()),
                 list.stream().map(TransferOpsServiceImpl::itemNo).toList());
@@ -183,6 +206,8 @@ public class TransferOpsServiceImpl implements TransferOpsService {
     @Transactional
     public ReceiveResult receive(String transferNo, List<String> receivedNos, String note) {
         InvTransfer t = require(transferNo);
+        access.target(t);
+        InventoryTransferServiceImpl.requireSupportedPowerbankEndpoints(t);
         String to = sm.next(t.getStatus(), "RECEIVE");
         List<InvTransferItem> list = itemsOf(transferNo);
         Set<String> expected = new LinkedHashSet<>();
@@ -199,6 +224,8 @@ public class TransferOpsServiceImpl implements TransferOpsService {
         if (n == 0) throw BizException.conflict("error.common.state_changed");
 
         String warehouseNo = warehouseOf(t.getToType(), t.getToRef());
+        InvWarehouse destination = warehouseNo == null ? null : warehouses.selectOne(new LambdaQueryWrapper<InvWarehouse>()
+                .eq(InvWarehouse::getWarehouseNo,warehouseNo).last("limit 1"));
         // 撤机回仓：签收不直接进仓，先进到仓待检，复检合格才入库
         boolean returnForQc = warehouseNo != null && CABINET.equals(t.getItemType())
                 && TransferSource.REMOVAL.name().equals(t.getSourceType());
@@ -217,14 +244,23 @@ public class TransferOpsServiceImpl implements TransferOpsService {
             received++;
             items.update(null, new LambdaUpdateWrapper<InvTransferItem>().eq(InvTransferItem::getId, i.getId()).set(InvTransferItem::getChecked, 1));
             if (returnForQc) {
-                lifecycle.receiveForInspection(no);
+                receiveCabinet(no,warehouseNo,destination,true);
                 forQc.add(no);
             } else if (CABINET.equals(t.getItemType())) {
-                lifecycle.receive(no, warehouseNo);
+                receiveCabinet(no,warehouseNo,destination,false);
                 intoStock.add(no);
             } else if (warehouseNo != null) {
-                powerbanks.update(null, new LambdaUpdateWrapper<DevPowerbank>().eq(DevPowerbank::getPowerbankNo, no)
+                powerbanks.selectOne(new LambdaQueryWrapper<DevPowerbank>().eq(DevPowerbank::getPowerbankNo,no).last("limit 1 for update"));
+                if (!transferNo.equals(movements.latestShipments(List.of(no)).get(no)))
+                    throw BizException.conflict("error.common.state_changed");
+                int changed=powerbanks.update(null, new LambdaUpdateWrapper<DevPowerbank>().eq(DevPowerbank::getPowerbankNo, no)
+                        .eq(DevPowerbank::getStatus,PowerbankStatus.IN_STOCK.name()).isNull(DevPowerbank::getWarehouseNo)
+                        .isNull(DevPowerbank::getCabinetNo)
                         .set(DevPowerbank::getWarehouseNo, warehouseNo));
+                if(changed!=1) throw BizException.conflict("error.common.state_changed");
+                movements.record(new ai.neargo.sharehub.dev.movement.MovementRecorder.Move(POWERBANK,no,
+                        ai.neargo.sharehub.dev.movement.MovementEvent.RECEIVE,ai.neargo.sharehub.dev.movement.MovementRecorder.TRANSIT,
+                        ai.neargo.sharehub.dev.movement.MovementRecorder.wh(warehouseNo),null,null,null,transferNo));
                 intoStock.add(no);
             }
         }
@@ -361,6 +397,7 @@ public class TransferOpsServiceImpl implements TransferOpsService {
 
     private InventoryTransferDetail detail(String transferNo) {
         InvTransfer e = require(transferNo);
+        access.read(e);
         List<TransferItem> rows = itemsOf(transferNo).stream()
                 .map(i -> new TransferItem(i.getTransferNo(), itemNo(i), i.getChecked() != null && i.getChecked() == 1)).toList();
         return new InventoryTransferDetail(new InventoryTransfer(e.getTransferNo(), e.getFromName(), e.getToName(), e.getFromType(),
@@ -370,6 +407,32 @@ public class TransferOpsServiceImpl implements TransferOpsService {
 
     private static String itemNo(InvTransferItem i) {
         return i.getPowerbankNo() != null && !i.getPowerbankNo().isBlank() ? i.getPowerbankNo() : i.getCabinetNo();
+    }
+
+    private void requireSource(InvTransfer transfer,String warehouse,String site,String location,String itemNo) {
+        // REMOVAL来源及设备明细仅由完工监听器建立，公共保存和改明细均禁止改写。
+        // 已撤机设备不再有site/location；要求仍未入仓、未重新绑定且属于该受信单据。
+        var latest=TransferSource.REMOVAL.name().equals(transfer.getSourceType()) ? movements.latestForUpdate(CABINET,itemNo) : null;
+        if (latest!=null && ai.neargo.sharehub.dev.movement.MovementEvent.UNDEPLOY.name().equals(latest.getEvent())
+                && java.util.Objects.equals(transfer.getSourceRef(),latest.getSourceRef())
+                && TransferSource.REMOVAL.name().equals(transfer.getSourceType()) && transfer.getSourceRef()!=null
+                && TransferEndpointType.SITE.name().equals(transfer.getFromType())
+                && warehouse==null && site==null && location==null
+                && items.selectCount(new LambdaQueryWrapper<InvTransferItem>()
+                    .eq(InvTransferItem::getTransferNo,transfer.getTransferNo()).eq(InvTransferItem::getCabinetNo,itemNo))==1) return;
+        String actual=TransferEndpointType.WAREHOUSE.name().equals(transfer.getFromType()) ? warehouse
+                : TransferEndpointType.SITE.name().equals(transfer.getFromType()) ? site : location;
+        if(!java.util.Objects.equals(transfer.getFromRef(),actual)) throw BizException.conflict("error.transfer.source_mismatch",itemNo);
+    }
+
+    /** 已校验目的端及单据明细。收货人不必拥有设备的旧区域；到仓后更新当前区域，履历不改写。 */
+    private void receiveCabinet(String no,String warehouseNo,InvWarehouse destination,boolean forInspection) {
+        ai.neargo.common.data.scope.DataScopeContext.executeWithoutScope(()->{
+            if(forInspection) lifecycle.receiveForInspection(no); else lifecycle.receive(no,warehouseNo);
+            if(destination!=null) cabinets.update(null,new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<DevCabinet>()
+                    .eq("cabinet_no",no).set("region_id",destination.getRegionId()));
+            return null;
+        });
     }
 
     private static String operator() {

@@ -34,9 +34,8 @@ public final class InvDtos {
      * 从一个地方搬走，「谁经的手」是少了一台时唯一的追责线索，不能由请求体自称。
      * 同样不含 {@code transferNo}：建单时服务端取号，更新时以路径为准。
      *
-     * <p>{@code status} 留在写入面里是有意的：它不是直接赋值，而是**目标状态**，
-     * 由 {@code InvTransferStateMachine} 反查事件（SHIP / RECEIVE）后裁决，
-     * 非法跃迁（如 DRAFT 直接 DONE）在那里被拒。
+     * <p>{@code status} 仅为旧客户端兼容保留。更新只能省略或保持当前状态；
+     * 发货与签收必须调用专用动作端点，确保设备状态与库存账同时处理。
      */
     public record InvTransferReq(String fromType, String fromRef, String fromName,
                                  String toType, String toRef, String toName,

@@ -11,6 +11,9 @@ public interface WarehouseLookup {
     /** 仓库是否存在（未删除）。 */
     boolean exists(String warehouseNo);
 
+    /** 校验当前操作者的仓库范围；设备旧区域字段不能代替实际仓库授权。 */
+    void requireVisible(String warehouseNo);
+
     /** 默认回仓仓号：参数 inv.return_warehouse 配了且存在就用它，否则取第一个仓；一个仓都没有返回 null。 */
     String defaultReturnWarehouse();
 }

@@ -32,8 +32,8 @@ class TransferOperatorTest extends ApiTestSupport {
         m.put("fromType", "WAREHOUSE");
         m.put("fromRef", "WH0001");
         m.put("fromName", "三号仓");
-        m.put("toType", "SITE");
-        m.put("toRef", "ST0001");
+        m.put("toType", "WAREHOUSE");
+        m.put("toRef", "WH0002");
         m.put("toName", "万达广场");
         m.put("itemType", "POWERBANK");
         m.put("powerbankCount", 40);

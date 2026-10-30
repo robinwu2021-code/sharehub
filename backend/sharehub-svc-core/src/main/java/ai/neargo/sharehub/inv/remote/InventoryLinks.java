@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * 本系统 ↔ 独立进销存的主数据映射（S3.3）：物料、仓库按需建立并记进 inventory_sync_state；
@@ -90,7 +89,7 @@ public class InventoryLinks {
         String name = warehouses.list().stream().filter(w -> w.warehouseNo().equals(warehouseNo)).map(WarehouseItem::name)
                 .findFirst().orElse(warehouseNo);
         id = api.warehouses().stream().filter(w -> name.equals(w.name())).map(InventoryApi.Warehouse::locationId).findFirst()
-                .orElseGet(() -> api.createWarehouse(name, "wh-" + warehouseNo + "-" + UUID.randomUUID()));
+                .orElseGet(() -> api.createWarehouse(name, "wh-" + warehouseNo));
         put(k, id);
         return id;
     }

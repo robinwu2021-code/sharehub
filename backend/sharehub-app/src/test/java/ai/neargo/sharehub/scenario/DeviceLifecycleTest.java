@@ -204,7 +204,8 @@ class DeviceLifecycleTest extends ApiTestSupport {
     /** 站点 + 点位 + 在库机柜（带一块在柜宝，仓 2）；live=true 时直接置为已上线（在线、营业、有合同）。 */
     private Fx fixture(boolean live) {
         String site = "STD" + rnd();
-        String venue = jdbc.queryForObject("SELECT venue_no FROM loc_venue WHERE deleted=0 ORDER BY id LIMIT 1", String.class);
+        String venue = "VND" + rnd();
+        jdbc.update("INSERT INTO loc_venue (venue_no, tenant_id, name) VALUES (?, 'MAIN', '生命周期测试场地')", venue);
         jdbc.update("INSERT INTO loc_site (site_no, tenant_id, venue_no, name, status, open_hours) VALUES (?, 'MAIN', ?, ?, ?, '10:00-22:00')",
                 site, venue, "设备测试站点 " + site, live ? "ACTIVE" : "PREPARING");
         String loc = location(site);
@@ -212,8 +213,8 @@ class DeviceLifecycleTest extends ApiTestSupport {
         cabinets.add(cab);
         jdbc.update("INSERT INTO dev_cabinet (cabinet_no, tenant_id, sn, vendor_code, device_type, location_no, location_name, site_no,"
                         + " slot_total, available_count, status, online_status, last_heartbeat_at, bound_at) VALUES"
-                        + " (?, 'MAIN', ?, 'TEST', 'POWERBANK', ?, '测试点位', ?, 8, 1, ?, ?, ?, NOW(3) - INTERVAL 1 HOUR)",
-                cab, cab, loc, site, live ? "DEPLOYED" : "IN_STOCK", live ? "ONLINE" : "OFFLINE", live ? LocalDateTime.now().toString() : null);
+                        + " (?, 'MAIN', ?, 'TEST', 'POWERBANK', ?, '测试点位', ?, 8, 1, ?, ?, ?, ?)",
+                cab, cab, loc, site, live ? "DEPLOYED" : "IN_STOCK", live ? "ONLINE" : "OFFLINE", live ? LocalDateTime.now().toString() : null, LocalDateTime.now().minusHours(1));
         String pb = "PBD" + rnd();
         jdbc.update("INSERT INTO dev_powerbank (powerbank_no, tenant_id, sn, battery, status, cabinet_no, slot_index) VALUES (?, 'MAIN', ?, 90, 'IN_CABINET', ?, 2)",
                 pb, pb, cab);
