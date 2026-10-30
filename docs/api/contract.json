@@ -14960,6 +14960,14 @@
       {
        "name": "diffQty",
        "type": "Integer"
+      },
+      {
+       "name": "itemId",
+       "type": "String"
+      },
+      {
+       "name": "trackingMode",
+       "type": "String"
       }
      ]
     },
@@ -15090,6 +15098,14 @@
       {
        "name": "diffQty",
        "type": "Integer"
+      },
+      {
+       "name": "itemId",
+       "type": "String"
+      },
+      {
+       "name": "trackingMode",
+       "type": "String"
       }
      ]
     },
@@ -15215,6 +15231,14 @@
       {
        "name": "diffQty",
        "type": "Integer"
+      },
+      {
+       "name": "itemId",
+       "type": "String"
+      },
+      {
+       "name": "trackingMode",
+       "type": "String"
       }
      ]
     },
@@ -15345,6 +15369,14 @@
       {
        "name": "diffQty",
        "type": "Integer"
+      },
+      {
+       "name": "itemId",
+       "type": "String"
+      },
+      {
+       "name": "trackingMode",
+       "type": "String"
       }
      ]
     },
@@ -15406,6 +15438,150 @@
     }
    ],
    "requestShape": null
+  },
+  {
+   "verb": "PUT",
+   "path": "/api/ops/inventory/counts/{countNo}/lines/{itemId}",
+   "perm": "device:inventory:stocktake",
+   "perms": [
+    "device:inventory:stocktake"
+   ],
+   "handler": "InventoryController#countLine",
+   "summary": "数量物料实盘（对接明细 B15）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "countNo",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "path",
+     "name": "itemId",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.inv.dto.StockDtos.CountLineReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "responseShape": [
+    {
+     "name": "count",
+     "type": "StockCount",
+     "fields": [
+      {
+       "name": "countNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "openedAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "List<StockCountLine>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "bookQty",
+       "type": "int"
+      },
+      {
+       "name": "countedQty",
+       "type": "Integer"
+      },
+      {
+       "name": "diffQty",
+       "type": "Integer"
+      },
+      {
+       "name": "itemId",
+       "type": "String"
+      },
+      {
+       "name": "trackingMode",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "exceptions",
+     "type": "List<StockCountScan>",
+     "fields": [
+      {
+       "name": "serialNo",
+       "type": "String"
+      },
+      {
+       "name": "verdict",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "missingSerials",
+     "type": "List<String>"
+    },
+    {
+     "name": "review",
+     "type": "CountReview",
+     "fields": [
+      {
+       "name": "state",
+       "type": "String"
+      },
+      {
+       "name": "approvalNo",
+       "type": "String"
+      },
+      {
+       "name": "round",
+       "type": "int"
+      },
+      {
+       "name": "submitterNo",
+       "type": "String"
+      },
+      {
+       "name": "decision",
+       "type": "String"
+      },
+      {
+       "name": "deciderName",
+       "type": "String"
+      },
+      {
+       "name": "lastError",
+       "type": "String"
+      },
+      {
+       "name": "configured",
+       "type": "boolean"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "countedQty",
+     "type": "Integer"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -15470,6 +15646,14 @@
       {
        "name": "diffQty",
        "type": "Integer"
+      },
+      {
+       "name": "itemId",
+       "type": "String"
+      },
+      {
+       "name": "trackingMode",
+       "type": "String"
       }
      ]
     },
@@ -15595,6 +15779,14 @@
       {
        "name": "diffQty",
        "type": "Integer"
+      },
+      {
+       "name": "itemId",
+       "type": "String"
+      },
+      {
+       "name": "trackingMode",
+       "type": "String"
       }
      ]
     },
@@ -15725,6 +15917,14 @@
       {
        "name": "diffQty",
        "type": "Integer"
+      },
+      {
+       "name": "itemId",
+       "type": "String"
+      },
+      {
+       "name": "trackingMode",
+       "type": "String"
       }
      ]
     },
@@ -15855,6 +16055,14 @@
       {
        "name": "diffQty",
        "type": "Integer"
+      },
+      {
+       "name": "itemId",
+       "type": "String"
+      },
+      {
+       "name": "trackingMode",
+       "type": "String"
       }
      ]
     },
@@ -16629,6 +16837,10 @@
     {
      "name": "powerbankNos",
      "type": "List<String>"
+    },
+    {
+     "name": "openingBasis",
+     "type": "String"
     }
    ]
   },
@@ -56388,10 +56600,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 631,
-  "records": 622,
-  "withPerm": 548,
-  "withBody": 257,
-  "shapedResponses": 489
+  "endpoints": 632,
+  "records": 624,
+  "withPerm": 549,
+  "withBody": 258,
+  "shapedResponses": 490
  }
 }

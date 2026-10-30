@@ -564,9 +564,27 @@ public class StockViewServiceImpl implements StockViewService {
         LocalDateTime opened = reg != null && reg.contains("|") ? LocalDateTime.parse(reg.split("\\|", 2)[1]) : null;
         return new StockCountDetail(new StockCount(v.countNo(), wh, v.status(), opened),
                 v.lines() == null ? List.of() : v.lines().stream()
-                        .map(l -> new StockCountLine(links.itemTypeOf(l.itemId()), l.bookQty(), l.countedQty(), l.diffQty())).toList(),
+                        .map(l -> new StockCountLine(links.itemTypeOf(l.itemId()), l.bookQty(), l.countedQty(), l.diffQty(), l.itemId(),
+                                l.trackingMode())).toList(),
                 v.exceptions() == null ? List.of() : v.exceptions().stream().map(x -> new StockCountScan(x.serialNo(), x.verdict())).toList(),
                 v.missingSerials() == null ? List.of() : v.missingSerials(),reviews.view(countNo));
+    }
+
+    /**
+     * 数量物料实盘（对接明细 B15）：按 itemId 录实盘数，不能拿重复扫码代替。与扫码同一道统一审核闸门：
+     * 只在盘点中、未送审时可改。
+     */
+    @Override
+    public StockCountDetail countLine(String countNo, String itemId, Integer countedQty) {
+        requireService();
+        var view = accessibleCount(countNo);
+        if (itemId == null || itemId.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "itemId");
+        if (countedQty == null || countedQty < 0 || countedQty > 10_000_000) throw BizException.badRequest("error.common.invalid_value", "countedQty");
+        call(() -> reviews.edit(countNo, links.warehouseNoOf(view.locationId()), () -> {
+            remote.api().countLine(countNo, itemId.trim(), countedQty, key("line"));
+            return null;
+        }));
+        return count(countNo);
     }
 
     @Override

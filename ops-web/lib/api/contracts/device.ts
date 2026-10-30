@@ -146,6 +146,8 @@ export interface DeviceApi {
   getStockCount(countNo: string): Promise<StockCountDetail>;
   openStockCount(warehouseNo: string): Promise<StockCountDetail>;
   scanStockCount(countNo: string, serialNos: string[]): Promise<StockCountDetail>;
+  /** 数量物料实盘（B15）：只在盘点中、未送审时。 */
+  setStockCountLine(countNo: string, itemId: string, countedQty: number): Promise<StockCountDetail>;
   submitStockCount(countNo: string): Promise<StockCountDetail>;
   approveStockCount(countNo: string, note?: string): Promise<StockCountDetail>;
   rejectStockCount(countNo: string, note: string): Promise<StockCountDetail>;

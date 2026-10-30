@@ -105,9 +105,9 @@ public class InventoryFake implements InventoryApi {
     }
 
     @Override
-    public String createWarehouse(String name, String idempotencyKey) {
+    public String createWarehouse(String name, String externalRef, String idempotencyKey) {
         String id = "LOC-" + (warehouses.size() + 1);
-        warehouses.put(id, new Warehouse(id, name, null, "ACTIVE"));
+        warehouses.put(id, new Warehouse(id, name, null, "ACTIVE", externalRef));
         return id;
     }
 
@@ -115,7 +115,7 @@ public class InventoryFake implements InventoryApi {
     public void updateWarehouse(String locationId, String name, String regionRef, String idempotencyKey) {
         Warehouse w = warehouses.get(locationId);
         if (w == null) throw err(404, "inventory.not_found", "warehouse");
-        warehouses.put(locationId, new Warehouse(locationId, name, regionRef, w.status()));
+        warehouses.put(locationId, new Warehouse(locationId, name, regionRef, w.status(), w.externalRef()));
     }
 
     @Override
@@ -124,7 +124,18 @@ public class InventoryFake implements InventoryApi {
         if (w == null) throw err(404, "inventory.not_found", "warehouse");
         boolean qtyLeft = qty.entrySet().stream().anyMatch(e -> e.getKey().startsWith(locationId + "|") && e.getValue().signum() > 0);
         if (stock.containsValue(locationId) || qtyLeft) throw err(409, "inventory.conflict", locationId + ":has_stock");
-        warehouses.put(locationId, new Warehouse(locationId, w.name(), w.regionRef(), "DISABLED"));
+        warehouses.put(locationId, new Warehouse(locationId, w.name(), w.regionRef(), "DISABLED", w.externalRef()));
+    }
+
+    /** 入库单号 → 依据（生产档案的 OPENING 须带）。 */
+    public final Map<String, String> inboundBasis = new HashMap<>();
+
+    @Override
+    public String createInbound(String locationId, String purpose, String sourceRef, String basis, List<String> attachmentRefs, String remark,
+                                List<InboundLine> lines, String idempotencyKey) {
+        String no = createInbound(locationId, purpose, sourceRef, remark, lines, idempotencyKey);
+        if (basis != null) inboundBasis.put(no, basis);
+        return no;
     }
 
     @Override
@@ -371,8 +382,16 @@ public class InventoryFake implements InventoryApi {
         int counted = (int) scanned.stream().filter(book::contains).count();
         List<String> missing = book.stream().filter(x -> !scanned.contains(x)).toList();
         List<CountScan> extra = scanned.stream().filter(x -> !book.contains(x)).map(x -> new CountScan(x, "NOT_IN_BOOK")).toList();
-        return new CountView(countNo, loc, (String) c[1], 1, null, null, null,
-                List.of(new CountLine(items.get("CABINET"), "SERIAL", book.size(), counted, counted - book.size())), extra, missing);
+        List<CountLine> lines = new ArrayList<>();
+        lines.add(new CountLine(items.get("CABINET"), "SERIAL", book.size(), counted, counted - book.size()));
+        // 数量物料：账面 = 该库位在手，实盘 = countLine 录入的数（没录为空）
+        qty.forEach((k, v) -> {
+            if (!k.startsWith(loc + "|")) return;
+            String item = k.substring(loc.length() + 1);
+            Integer got = countedQty.get(countNo + "|" + item);
+            lines.add(new CountLine(item, "QUANTITY", v.intValue(), got, got == null ? null : got - v.intValue()));
+        });
+        return new CountView(countNo, loc, (String) c[1], 1, null, null, null, lines, extra, missing);
     }
 
     @SuppressWarnings("unchecked")

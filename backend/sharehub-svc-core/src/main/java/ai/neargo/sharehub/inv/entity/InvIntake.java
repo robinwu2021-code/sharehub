@@ -25,6 +25,8 @@ public class InvIntake {
     private String currency;
     private String warehouseName;
     private String sourceRef;
+    /** 期初依据（V214 列）：期初建账入库单必填，随入库带给库存服务（生产档案 OPENING 要求依据）。 */
+    private String openingBasis;
     private LocalDateTime arrivedAt;
     /** OPEN / DONE。 */
     private String status;

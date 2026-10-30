@@ -135,6 +135,25 @@ class MaterialServiceTest extends ApiTestSupport {
     }
 
     @Test
+    @DisplayName("★ B15 数量物料实盘：按物料录实盘数，差异 = 实盘 − 账面；负数被拒")
+    void quantityCountLine() {
+        String admin = login("ADMIN");
+        String mat = material(admin, "实盘耗材", "QUANTITY");
+        doc(admin, Map.of("purpose", "OPENING", "warehouseNo", "WH001", "lines", List.of(Map.of("materialNo", mat, "qty", 7)))).okData();
+        String cn = post("/api/ops/inventory/counts", Map.of("warehouseNo", "WH001"), admin).okData().path("count").path("countNo").asText();
+        String itemId = fake.items.get(mat);
+        JsonNode d = put("/api/ops/inventory/counts/" + cn + "/lines/" + itemId, Map.of("countedQty", 6), admin).okData();
+        JsonNode line = null;
+        for (JsonNode l : d.path("lines")) if (itemId.equals(l.path("itemId").asText())) line = l;
+        assertThat(line).isNotNull();
+        assertThat(line.path("trackingMode").asText()).isEqualTo("QUANTITY");
+        assertThat(line.path("countedQty").asInt()).isEqualTo(6);
+        assertThat(line.path("diffQty").asInt()).isEqualTo(-1);
+        assertThat(put("/api/ops/inventory/counts/" + cn + "/lines/" + itemId, Map.of("countedQty", -1), admin).status).isEqualTo(400);
+        post("/api/ops/inventory/counts/" + cn + "/cancel", Map.of(), admin).okData();
+    }
+
+    @Test
     @DisplayName("物料新建即同步成库存服务物料（A02），不等第一次出入库")
     void createSyncsToService() {
         String mat = material(login("ADMIN"), "新建即同步", "QUANTITY");

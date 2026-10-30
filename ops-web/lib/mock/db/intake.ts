@@ -118,6 +118,7 @@ export function createIntake(x: IntakeCreateReq): IntakeDetail {
   if (!x?.warehouseNo) fail("请选择仓库", "Warehouse required");
   const kind = x.kind ?? "ARRIVAL";
   if (kind !== "ARRIVAL" && kind !== "OPENING") fail("入库类型不对", "Invalid kind");
+  if (kind === "OPENING" && !x.openingBasis?.trim()) fail("期初建账请填期初依据", "Opening basis required");
   const costs = Object.values(x.unitCosts ?? {});
   if (costs.some((v) => v < 0)) fail("单价不能为负", "Negative unit cost");
   if (costs.length && !x.currency?.trim()) fail("填了单价请选币种", "Currency required");

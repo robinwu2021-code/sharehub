@@ -98,7 +98,10 @@ public class RemoteInventoryPort implements InventoryPort {
             if ("COMPLETED".equals(op.phase())) return null;
             String loc = journal.reference(() -> links.locationId(api, warehouseNo));
             String item = journal.reference(() -> links.itemId(api, itemType));
-            String doc = journal.step(op, "IN_CREATE", () -> api.createInbound(loc, purpose, intakeNo, "到仓待检 " + intakeNo,
+            // 期初带依据：库存服务的 basis 是 ≤ 32 字符的依据编号（不是说明文字），给入库单号，
+            // 依据全文在本地入库单（opening_basis）。附件宿主暂无上传入口，生产档案要求附件时会被拒（开发方案 D5）
+            String basis = "OPENING".equals(purpose) ? intakeNo : null;
+            String doc = journal.step(op, "IN_CREATE", () -> api.createInbound(loc, purpose, intakeNo, basis, List.of(), "到仓待检 " + intakeNo,
                     List.of(new InventoryApi.InboundLine(item, null, null, List.of(new InventoryApi.Serial(itemNo, qcNo, null)))),
                     journal.stepKey(op, "IN_CREATE")));
             journal.step(op, "IN_POST", () -> {
@@ -237,11 +240,18 @@ public class RemoteInventoryPort implements InventoryPort {
     public void transferShip(String transferNo, String itemType, String fromWarehouseNo, List<String> itemNos) {
         if (fromWarehouseNo == null || fromWarehouseNo.isBlank() || itemNos.isEmpty()) return;
         remote(() -> {
-            String doc = api.createOutbound(links.locationId(api, fromWarehouseNo), "TRANSFER_OUT", Map.of(), "调拨发货 " + transferNo,
-                    itemNos, key("xfer-out", transferNo));
-            api.postOutbound(doc, key("xfer-out-post", doc));
-            // 签收时据此判断「发货时库存服务有没有调出」
-            links.put("xfer:" + transferNo, doc);
+            // 恢复日志（对接明细 B08）：键 = 调拨单号（一张单只发一次），丢响应原样重试续做、不会重复调出
+            var op = journal.lock("TRANSFER_SHIP", transferNo, journal.payload(new TransferIntent(transferNo, itemType, fromWarehouseNo, itemNos)),
+                    "SERVICE", "TS");
+            if (COMPLETED.equals(op.phase())) return null;
+            String loc = journal.reference(() -> links.locationId(api, fromWarehouseNo));
+            String doc = journal.step(op, "OUT", () -> api.createOutbound(loc, "TRANSFER_OUT", Map.of(), "调拨发货 " + transferNo,
+                    itemNos, journal.stepKey(op, "OUT")));
+            journal.step(op, "OUT_POST", () -> {
+                api.postOutbound(doc, journal.stepKey(op, "OUT_POST"));
+                return doc;
+            });
+            journal.complete(op);
             return doc;
         });
     }
@@ -251,18 +261,30 @@ public class RemoteInventoryPort implements InventoryPort {
     public void transferReceive(String transferNo, String itemType, String fromWarehouseNo, String toWarehouseNo, List<String> itemNos) {
         if (toWarehouseNo == null || toWarehouseNo.isBlank() || itemNos.isEmpty()) return;
         boolean fromWarehouse = fromWarehouseNo != null && !fromWarehouseNo.isBlank();
-        if (fromWarehouse && links.get("xfer:" + transferNo) == null) {
+        // 发货时有没有在库存服务调出：看发货的日志是否完成（对接明细 B09：不能从「没有映射」推断没执行）；
+        // xfer: 映射是日志之前发出的单留下的，兼容
+        boolean shippedRemotely = COMPLETED.equals(journal.phaseOf("TRANSFER_SHIP", transferNo)) || links.get("xfer:" + transferNo) != null;
+        if (fromWarehouse && !shippedRemotely) {
             // 切引擎前发出的单：库存服务里这批还在调出仓，再调入会撞「已在库」。不拦签收，账由盘点纠正
-            log.warn("调拨发货时引擎还是 LOCAL，库存服务没有调出 transferNo={} from={} to={} items={}：本次签收不同步，请对两仓盘点纠正",
+            log.warn("调拨发货时没有在库存服务调出 transferNo={} from={} to={} items={}：本次签收不同步，请对两仓盘点纠正",
                     transferNo, fromWarehouseNo, toWarehouseNo, itemNos);
             return;
         }
         remote(() -> {
+            var op = journal.lock("TRANSFER_RECEIVE", transferNo, journal.payload(new TransferIntent(transferNo, itemType, toWarehouseNo, itemNos)),
+                    "SERVICE", "TR");
+            if (COMPLETED.equals(op.phase())) return null;
             List<InventoryApi.Serial> serials = itemNos.stream()
                     .map(no -> new InventoryApi.Serial(no, "XFER-" + transferNo + "-" + no, null)).toList();
-            String doc = api.createInbound(links.locationId(api, toWarehouseNo), "TRANSFER_IN", transferNo, "调拨签收 " + transferNo,
-                    List.of(new InventoryApi.InboundLine(links.itemId(api, itemType), null, null, serials)), key("xfer-in", transferNo));
-            api.postInbound(doc, key("xfer-in-post", doc));
+            String loc = journal.reference(() -> links.locationId(api, toWarehouseNo));
+            String item = journal.reference(() -> links.itemId(api, itemType));
+            String doc = journal.step(op, "IN", () -> api.createInbound(loc, "TRANSFER_IN", transferNo, "调拨签收 " + transferNo,
+                    List.of(new InventoryApi.InboundLine(item, null, null, serials)), journal.stepKey(op, "IN")));
+            journal.step(op, "IN_POST", () -> {
+                api.postInbound(doc, journal.stepKey(op, "IN_POST"));
+                return doc;
+            });
+            journal.complete(op);
             return doc;
         });
     }
@@ -289,6 +311,10 @@ public class RemoteInventoryPort implements InventoryPort {
     }
 
     record RevokeIntent(List<String> cabinetNos, String reason) {
+    }
+
+    /** 调拨一侧：发货记调出仓、签收记目的仓与实收的件。 */
+    record TransferIntent(String transferNo, String itemType, String warehouseNo, List<String> itemNos) {
     }
 
     /** 登记一次库存写操作。requestKey 空 = 生成一次性的：同一请求内的步骤仍记录，但跨请求不能续做。 */
@@ -368,8 +394,4 @@ public class RemoteInventoryPort implements InventoryPort {
         return me == null ? "SYSTEM" : me;
     }
 
-    /** 幂等键：一次业务动作一个键（同请求内重试安全；跨请求的重复操作本地状态机已拦）。≤ 64 字符。 */
-    private static String key(String kind, String ref) {
-        return kind + "-" + UUID.randomUUID();
-    }
 }

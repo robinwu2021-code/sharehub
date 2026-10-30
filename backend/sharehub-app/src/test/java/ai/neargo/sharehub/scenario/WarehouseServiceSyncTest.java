@@ -104,6 +104,19 @@ class WarehouseServiceSyncTest extends ApiTestSupport {
     }
 
     @Test
+    @DisplayName("★ 建仓带本系统编码；认领先按编码（名称不同也认），不按名称猜")
+    void adoptsByExternalRef() {
+        String no = create(tag + "编码仓");
+        assertThat(remoteOf(no).externalRef()).as("建仓带仓号").isEqualTo(no);
+
+        jdbc.update("UPDATE sys_param SET value='LOCAL' WHERE param_key='inv.engine'");
+        String old = create(tag + "旧编码仓");
+        fake.warehouses.put("LOC-REF", new InventoryApi.Warehouse("LOC-REF", "库存服务那边改过的名字", null, "ACTIVE", old));
+        fake.warehouses.put("LOC-NAME", new InventoryApi.Warehouse("LOC-NAME", tag + "旧编码仓", null, "ACTIVE"));
+        assertThat(links.locationId(fake, old)).isEqualTo("LOC-REF");
+    }
+
+    @Test
     @DisplayName("启用中的仓不许同名")
     void rejectsDuplicateActiveName() {
         create(tag + "重名仓");

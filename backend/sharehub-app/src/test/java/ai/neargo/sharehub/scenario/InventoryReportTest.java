@@ -58,7 +58,7 @@ class InventoryReportTest extends ApiTestSupport {
         wh = post("/api/ops/inventory/warehouses", Map.of("name", "报表仓-" + tag), token).okData().path("warehouseNo").asText();
         String a = cabinet(token), b = cabinet(token);
         intakes.add(post("/api/ops/inventory/intakes", Map.of("kind", "OPENING", "warehouseNo", wh, "currency", "AED",
-                "unitCosts", Map.of(a, 1000, b, 500), "cabinetNos", List.of(a, b)), token).okData().path("intake").path("intakeNo").asText());
+                "unitCosts", Map.of(a, 1000, b, 500), "cabinetNos", List.of(a, b), "openingBasis", "期初盘点表"), token).okData().path("intake").path("intakeNo").asText());
         disposals.add(post("/api/ops/inventory/disposals", Map.of("kind", "SCRAP", "reasonCode", "BROKEN", "warehouseNo", wh, "note", "坏",
                 "cabinetNos", List.of(a)), token).okData().path("disposal").path("disposalNo").asText());
 

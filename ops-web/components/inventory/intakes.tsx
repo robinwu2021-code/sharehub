@@ -83,6 +83,7 @@ export function IntakesTab() {
         currency: Object.keys(unitCosts).length ? String(v.currency ?? "") || null : null,
         unitCosts: Object.keys(unitCosts).length ? unitCosts : undefined,
         cabinetNos: cab.nos, powerbankNos: pb.nos,
+        openingBasis: v.kind === "OPENING" ? String(v.openingBasis ?? "").trim() || undefined : undefined,
       });
     },
     onSuccess: (d) => {
@@ -102,6 +103,8 @@ export function IntakesTab() {
     { key: "warehouseNo", label: "仓库", type: "select", required: true, options: whOptions },
     { key: "supplierNo", label: "供应商", type: "select", options: spOptions, help: "采购到货选供应商；不合格「退供应商」时据此知道退给谁" },
     { key: "sourceRef", label: "来源单号", maxLength: 64 },
+    { key: "openingBasis", label: "期初依据", type: "textarea", rows: 2, maxLength: 1024, disabledWhen: (v) => v.kind !== "OPENING",
+      help: "期初建账必填：盘点表、交接清单等依据；随入库带给库存服务" },
     { key: "cabinetNos", label: "机柜编号", type: "textarea", rows: 4, placeholder: "每行一个，可扫码；带单价写「编号,单价」",
       help: "批量导入：从 Excel 复制两列（编号、单价）直接粘贴" },
     { key: "powerbankNos", label: "充电宝编号", type: "textarea", rows: 4, placeholder: "每行一个，可扫码；带单价写「编号,单价」" },

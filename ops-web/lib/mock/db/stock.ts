@@ -6,11 +6,12 @@ import type {
 import { fail, notFound } from "../../biz-error";
 import { cabinets, powerbanks, inventoryTransfers, transferItemsOf } from "./device";
 import { listDeviceMovements, allMovements } from "./movement";
+import { listMaterialBalances } from "./material";
 import { WAREHOUSES, ensurePoolSeed } from "./device-pool";
 import { startBusinessApproval } from "../../flow/mock-approvals";
 import { ME } from "../../flow/mock-db";
 
-const counts: (StockCount & { scanned: string[]; review?: import("../../types").StockCountReview })[] = [];
+const counts: (StockCount & { scanned: string[]; lineQty?: Record<string, number>; review?: import("../../types").StockCountReview })[] = [];
 let seq = 0;
 
 export const engine = (): InventoryEngine => ({ engine: "SERVICE", configured: true, endpointMode: "STATIC", reachable: true, failure: null, pendingOperations: 0 });
@@ -34,6 +35,15 @@ export function listStockLedger(q: { warehouseNo?: string; itemType?: string; ke
   return { list: rows.slice((page - 1) * size, page * size), total: rows.length };
 }
 
+/** 数量物料实盘（同后端 B15）。 */
+export function setStockCountLine(no: string, itemId: string, countedQty: number): StockCountDetail {
+  const c = head(no);
+  if (c.status !== "OPEN") fail("盘点已提交或已结束，不能再录", "The count is no longer open");
+  if (!Number.isInteger(countedQty) || countedQty < 0) fail("实盘数须为非负整数", "Counted quantity must be a non-negative integer");
+  c.lineQty = { ...(c.lineQty ?? {}), [itemId]: countedQty };
+  return detail(no);
+}
+
 function head(no: string) {
   return counts.find((c) => c.countNo === no) ?? notFound("盘点单", "Stock count", no);
 }
@@ -42,10 +52,16 @@ function detail(no: string): StockCountDetail {
   const c = head(no);
   const book = cabinets.filter((k) => k.warehouseNo === c.warehouseNo && k.status === "IN_STOCK" && !k.issuedAgentNo).map((k) => k.cabinetNo);
   const counted = c.scanned.filter((x) => book.includes(x)).length;
-  const { scanned: _s, ...count } = c;
+  const { scanned: _s, lineQty: _q, ...count } = c;
   return {
     count,
-    lines: [{ itemType: "CABINET", bookQty: book.length, countedQty: counted, diffQty: counted - book.length }],
+    lines: [{ itemType: "CABINET", bookQty: book.length, countedQty: counted, diffQty: counted - book.length, itemId: null, trackingMode: "SERIAL" },
+      // 数量物料（同后端 B15）：账面取该仓物料在手，实盘取录入的数
+      ...(c.warehouseNo ? listMaterialBalances({ warehouseNo: c.warehouseNo }) : []).filter((b) => b.trackingMode === "QUANTITY").map((b) => {
+        const got = c.lineQty?.[b.materialNo] ?? null;
+        return { itemType: b.materialName, bookQty: b.onHand, countedQty: got, diffQty: got == null ? null : got - b.onHand,
+          itemId: b.materialNo, trackingMode: "QUANTITY" as const };
+      })],
     exceptions: c.scanned.filter((x) => !book.includes(x)).map((serialNo) => ({ serialNo, verdict: "NOT_IN_BOOK" })),
     missingSerials: book.filter((x) => !c.scanned.includes(x)),
     review: c.review ?? { state: "DRAFT", approvalNo: null, round: 0, submitterNo: null, decision: null, deciderName: null, lastError: null, configured: true },

@@ -53,6 +53,9 @@ public interface StockViewService {
 
     StockCountDetail scan(String countNo, List<String> serialNos);
 
+    /** 数量物料实盘录入（B15）：只在盘点中、未送审时。 */
+    StockCountDetail countLine(String countNo, String itemId, Integer countedQty);
+
     StockCountDetail submit(String countNo);
 
     StockCountDetail approve(String countNo, String note);

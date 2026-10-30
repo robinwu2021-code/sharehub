@@ -178,6 +178,14 @@ public class InventoryController {
         return stock.openCount(req == null ? null : req.warehouseNo());
     }
 
+    /** 数量物料实盘（对接明细 B15）。 */
+    @PutMapping("/inventory/counts/{countNo}/lines/{itemId}")
+    @PreAuthorize("@perm.can('device:inventory:stocktake')")
+    public ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail countLine(@PathVariable String countNo, @PathVariable String itemId,
+            @RequestBody ai.neargo.sharehub.inv.dto.StockDtos.CountLineReq req) {
+        return stock.countLine(countNo, itemId, req == null ? null : req.countedQty());
+    }
+
     @PostMapping("/inventory/counts/{countNo}/scans")
     @PreAuthorize("@perm.can('device:inventory:stocktake')")
     public ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail scanCount(@PathVariable String countNo,

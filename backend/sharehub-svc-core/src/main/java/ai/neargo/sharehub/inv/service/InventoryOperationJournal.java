@@ -178,6 +178,13 @@ public class InventoryOperationJournal {
         return n == null ? 0 : n;
     }
 
+    /** 某操作的阶段（不校验请求体与操作人，只供判断「做没做过」）；没有返回 null。 */
+    public String phaseOf(String kind, String key) {
+        List<String> found = durable.execute(tx -> jdbc.query("SELECT phase FROM inv_operation WHERE tenant_id=? AND inventory_owner_ref='' AND kind=? AND request_key=?",
+                (rs, row) -> rs.getString(1), SecurityUtils.tenantId(), kind, key));
+        return found == null || found.isEmpty() ? null : found.getFirst();
+    }
+
     public boolean attempted(Operation op, String code) {
         return Boolean.TRUE.equals(durable.execute(tx -> jdbc.queryForObject("SELECT COUNT(*) FROM inv_operation_step WHERE operation_no=? AND step_code=?", Integer.class,
                 op.operationNo(), code) > 0));

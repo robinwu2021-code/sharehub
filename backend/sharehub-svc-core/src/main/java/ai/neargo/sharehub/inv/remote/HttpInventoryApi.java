@@ -88,8 +88,11 @@ public class HttpInventoryApi implements InventoryApi {
     }
 
     @Override
-    public String createWarehouse(String name, String idempotencyKey) {
-        return call(HttpMethod.POST, V1 + "/warehouses", Map.of("name", name), idempotencyKey).path("locationId").asText();
+    public String createWarehouse(String name, String externalRef, String idempotencyKey) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", name);
+        if (externalRef != null && !externalRef.isBlank()) body.put("externalRef", externalRef);
+        return call(HttpMethod.POST, V1 + "/warehouses", body, idempotencyKey).path("locationId").asText();
     }
 
     @Override
@@ -108,12 +111,14 @@ public class HttpInventoryApi implements InventoryApi {
     // —— 入库 ——
 
     @Override
-    public String createInbound(String locationId, String purpose, String sourceRef, String remark, List<InboundLine> lines,
-                                String idempotencyKey) {
+    public String createInbound(String locationId, String purpose, String sourceRef, String basis, List<String> attachmentRefs, String remark,
+                                List<InboundLine> lines, String idempotencyKey) {
         Map<String, Object> body = new HashMap<>();
         body.put("locationId", locationId);
         body.put("purpose", purpose);
         body.put("sourceRef", sourceRef);
+        if (basis != null && !basis.isBlank()) body.put("basis", basis);
+        if (attachmentRefs != null && !attachmentRefs.isEmpty()) body.put("attachmentRefs", attachmentRefs);
         body.put("remark", remark);
         body.put("lines", lines);
         return call(HttpMethod.POST, V1 + "/inbounds", body, idempotencyKey).path("docNo").asText();
@@ -355,6 +360,9 @@ public class HttpInventoryApi implements InventoryApi {
                     .header("Authorization", "Bearer " + appKey + ":" + appSecret)
                     .accept(MediaType.APPLICATION_JSON);
             req.header("X-Inventory-Actor", InventoryActor.current());
+            // 链路号：两边日志能按同一个号对上（对接方案 §3.1：宿主原先没发）
+            String trace = org.slf4j.MDC.get(ai.neargo.sharehub.trace.TraceContext.MDC_KEY);
+            if (trace != null && !trace.isBlank()) req.header("X-Trace-Id", trace);
             if (idempotencyKey != null) req.header("Idempotency-Key", idempotencyKey.length() > 64 ? idempotencyKey.substring(0, 64) : idempotencyKey);
             if (body != null) req.contentType(MediaType.APPLICATION_JSON).body(body);
             String raw = req.retrieve().body(String.class);

@@ -30,7 +30,7 @@ public final class IntakeDtos {
      */
     public record CreateReq(String kind, String warehouseNo, String supplierNo, String sourceRef, String arrivedAt, String note,
                             String currency, java.util.Map<String, java.math.BigDecimal> unitCosts,
-                            List<String> cabinetNos, List<String> powerbankNos) {
+                            List<String> cabinetNos, List<String> powerbankNos, String openingBasis) {
     }
 
     public record ItemRef(String itemType, String itemNo) {

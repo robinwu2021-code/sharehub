@@ -128,6 +128,7 @@ export const deviceHttp: DeviceApi = {
   getStockCount: (no) => client.get(`/api/ops/inventory/counts/${no}`),
   openStockCount: (warehouseNo) => client.post("/api/ops/inventory/counts", { warehouseNo }),
   scanStockCount: (no, serialNos) => client.post(`/api/ops/inventory/counts/${no}/scans`, { serialNos }),
+  setStockCountLine: (no, itemId, countedQty) => client.put(`/api/ops/inventory/counts/${no}/lines/${itemId}`, { countedQty }),
   submitStockCount: (no) => client.post(`/api/ops/inventory/counts/${no}/submit`, {}),
   approveStockCount: (no, note) => client.post(`/api/ops/inventory/counts/${no}/approve`, { note }),
   rejectStockCount: (no, note) => client.post(`/api/ops/inventory/counts/${no}/reject`, { note }),

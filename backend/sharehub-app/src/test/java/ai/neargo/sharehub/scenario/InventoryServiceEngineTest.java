@@ -104,8 +104,16 @@ class InventoryServiceEngineTest extends ApiTestSupport {
         String c = "CABO" + tag + (++seq);
         post("/api/ops/cabinets", Map.of("cabinetNo", c, "sn", c, "vendorCode", "TEST", "slotTotal", 8), login("ADMIN")).okData();
         jdbc.update("UPDATE dev_cabinet SET warehouse_no = NULL WHERE cabinet_no = ?", c);
-        post("/api/ops/inventory/intakes", Map.of("kind", "OPENING", "warehouseNo", "WH002", "cabinetNos", List.of(c)), login("WAREHOUSE")).okData();
+        post("/api/ops/inventory/intakes", Map.of("kind", "OPENING", "warehouseNo", "WH002", "cabinetNos", List.of(c), "openingBasis", "期初盘点表 OB-" + tag),
+                login("WAREHOUSE")).okData();
         assertThat(inboundsOf(c)).singleElement().satisfies(d -> assertThat(d.purpose()).isEqualTo("OPENING"));
+        String doc = fake.docs.entrySet().stream().filter(e -> inboundsOf(c).contains(e.getValue())).map(java.util.Map.Entry::getKey).findFirst().orElseThrow();
+        String intakeNo = jdbc.queryForObject("SELECT intake_no FROM inv_intake_item WHERE item_no=? ORDER BY id DESC LIMIT 1", String.class, c);
+        assertThat(fake.inboundBasis.get(doc)).as("依据编号 = 入库单号（库存服务 basis ≤ 32）").isEqualTo(intakeNo);
+        assertThat(jdbc.queryForObject("SELECT opening_basis FROM inv_intake WHERE intake_no=?", String.class, intakeNo))
+                .as("依据全文留在本地").isEqualTo("期初盘点表 OB-" + tag);
+        assertThat(post("/api/ops/inventory/intakes", Map.of("kind", "OPENING", "warehouseNo", "WH002", "cabinetNos", List.of(c)),
+                login("WAREHOUSE")).status).as("期初不填依据被拒").isEqualTo(400);
         assertThat(fake.stock).containsKey(c);
     }
 
@@ -421,6 +429,21 @@ class InventoryServiceEngineTest extends ApiTestSupport {
         assertThat(fake.stock).containsEntry(a, loc("WH003")).doesNotContainKey(b);
         assertThat(fake.gates.get(a)).contains("XFER-" + t + "-" + a);
         assertThat(jdbc.queryForObject("SELECT warehouse_no FROM dev_cabinet WHERE cabinet_no=?", String.class, a)).isEqualTo("WH003");
+    }
+
+    @Test
+    @DisplayName("★★ B08 调拨发货过账后响应丢失：重试续做，库存服务只有一张调出单；签收照常调入")
+    void transferShipLostResponseResumes() {
+        String c = stocked();
+        String admin = login("ADMIN");
+        String t = transfer(admin, List.of(c));
+        fake.loseNextOutboundPostResponse = true;
+        assertThat(post("/api/ops/inventory-transfers/" + t + "/ship", Map.of(), admin).status).isEqualTo(409);
+        assertThat(jdbc.queryForObject("SELECT status FROM inv_transfer WHERE transfer_no=?", String.class, t)).isEqualTo("DRAFT");
+        post("/api/ops/inventory-transfers/" + t + "/ship", Map.of(), admin).okData();
+        assertThat(fake.docs.values().stream().filter(d -> "OUT".equals(d.kind()) && d.serials().contains(c)).count()).isEqualTo(1);
+        post("/api/ops/inventory-transfers/" + t + "/receive", Map.of("receivedNos", List.of(c)), admin).okData();
+        assertThat(fake.stock).containsEntry(c, loc("WH003"));
     }
 
     @Test

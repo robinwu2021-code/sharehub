@@ -40,7 +40,7 @@ describe("入库单（V202 mock）", () => {
     const free = ["CABRC1", "CABRC2", "CABRC3"];
     for (const no of free) cabinets.push({ ...cabinets[0], cabinetNo: no, sn: no, status: "IN_STOCK", archivedAt: null,
       locationNo: null, issuedAgentNo: null, warehouseNo: null });
-    const op = ik.createIntake({ kind: "OPENING", warehouseNo: "WH003", cabinetNos: [free[0]] });
+    const op = ik.createIntake({ kind: "OPENING", warehouseNo: "WH003", cabinetNos: [free[0]], openingBasis: "期初盘点表" });
     expect(op.intake.status).toBe("DONE");
     expect(cabinets.find((x) => x.cabinetNo === free[0])!.warehouseNo).toBe("WH003");
     expect(() => ik.createIntake({ warehouseNo: "WH003", unitCosts: { [free[1]]: 10 }, cabinetNos: [free[1]] })).toThrow(/币种/);

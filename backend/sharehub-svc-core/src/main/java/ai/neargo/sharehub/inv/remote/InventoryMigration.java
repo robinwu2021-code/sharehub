@@ -27,7 +27,7 @@ import java.util.UUID;
  * 存量迁移（S7，D §2.8）：把本地设备表里的库存账推到独立进销存，切换前跑完。
  *
  * <ul>
- *   <li><b>在仓</b>的柜与宝：在所在仓做 PURCHASE 入库，gateRef = 最近一次通过的质检记录号（存量免检的用 MIG-{设备号}）；</li>
+ *   <li><b>在仓</b>的柜与宝：在所在仓做 OPENING 入库（依据 MIGRATION），gateRef = 最近一次通过的质检记录号（存量免检的用 MIG-{设备号}）；</li>
  *   <li><b>仓外</b>的柜（出库池 / 已绑定 / 投放中 / 故障）：先入默认回仓仓，再 ISSUE 出库给其商家（有站点带站点），
  *       本地已签收的当场领取 —— 进销存里就成了「已交付」，绑定与投放仍是业务侧的事；</li>
  *   <li>跳过并列明原因：直营站点的柜（没有商家可出库）、在途、报废、不在柜也不在仓的宝。</li>
@@ -107,7 +107,8 @@ public class InventoryMigration {
                 if (!"IN".equals(st) && !"OUT".equals(st)) {
                     String wh = c.warehouseNo() != null ? c.warehouseNo() : warehouses.defaultReturnWarehouse();
                     if (wh == null) throw BizException.conflict("error.issue.no_warehouse");
-                    String doc = api.createInbound(links.locationId(api, wh), "PURCHASE", "MIGRATION", "存量迁移",
+                    // 存量是期初，不是采购（记成 PURCHASE 会让切换当期采购量虚增；对接方案 §4.2）
+                    String doc = api.createInbound(links.locationId(api, wh), "OPENING", "MIGRATION", "MIGRATION", List.of(), "存量迁移",
                             List.of(new InventoryApi.InboundLine(links.itemId(api, c.itemType()), null, null,
                                     List.of(new InventoryApi.Serial(c.itemNo(), gateRef(c.itemNo()), null)))), key());
                     api.postInbound(doc, key());

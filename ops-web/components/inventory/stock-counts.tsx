@@ -17,7 +17,7 @@ import { FilterSelect } from "@/components/ui/filter-select";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/input";
+import { Input, Select } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Notice } from "@/components/ui/notice";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
@@ -92,6 +92,25 @@ export function StockCountsTab() {
   );
 }
 
+/** 数量物料实盘录入（对接明细 B15）：按物料录数，不拿重复扫码代替。 */
+function QtyEditor({ countNo, line }: { countNo: string; line: StockCountLine }) {
+  const qc = useQueryClient();
+  const [value, setValue] = useState(line.countedQty == null ? "" : String(line.countedQty));
+  const n = Number(value);
+  const valid = value.trim() !== "" && Number.isInteger(n) && n >= 0;
+  const save = useMutation({
+    mutationFn: () => api.setStockCountLine(countNo, line.itemId!, n),
+    onSuccess: (r) => { qc.setQueryData(["stock-count", countNo], r); notify.success("已录入实盘数"); },
+  });
+  return (
+    <span className="inline-flex items-center justify-end gap-1.5">
+      <Input aria-label={`${line.itemType ?? ""} 实盘数`} type="number" className="w-24 text-right" value={value}
+        onChange={(e) => setValue(e.target.value)} />
+      <Button size="sm" variant="outline" disabled={!valid || save.isPending || n === line.countedQty} onClick={() => save.mutate()}>保存</Button>
+    </span>
+  );
+}
+
 function CountDrawer({ countNo, onClose }: { countNo: string | null; onClose: () => void }) {
   const qc = useQueryClient();
   const canWrite = useCan()("device:inventory:stocktake");
@@ -124,7 +143,8 @@ function CountDrawer({ countNo, onClose }: { countNo: string | null; onClose: ()
   const lineCols: Column<StockCountLine>[] = [
     { header: "类型", cell: (l) => (l.itemType ? ITEM_LABEL[l.itemType] ?? l.itemType : "-") },
     { header: "账面", className: "text-right tabular-nums", cell: (l) => l.bookQty },
-    { header: "实盘", className: "text-right tabular-nums", cell: (l) => l.countedQty ?? "-" },
+    { header: "实盘", className: "text-right tabular-nums", cell: (l) => (canWrite && editable && l.trackingMode === "QUANTITY" && l.itemId
+      ? <QtyEditor countNo={countNo!} line={l} /> : l.countedQty ?? "-") },
     { header: "差异", className: "text-right tabular-nums", cell: (l) => l.diffQty ?? "-" },
   ];
 

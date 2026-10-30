@@ -391,7 +391,10 @@ public class MaterialServiceImpl implements MaterialService {
                 ? new InventoryApi.InboundLine(itemIds.get(l.material().getMaterialNo()), null, null,
                         l.serials().stream().map(sn -> new InventoryApi.Serial(sn, null, null)).toList())
                 : new InventoryApi.InboundLine(itemIds.get(l.material().getMaterialNo()), l.qty(), null, List.of())).toList();
-        String no = journal.step(operation, "IN_CREATE", () -> api.createInbound(loc, purpose, docNo, remark, in, journal.stepKey(operation, "IN_CREATE")));
+        // 期初依据给物料单号：库存服务的 basis 是 ≤ 32 字符的依据编号，说明文字在本地单据
+        String basis = "OPENING".equals(purpose) ? docNo : null;
+        String no = journal.step(operation, "IN_CREATE", () -> api.createInbound(loc, purpose, docNo, basis, List.of(), remark, in,
+                journal.stepKey(operation, "IN_CREATE")));
         journal.step(operation, "IN_POST", () -> { api.postInbound(no, journal.stepKey(operation, "IN_POST")); return no; });
         return no;
     }

@@ -103,11 +103,20 @@ public class InventoryLinks {
         if (id != null) return id;
         java.util.Set<String> taken = new java.util.HashSet<>();
         listByPrefix("wh:").forEach(x -> taken.add(x.getV()));
-        List<String> candidates = api.warehouses().stream()
+        List<InventoryApi.Warehouse> all = api.warehouses();
+        // 先按本系统编码认领（库存服务 60a614575 起有 externalRef）：编码是稳定的，名称可改、可重名
+        java.util.Optional<String> byRef = all.stream().filter(w -> warehouseNo.equals(w.externalRef()) && !taken.contains(w.locationId()))
+                .map(InventoryApi.Warehouse::locationId).findFirst();
+        if (byRef.isPresent()) {
+            put(k, byRef.get());
+            return byRef.get();
+        }
+        List<String> candidates = all.stream()
+                .filter(w -> w.externalRef() == null || w.externalRef().isBlank())
                 .filter(w -> name.equals(w.name()) && !"DISABLED".equals(w.status()) && !taken.contains(w.locationId()))
                 .map(InventoryApi.Warehouse::locationId).toList();
         if (candidates.size() > 1) throw BizException.conflict("error.inventory.warehouse_ambiguous", name, candidates.size());
-        id = candidates.isEmpty() ? api.createWarehouse(name, "wh-" + warehouseNo) : candidates.getFirst();
+        id = candidates.isEmpty() ? api.createWarehouse(name, warehouseNo, "wh-" + warehouseNo) : candidates.getFirst();
         put(k, id);
         return id;
     }

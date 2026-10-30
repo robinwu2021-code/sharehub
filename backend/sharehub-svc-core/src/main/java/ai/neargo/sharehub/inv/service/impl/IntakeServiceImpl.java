@@ -227,6 +227,12 @@ public class IntakeServiceImpl implements IntakeService {
         h.setArrivedAt(notBlank(r.arrivedAt()) ? LocalDateTime.parse(r.arrivedAt().trim().replace(' ', 'T')) : LocalDateTime.now());
         h.setStatus(IntakeStatus.OPEN.name());
         h.setNote(blankToNull(r.note()));
+        // 期初依据：库存服务的 OPENING 用途要求依据（生产档案 sharehub.json），在这里收下、入库时带过去
+        if (OPENING.equals(kind)) {
+            if (!notBlank(r.openingBasis())) throw BizException.badRequest("error.common.missing_parameter", "openingBasis");
+            if (r.openingBasis().trim().length() > 1024) throw BizException.badRequest("error.common.invalid_value", "openingBasis");
+            h.setOpeningBasis(r.openingBasis().trim());
+        }
         h.setCreatedBy(operator());
         intakes.insert(h);
         cabNos.forEach(no -> insertItem(h.getIntakeNo(), CABINET, no, costs.get(no)));

@@ -118,7 +118,7 @@ cab4, cab5 = "CABOP" + tag, "CABDS" + tag
 for c in (cab4, cab5):
     req("POST", "/api/ops/cabinets", {"cabinetNo": c, "sn": c, "vendorCode": "TEST", "slotTotal": 8}, admin)
 st, op, raw = req("POST", "/api/ops/inventory/intakes", {"kind": "OPENING", "warehouseNo": "WH003",
-    "currency": "AED", "unitCosts": {cab4: 1200, cab5: 800}, "cabinetNos": [cab4, cab5]}, admin)
+    "currency": "AED", "unitCosts": {cab4: 1200, cab5: 800}, "cabinetNos": [cab4, cab5], "openingBasis": "冒烟期初盘点表"}, admin)
 ck("入库单：期初建账登记即入库、带金额", st == 200 and op["intake"]["status"] == "DONE" and float(op["intake"]["totalCost"]) == 2000, raw)
 st, dp, raw = req("POST", "/api/ops/inventory/disposals", {"kind": "SCRAP", "reasonCode": "BROKEN", "warehouseNo": "WH003",
     "note": "冒烟报废", "cabinetNos": [cab5]}, admin)

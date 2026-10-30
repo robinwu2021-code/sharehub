@@ -102,6 +102,7 @@ export const deviceMock: DeviceApi = {
   getStockCount: async (no) => wait(st.getStockCount(no)),
   openStockCount: async (wh) => wait(st.openStockCount(wh), 350),
   scanStockCount: async (no, nos) => wait(st.scanStockCount(no, nos), 300),
+  setStockCountLine: async (no, itemId, qty) => wait(st.setStockCountLine(no, itemId, qty)),
   submitStockCount: async (no) => wait(st.submitStockCount(no), 300),
   approveStockCount: async (no) => wait(st.rejectDirectCountReview(), 300),
   rejectStockCount: async (no, note) => wait(st.rejectDirectCountReview(), 300),

@@ -29,10 +29,19 @@ public interface InventoryApi {
 
     List<Warehouse> warehouses();
 
-    record Warehouse(String locationId, String name, String regionRef, String status) {
+    /** externalRef：库位在本系统的编号（= 本地仓号）。库存服务 60a614575 起支持，旧版返回空。 */
+    record Warehouse(String locationId, String name, String regionRef, String status, String externalRef) {
+        public Warehouse(String locationId, String name, String regionRef, String status) {
+            this(locationId, name, regionRef, status, null);
+        }
     }
 
-    String createWarehouse(String name, String idempotencyKey);
+    default String createWarehouse(String name, String idempotencyKey) {
+        return createWarehouse(name, null, idempotencyKey);
+    }
+
+    /** 建仓并带本系统编码（对接方案 §4.2：映射按 externalRef，不按名称）；旧版库存服务忽略 externalRef。 */
+    String createWarehouse(String name, String externalRef, String idempotencyKey);
 
     /** 改仓库名称 / 区域（regionRef 可空）。 */
     void updateWarehouse(String locationId, String name, String regionRef, String idempotencyKey);
@@ -48,8 +57,18 @@ public interface InventoryApi {
     record InboundLine(String itemId, Integer qty, String gateRef, List<Serial> serials) {
     }
 
-    /** 建入库草稿（purpose：PURCHASE / RETURN），返回单号。 */
-    String createInbound(String locationId, String purpose, String sourceRef, String remark, List<InboundLine> lines, String idempotencyKey);
+    /** 建入库草稿（不带依据与附件），返回单号。 */
+    default String createInbound(String locationId, String purpose, String sourceRef, String remark, List<InboundLine> lines,
+                                 String idempotencyKey) {
+        return createInbound(locationId, purpose, sourceRef, null, List.of(), remark, lines, idempotencyKey);
+    }
+
+    /**
+     * 建入库草稿，带依据与附件：业态档案里要求依据 / 附件的用途（生产档案 sharehub.json 的 OPENING 两样都要）
+     * 不带会被拒 {@code BAD_REQUEST basis / attachmentRefs}。basis 是 ≤ 32 字符的依据编号（库存服务列宽），不是说明文字。
+     */
+    String createInbound(String locationId, String purpose, String sourceRef, String basis, List<String> attachmentRefs, String remark,
+                         List<InboundLine> lines, String idempotencyKey);
 
     void postInbound(String docNo, String idempotencyKey);
 

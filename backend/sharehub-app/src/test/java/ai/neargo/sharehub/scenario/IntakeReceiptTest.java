@@ -49,7 +49,7 @@ class IntakeReceiptTest extends ApiTestSupport {
     void opening() {
         String token = login("ADMIN");
         String c = newCabinet(token);
-        JsonNode d = post("/api/ops/inventory/intakes", Map.of("kind", "OPENING", "warehouseNo", "WH002", "cabinetNos", List.of(c)), token).okData();
+        JsonNode d = post("/api/ops/inventory/intakes", Map.of("kind", "OPENING", "warehouseNo", "WH002", "cabinetNos", List.of(c), "openingBasis", "期初盘点表 2026-10"), token).okData();
         intakes.add(d.path("intake").path("intakeNo").asText());
         assertThat(d.path("intake").path("kind").asText()).isEqualTo("OPENING");
         assertThat(d.path("intake").path("status").asText()).isEqualTo("DONE");

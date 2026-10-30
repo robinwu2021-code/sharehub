@@ -27,7 +27,12 @@ public final class StockDtos {
     public record StockCount(String countNo, String warehouseNo, String status, LocalDateTime openedAt) {
     }
 
-    public record StockCountLine(String itemType, int bookQty, Integer countedQty, Integer diffQty) {
+    /** itemId / trackingMode：数量物料（QUANTITY）要按 itemId 录实盘数（对接明细 B15），逐件的靠扫码。 */
+    public record StockCountLine(String itemType, int bookQty, Integer countedQty, Integer diffQty, String itemId, String trackingMode) {
+    }
+
+    /** 数量物料实盘录入（B15）。 */
+    public record CountLineReq(Integer countedQty) {
     }
 
     public record StockCountScan(String serialNo, String verdict) {

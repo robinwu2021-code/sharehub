@@ -305,6 +305,8 @@ export interface IntakeCreateReq {
   note?: string;
   cabinetNos?: string[];
   powerbankNos?: string[];
+  /** 期初依据（期初建账必填，如盘点表、交接清单）：随入库带给库存服务，生产档案的 OPENING 要求依据。 */
+  openingBasis?: string;
 }
 export interface IntakeItemRef {
   itemType: IntakeItemType;
@@ -1049,6 +1051,9 @@ export interface StockCountLine {
   bookQty: number;
   countedQty: number | null;
   diffQty: number | null;
+  /** 数量物料（trackingMode = QUANTITY）按 itemId 录实盘数（B15）；逐件的靠扫码。 */
+  itemId?: string | null;
+  trackingMode?: "SERIAL" | "QUANTITY" | null;
 }
 
 export interface StockCountScan {
