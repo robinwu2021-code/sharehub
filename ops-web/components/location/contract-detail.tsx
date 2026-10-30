@@ -7,7 +7,11 @@
 // 塞回列表页会让那个文件再长 200 行，且这三者的关系只有读代码才看得出来。
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { Contract, ContractStatus, ContractLogEvent, ContractLogItem, ContractTerminationStatus } from "@/lib/types";
+import type {
+  Contract, ContractStatus, ContractLogEvent, ContractLogItem, ContractTerminationStatus,
+  ContractShareBase, ContractSettlePeriod,
+} from "@/lib/types";
+import { SHARE_MODE_LABEL } from "./lead-meta";
 import { Drawer, Field } from "@/components/ui/drawer";
 
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
@@ -46,11 +50,13 @@ const CONTRACT_STEPS: Step[] = [
   { key: "EXPIRED", label: "已到期" },
 ];
 
-const SHARE_MODE: Record<string, string> = {
-  SHARE: "纯分成", ENTRY_FEE: "进场费", GUARANTEE: "保底", FREE: "免费",
-};
-const SHARE_BASE: Record<string, string> = { NET: "净额", GROSS: "毛额" };
-const SETTLE_PERIOD: Record<string, string> = { MONTH: "按月", QUARTER: "按季" };
+/**
+ * 合同条款枚举的展示名，导出给合同编辑表单用 —— 详情与表单同一份，不各写一套。
+ * 分成模式与商机谈判条件同一枚举，名字取 lead-meta 的 SHARE_MODE_LABEL。
+ */
+const SHARE_MODE = SHARE_MODE_LABEL;
+export const SHARE_BASE: Record<ContractShareBase, string> = { NET: "净额", GROSS: "毛额" };
+export const SETTLE_PERIOD: Record<ContractSettlePeriod, string> = { MONTH: "按月", QUARTER: "按季" };
 const AUDIT_STAGE: Record<string, string> = { OPS: "运营审条款", FINANCE: "财务会签" };
 
 /** 终止申请三态。走 StatusMap 而不是内联三元——与页面层的棘轮口径一致。 */
@@ -181,6 +187,14 @@ export function ContractDetailDrawer({
               {t.deviceQuota != null && <Field label="设备配额"><span className="tabular-nums">{t.deviceQuota}</span></Field>}
               {t.exclusive != null && <Field label="独家">{t.exclusive ? "是" : "否"}</Field>}
               {t.placementNote && <Field label="点位约定">{t.placementNote}</Field>}
+              {t.depositAmount != null && (
+                <Field label="押金">
+                  <span className="tabular-nums">{t.depositAmount}</span>
+                  {t.depositTerms && <span className="ms-2 text-muted-foreground">{t.depositTerms}</span>}
+                </Field>
+              )}
+              {t.autoRenew != null && <Field label="到期自动续约">{t.autoRenew ? "是" : "否"}</Field>}
+              {t.signerName && <Field label="签约人">{t.signerName}</Field>}
               {t.remark && <Field label="备注">{t.remark}</Field>}
             </>
           )}

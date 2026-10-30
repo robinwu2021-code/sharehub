@@ -13,11 +13,19 @@ import ai.neargo.sharehub.common.event.DomainEvent;
  * @param countedQty 撤机现场清点的宝数（撤机单必填）
  */
 public record WorkOrderCompletedEvent(String woNo, String type, String source, String sourceRef, String siteNo,
-                                      String cabinetNo, String at, String locationNo, Integer countedQty) implements DomainEvent {
+                                      String cabinetNo, String at, String locationNo, Integer countedQty,
+                                      // V164：撤机去向 RETURN_TO_POOL / RETURN_TO_WAREHOUSE；空 = 回仓（老事件、非撤机单）
+                                      String disposition) implements DomainEvent {
+
+    /** V164 之前的形状（发件箱里排队的老事件反序列化也走这里的语义：去向为空 = 回仓）。 */
+    public WorkOrderCompletedEvent(String woNo, String type, String source, String sourceRef, String siteNo,
+                                   String cabinetNo, String at, String locationNo, Integer countedQty) {
+        this(woNo, type, source, sourceRef, siteNo, cabinetNo, at, locationNo, countedQty, null);
+    }
 
     /** 兼容构造点（无装机 / 撤机现场数据）。 */
     public WorkOrderCompletedEvent(String woNo, String type, String source, String sourceRef, String siteNo, String cabinetNo, String at) {
-        this(woNo, type, source, sourceRef, siteNo, cabinetNo, at, null, null);
+        this(woNo, type, source, sourceRef, siteNo, cabinetNo, at, null, null, null);
     }
 
     @Override

@@ -12,6 +12,8 @@ import lombok.EqualsAndHashCode;
 public class WoOrder extends BaseEntity {
     private String woNo;
     private String type;
+    /** 撤机去向（V164，{@link ai.neargo.sharehub.wo.RemovalDisposition}）；仅撤机单有值。 */
+    private String removalDisposition;
     private String source;
     private String priority;
     private String cabinetNo;

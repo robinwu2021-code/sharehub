@@ -1,3 +1,4 @@
+import type { VenueIndustry } from "./location";
 import type { Archivable } from "./common";
 
 import type { DataScope } from "./org";
@@ -41,6 +42,26 @@ export interface Agent extends Archivable {
   shareRate: number; // 默认分润比例 0..1
   cabinetCount: number;
   status: AgentStatus;
+  /**
+   * 位置（V157，商家核心资料，需求方案 D6）：地址 + 地图坐标三者同时给。
+   * 补齐后系统建默认站点；位置或行业缺一样就不能划拨设备。保存时**不传 = 不改**。
+   */
+  address?: string | null;
+  lng?: number | null;
+  lat?: number | null;
+  /** 行业，与场地方同一词表。 */
+  industry?: VenueIndustry | null;
+  /** 系统建的默认站点（只读）。商家端不出现「站点」这个词。 */
+  defaultSiteNo?: string | null;
+  /** VAT 税号（V183，C10）：有 = VAT 登记户，分成到账时出自开票单据；保存时不传 = 不改，空串 = 清掉。 */
+  vatTrn?: string | null;
+  /** 营业执照号（V185，MER-01）。保存时不传 = 不改。 */
+  licenseNo?: string | null;
+}
+
+/** 核心资料是否齐全：位置（地址 + 坐标）与行业。店名、联系人建账号时已必填。 */
+export function agentCoreComplete(a: Pick<Agent, "address" | "lng" | "lat" | "industry">): boolean {
+  return !!a.address?.trim() && a.lng != null && a.lat != null && !!a.industry;
 }
 
 /**
@@ -75,6 +96,11 @@ export type ApplyStatus = "DRAFT" | "SUBMITTED" | "REVIEWING" | "APPROVED" | "RE
 export type OperatorType = "AGENT" | "CITY_PARTNER";
 
 export interface AgentApply {
+  /**
+   * 仅审核通过的响应里有：开通时新建凭据才发的**一次性初始口令**（首登强制改）。
+   * 同一个人开第二家商家时为 null；列表与详情接口不带。只显示这一次。
+   */
+  initialPassword?: string | null;
   applyNo: string;
   source: ApplySource;
   status: ApplyStatus;
@@ -300,4 +326,23 @@ export interface AgentOpsAssessment {
   coefficient: number;
   computedAt: string | null;
   createdAt: string | null;
+}
+
+
+/**
+ * 商家门户「商家资料」（后端 `MerchantProfileService.Profile`，`GET /api/agent/me/profile`，V175）。
+ * 商家号取自会话；名称、位置、行业只读，联系人可改。联系人是业务联系方式，**不是登录标识**。
+ */
+export interface MerchantProfile {
+  agentNo: string;
+  name: string;
+  address: string | null;
+  lng: number | null;
+  lat: number | null;
+  industry: string | null;
+  contactName: string | null;
+  phone: string | null;
+  email: string | null;
+  defaultSiteNo: string | null;
+  status: string;
 }

@@ -206,8 +206,8 @@ public class IamAdminController {
      * 「为什么不让我改」的地方 —— 抹掉之后闸还在拦，但界面上只剩一个 500，
      * 于是看起来像系统坏了而不是像被拦了。实跑对着真后端验出来的（首次前后端联跑）。
      *
-     * <p>消息里用**菜单名**而不是 {@code menuNo}：在界面上弹「M_org 对超管不可见了」，
-     * 操作者刚刚改的那一栏写着「员工与权限」，对不上号 —— 他得先知道 M_org 是什么
+     * <p>消息里用**菜单名**而不是 {@code menuNo}：在界面上弹「M_system 对超管不可见了」，
+     * 操作者刚刚改的那一栏写着「系统管理」，对不上号 —— 他得先知道 M_system 是什么
      * 才能看懂这句拦截。内部编号是给日志看的，不是给人看的。
      */
     private void assertAdminCanStillGetBackIn() {
@@ -225,8 +225,12 @@ public class IamAdminController {
         }
     }
 
-    /** 回得来的那扇门：菜单管理自己就在这一支下面。 */
-    private static final String ADMIN_SECTION = "M_org";
+    /**
+     * 回得来的那扇门：菜单管理自己就在这一支下面。
+     * 2026-10-28 V172「员工与权限」（M_org）并入「系统管理」（M_system），菜单管理随之搬家 ——
+     * 这里不跟着改的话，M_org 删掉后闸会认定「对超管不可见」，此后菜单管理的任何修改都被拒。
+     */
+    private static final String ADMIN_SECTION = "M_system";
 
     @GetMapping("/menus")
     @PreAuthorize("@perm.can('org:role:read')")

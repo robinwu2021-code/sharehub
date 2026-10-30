@@ -28,12 +28,21 @@ import java.util.Set;
 public class ContractExpiryEvaluator implements StateEvaluator {
 
     public static final String CONTRACT_EXPIRING = "CONTRACT_EXPIRING";
+    /**
+     * 提醒窗口与两档升级都是配置（C12，V184；运营方原文「到期前 2 个月提醒」—— 60 / 61 / 62 天由运营定）：
+     * contract.expiry.remind_days（60）、contract.expiry.escalate_medium_days（30）、contract.expiry.escalate_high_days（7）。
+     */
     static final int WINDOW_DAYS = 60;
+    static final String KEY_WINDOW = "contract.expiry.remind_days";
+    static final String KEY_MEDIUM = "contract.expiry.escalate_medium_days";
+    static final String KEY_HIGH = "contract.expiry.escalate_high_days";
 
     private final ContractQueryPort contracts;
+    private final ai.neargo.sharehub.api.platform.port.SysParamPort params;
 
-    public ContractExpiryEvaluator(ContractQueryPort contracts) {
+    public ContractExpiryEvaluator(ContractQueryPort contracts, ai.neargo.sharehub.api.platform.port.SysParamPort params) {
         this.contracts = contracts;
+        this.params = params;
     }
 
     @Override
@@ -49,23 +58,30 @@ public class ContractExpiryEvaluator implements StateEvaluator {
 
     @Override
     public List<Finding> evaluate(EvalScope scope, LocalDateTime now) {
-        return contracts.expiringWithin(WINDOW_DAYS, 1000).stream()
+        int window = Math.max(1, params.intOf(KEY_WINDOW, WINDOW_DAYS));
+        int medium = params.intOf(KEY_MEDIUM, 30);
+        int high = params.intOf(KEY_HIGH, 7);
+        return contracts.expiringWithin(window, 1000).stream()
                 .filter(c -> c.endAt() != null)
-                .map(c -> finding(c, now))
+                .map(c -> finding(c, now, medium, high))
                 .toList();
     }
 
-    private static Finding finding(ContractBrief c, LocalDateTime now) {
+    private static Finding finding(ContractBrief c, LocalDateTime now, int medium, int high) {
         long days = ChronoUnit.DAYS.between(now.toLocalDate(), c.endAt());
         return new Finding(CONTRACT_EXPIRING, AlarmSubjectType.CONTRACT, c.contractNo(), c.siteNo(), null, null, null,
                 AlarmCause.EXPIRING, ImpactScope.SITE, 0,
                 List.of(new Finding.Evidence("CONTRACT_END", null, null, now, "剩余 " + days + " 天（" + c.endAt() + " 到期）")),
-                Map.of(Finding.ATTR_PRIORITY, priorityOf(days).name(), "endAt", c.endAt().toString()));
+                Map.of(Finding.ATTR_PRIORITY, priorityOf(days, medium, high).name(), "endAt", c.endAt().toString()));
     }
 
     static WoPriority priorityOf(long daysLeft) {
-        if (daysLeft <= 7) return WoPriority.HIGH;
-        if (daysLeft <= 30) return WoPriority.MEDIUM;
+        return priorityOf(daysLeft, 30, 7);
+    }
+
+    static WoPriority priorityOf(long daysLeft, int medium, int high) {
+        if (daysLeft <= high) return WoPriority.HIGH;
+        if (daysLeft <= medium) return WoPriority.MEDIUM;
         return WoPriority.LOW;
     }
 }

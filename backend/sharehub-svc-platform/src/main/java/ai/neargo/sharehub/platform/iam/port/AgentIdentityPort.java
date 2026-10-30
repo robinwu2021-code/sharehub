@@ -53,6 +53,12 @@ public interface AgentIdentityPort {
     String sendLoginOtp(String rawPhone);
 
     /**
+     * 登录标识（邮箱或手机号）→ 可登录的自然人 {@code principal_no}；查不到、停用、格式不对一律 null。
+     * 口令登录用它找人，再按 {@code realm=AGENT} 校验口令。调用方对 null 与口令错必须回同一句话。
+     */
+    String resolvePrincipal(String identifier);
+
+    /**
      * 校验手机号 + 验证码，返回该自然人的 {@code principal_no}。
      *
      * <p>失败一律抛 {@link IllegalArgumentException}，且<b>文案不区分「号不存在」与「码不对」</b>

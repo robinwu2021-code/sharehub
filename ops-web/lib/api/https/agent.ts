@@ -63,6 +63,7 @@ export const agentHttp: AgentApi = {
   listAgentApplies: (q) => client.get("/api/agent/applies", q),
   acceptAgentApply: (applyNo) => client.post(`/api/agent/applies/${applyNo}/accept`, {}),
   auditAgentApply: ({ applyNo, ...body }) => client.post(`/api/agent/applies/${applyNo}/audit`, body),
+  resendAgentInvite: (agentNo) => client.post(`/api/agent/agents/${agentNo}/invite`, {}),
   // 自助注册三件套：全部免鉴权，防刷靠 OTP + 单 IP 限流 + 同手机号至多一张在途
   sendApplyOtp: (phone) => client.post("/api/agent/apply/otp", { phone }),
   selfServiceApply: (x) => client.post("/api/agent/apply", x),
@@ -78,24 +79,16 @@ export const agentHttp: AgentApi = {
   listAssignableAssets: (q?: AssignableAssetQ) =>
     client.get<PageResult<AssignableAsset>>("/api/agent/assignable-assets", q),
 
-  // T0-5：后端是**单资产**端点 POST /api/agent/assignments（AssignReq{agentNo,targetType,
-  // targetNo,action,operator} → AssignmentLog），前端契约是**批量**。此处做扇出适配。
-  //
-  // ⚠️ 非原子：后端没有批量端点，N 个资产 = N 次请求，中途失败会留下"部分划拨"。
-  //    types/agent.ts 的注释写着「后端一个事务」——那是 mock 的行为，真实后端做不到。
-  //    要恢复原子性需后端补 POST /assignments/batch。
+  // 整站换商家（V164 之后后端只收 SITE 粒度，按机柜 / 按点位划拨返回 error.assign.granularity_retired）。
+  // 走 POST /api/agent/assignments/batch：一个事务，整批成功或整批不动 —— 此前 N 次单资产请求的扇出
+  // 会留下「部分划拨」，已撤掉。机柜跟着站点走，不再单独划拨；绑定 / 解绑走设备域名下（已出库待绑定）动作。
   assignAgentAssets: async (x) => {
-    const targets = [
-      ...x.cabinetNos.map((no) => ({ targetType: "CABINET", targetNo: no })),
-      ...x.siteNos.map((no) => ({ targetType: "SITE", targetNo: no })),
-    ];
-    const logs = await Promise.all(
-      targets.map((t) =>
-        client.post<AssignmentLogRaw>("/api/agent/assignments", {
-          agentNo: x.agentNo, ...t, action: "ASSIGN", operator: x.operatorName,
-        }),
-      ),
-    );
+    if (x.cabinetNos.length > 0) {
+      throw new Error("按机柜划拨已下线：机柜随站点整站换商家，或在出库单里绑定 / 解绑");
+    }
+    const logs = await client.post<AssignmentLogRaw[]>("/api/agent/assignments/batch", {
+      agentNo: x.agentNo, siteNos: x.siteNos, action: "ASSIGN", operator: x.operatorName,
+    });
     return logs.map(toAssignmentRecord);
   },
 
@@ -120,6 +113,8 @@ export const agentHttp: AgentApi = {
 
   getAgentAccount: (no) => client.get(`/api/agent/accounts/${no}`),
   getAgentCommission: (no) => client.get(`/api/agent/commissions/${no}`),
+  getMyProfile: () => client.get("/api/agent/me/profile"),
+  updateMyContact: (x) => client.post("/api/agent/me/contact", x),
 
   // 代理清退（AgentExitController）：发起挂在代理资源下，推进 / 门禁挂在清退单资源下
   startAgentExit: (agentNo, reason) => client.post(`/api/agent/agents/${agentNo}/exit`, { reason }),

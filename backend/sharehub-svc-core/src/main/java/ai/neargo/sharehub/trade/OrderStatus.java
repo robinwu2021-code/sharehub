@@ -20,6 +20,8 @@ public enum OrderStatus {
     DISPENSING,
     /** 使用中。 */
     IN_USE,
+    /** 已扣款未归还（V180，TIME_LIMIT 模式）：到最长时限已发起最高收费，宝还在用户手里；之后归还只结单、不冲销。 */
+    OVERDUE_CHARGED,
     /** 已归还，待结算。 */
     RETURNED,
     /** 已结算（费用已定）。 */
@@ -36,7 +38,7 @@ public enum OrderStatus {
             return valueOf(v.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("订单状态非法: " + v
-                    + "（仅 CREATED/DISPENSING/IN_USE/RETURNED/SETTLED/CLOSED/EXCEPTION）");
+                    + "（仅 CREATED/DISPENSING/IN_USE/OVERDUE_CHARGED/RETURNED/SETTLED/CLOSED/EXCEPTION）");
         }
     }
 }

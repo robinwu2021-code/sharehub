@@ -62,10 +62,15 @@ const PLAN_FIELDS: FieldDef[] = [
     options: ["AED", "SAR", "QAR", "EGP"].map((c) => ({ value: c, label: c })), readOnlyOnEdit: true,
     help: "保存后不能改——已用这个方案下过的单都是这个币种" },
   { key: "freeMinutes", label: "免费时长（分钟）", type: "number", required: true, min: 0, section: "计费规则", help: "从借出开始算，这段时间内归还不收费" },
-  { key: "unitMinutes", label: "计费单位（分钟）", type: "number", required: true, min: 1, section: "计费规则", help: "不足一个单位按一个算" },
+  { key: "unitMinutes", label: "计费单位（分钟）", type: "number", required: true, min: 1, section: "计费规则", help: "免费时段之后按这个单位计费" },
+  // C03（第 5 批）：不足一个单位怎么算。留空 = 新建取系统参数 billing.unit_rounding（缺省进一）、修改保持原值
+  { key: "unitRounding", label: "不足一个单位", type: "select", section: "计费规则",
+    options: [{ value: "CEIL", label: "进一（按一个单位收）" }, { value: "FLOOR", label: "舍去（不收）" }, { value: "HALF_UP", label: "过半进一" }],
+    help: "例：单位 60 分钟、免费 5 分钟，借 70 分钟 → 计费 65 分钟：进一收 2 个单位，舍去收 1 个，过半进一收 1 个" },
   { key: "unitPrice", label: "单价", type: "number", required: true, min: 0, section: "计费规则", help: "每个计费单位收多少" },
   { key: "capDaily", label: "日封顶", type: "number", required: true, min: 0, section: "计费规则", help: "每 24 小时最多收这么多；0 = 不封顶" },
-  { key: "buyoutPrice", label: "买断价", type: "number", required: true, min: 0, section: "计费规则", help: "累计到这个金额就不再计费，设备归用户；须 ≥ 日封顶" },
+  { key: "buyoutPrice", label: "买断价", type: "number", required: true, min: 0, section: "计费规则", help: "累计到这个金额就不再计费，设备归用户；须 ≥ 日封顶。超时扣款按时限时，到时限收的也是它" },
+  { key: "lostFee", label: "遗失费（选填）", type: "number", min: 0, section: "计费规则", help: "留空 = 与买断价相同。填了则用户不还 / 主动买断按它收，与最高租赁收费分开" },
 ];
 
 /*
@@ -198,6 +203,8 @@ function FeePlansInner() {
       ...form,
       freeMinutes: Number(form.freeMinutes), unitMinutes: Number(form.unitMinutes),
       unitPrice: Number(form.unitPrice), capDaily: Number(form.capDaily), buyoutPrice: Number(form.buyoutPrice),
+      // 遗失费留空 = 与买断价合一；空串与 undefined 都按 null 发，后端据此清掉（V180 lost_fee 更新策略 ALWAYS）
+      lostFee: form.lostFee === undefined || form.lostFee === null || String(form.lostFee) === "" ? null : Number(form.lostFee),
     };
     const errors = validatePricePlan(v, editing, plansQ.data?.list ?? []);
     if (errors.length) { notify.error(errors[0]); return; }

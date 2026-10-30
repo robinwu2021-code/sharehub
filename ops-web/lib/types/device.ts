@@ -55,6 +55,286 @@ export interface Cabinet extends Archivable {
   qcStatus: QcStatus | null;
   /** 所在仓；在库设备才有。调拨按仓选设备要用它。 */
   warehouseNo: string | null;
+  /**
+   * 出库单归属：出库给了哪个商家（V161，商户入驻会话）。空 = 在仓或平台直营。
+   * 与 `warehouseNo` 互斥（在仓就不在出库单）。绑定只能绑到这个商家的站点点位上；
+   * `agentNo` 仍只由点位派生 —— 设备在出库单里、还没绑定时 `agentNo` 为空。
+   * 设计：docs/technical/设备出库与绑定-技术设计.md §2.1。
+   */
+  issuedAgentNo?: string | null;
+  /** 进入出库单的时刻。 */
+  issuedAt?: string | null;
+  /** 出库目的站点（V195）；空 = 到商家，可绑该商家任一站点。 */
+  issuedSiteNo?: string | null;
+  /** 出库内部接收人员工号（V195）。 */
+  issueReceiverNo?: string | null;
+  /** 接收人签收时刻（V195）；出库单里为空 = 已发货待签收，不能绑定。 */
+  issueClaimedAt?: string | null;
+}
+
+/** 出库单筛选：待绑定（已签收未绑定，即绑定候选）/ 已绑定（含已上线）/ 全部 / 已发货待签收 / 待我签收。 */
+export type PoolFilter = "UNBOUND" | "BOUND" | "ALL" | "UNCLAIMED" | "MINE";
+
+/** 出库给商家（POST /api/ops/devices/issue）。一个事务，全成或全不成。 */
+export interface IssueDevicesReq {
+  agentNo: string;
+  /** 目的站点（须属于该商家）；空 = 到商家。 */
+  siteNo?: string;
+  /** 内部接收人；空 = 出库即签收。 */
+  receiverNo?: string;
+  cabinetNos: string[];
+  /** 物流（V205，可选）。 */
+  carrier?: string | null;
+  trackingNo?: string | null;
+}
+/** 接收人签收（POST /api/ops/devices/claim）：只能签给自己的。 */
+export interface ClaimDevicesReq {
+  cabinetNos: string[];
+}
+/** 出库调整（POST /api/ops/devices/issue-redirect）：只收未绑定的；原因必填；换接收人须重新签收。 */
+export interface IssueRedirectReq {
+  cabinetNos: string[];
+  agentNo: string;
+  siteNo?: string;
+  receiverNo?: string;
+  reason: string;
+}
+/** 出库退回仓库（POST /api/ops/devices/pool-return）。只收未绑定的设备；原因必填。 */
+export interface PoolReturnReq {
+  cabinetNos: string[];
+  warehouseNo?: string;
+  reason: string;
+}
+/**
+ * 仓库（GET /api/ops/inventory/warehouses）。V182 种入、V201 起可新建 / 编辑 / 归档。
+ * isDefault = 撤机回仓与出库退回不选仓时落到的仓（系统参数 inv.return_warehouse）。
+ * 列表含已归档的仓；选仓下拉用 {@link activeWarehouses} 滤掉。
+ */
+export interface Warehouse {
+  warehouseNo: string;
+  name: string;
+  regionId: string | null;
+  address: string | null;
+  isDefault: boolean;
+  archivedAt: string | null;
+}
+/** 新建 / 编辑仓库（仓号新建时系统生成）。 */
+export interface WarehouseReq {
+  name: string;
+  regionId?: string | null;
+  address?: string | null;
+}
+/** 设备供应商（V201，GET /api/ops/inventory/suppliers）：到货登记的来源、退供应商的去向。 */
+export interface Supplier {
+  supplierNo: string;
+  name: string;
+  /** 对应的设备厂商（厂商接入，V207），可空。 */
+  vendorCode: string | null;
+  contactName: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  note: string | null;
+  archivedAt: string | null;
+}
+/** 发货物流（V205）：挂在调拨单 / 商家（出库）/ 处置单上。 */
+export type ShipmentDocType = "TRANSFER" | "ISSUE" | "DISPOSAL";
+/** 随发出动作提交；承运商与运单号都空 = 不记。 */
+export interface ShipInfo {
+  carrier?: string | null;
+  trackingNo?: string | null;
+  shippedAt?: string | null;
+  note?: string | null;
+}
+export interface Shipment {
+  shipmentNo: string;
+  docType: ShipmentDocType;
+  docRef: string;
+  carrier: string | null;
+  trackingNo: string | null;
+  shippedAt: string;
+  note: string | null;
+  itemNos: string[];
+  createdBy: string | null;
+}
+/**
+ * 安全库存（V204，GET /api/ops/inventory/stock-thresholds）：启用中的仓 × 柜 / 宝各一行，未设下限 minQty = 0。
+ * available = 在该仓在库、未绑点位、不在出库单（宝：不在柜内）；low = 低于下限（告警 LOW_STOCK 给仓管待办）。
+ */
+export interface StockThreshold {
+  warehouseNo: string;
+  warehouseName: string;
+  itemType: IntakeItemType;
+  minQty: number;
+  available: number;
+  low: boolean;
+}
+export interface StockThresholdReq {
+  warehouseNo: string;
+  itemType: IntakeItemType;
+  minQty: number;
+}
+/**
+ * 供应商绩效（V207，GET /api/ops/inventory/suppliers/stats）：到货 / 入库 / 质检不合格 / 退货台数，
+ * 合格率 = (到货 − 不合格) / 到货，没到过货为 null。
+ */
+export interface SupplierStats {
+  supplierNo: string;
+  received: number;
+  inbound: number;
+  failed: number;
+  returned: number;
+  passRate: number | null;
+}
+/** 处置出库（V203，GET /api/ops/inventory/disposals）：在库设备报废 / 退供应商，建单即过账。 */
+export type DisposalKind = "SCRAP" | "RETURN_SUPPLIER";
+/** 报废原因码：BROKEN 损坏 / OBSOLETE 淘汰 / OTHER 其他（SCRAP 必填）。 */
+export type DisposalReason = "BROKEN" | "OBSOLETE" | "OTHER";
+export interface Disposal {
+  disposalNo: string;
+  kind: DisposalKind;
+  warehouseNo: string;
+  warehouseName: string | null;
+  supplierNo: string | null;
+  supplierName: string | null;
+  reasonCode: DisposalReason | null;
+  note: string;
+  itemCount: number;
+  createdBy: string | null;
+  createdAt: string | null;
+}
+export interface DisposalItem {
+  itemType: IntakeItemType;
+  itemNo: string;
+}
+export interface DisposalDetail {
+  disposal: Disposal;
+  items: DisposalItem[];
+}
+export interface DisposalReq {
+  kind: DisposalKind;
+  warehouseNo: string;
+  supplierNo?: string | null;
+  reasonCode?: DisposalReason | null;
+  note: string;
+  cabinetNos?: string[];
+  powerbankNos?: string[];
+  /** 退供应商的物流（V205，可选）。 */
+  carrier?: string | null;
+  trackingNo?: string | null;
+}
+export interface SupplierReq {
+  name: string;
+  vendorCode?: string | null;
+  contactName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  note?: string | null;
+}
+/** 到仓待检（V192，GET /api/ops/inventory/intakes）。 */
+export type IntakeStatus = "OPEN" | "DONE";
+export type IntakeQcResult = "PENDING" | "PASSED" | "FAILED";
+export type IntakeDisposition = "PENDING" | "INBOUND" | "RETURN_SUPPLIER" | "SCRAP";
+export type IntakeItemType = "CABINET" | "POWERBANK";
+/** ARRIVAL 采购到货（走质检）/ RETURN 撤机回仓 / OPENING 期初建账（V202，登记即入库）。 */
+export type IntakeKind = "ARRIVAL" | "RETURN" | "OPENING";
+export type IntakeDisposal = "RETURN_SUPPLIER" | "SCRAP";
+/** 能手工新建的入库类型（RETURN 只由回仓调拨签收生成）。 */
+export type IntakeCreateKind = "ARRIVAL" | "OPENING";
+export interface Intake {
+  intakeNo: string;
+  kind: IntakeKind;
+  warehouseNo: string;
+  warehouseName: string | null;
+  sourceRef: string | null;
+  /** 供应商（V201，到货登记可选）与名称快照。 */
+  supplierNo: string | null;
+  supplierName: string | null;
+  /** 单价币种与明细单价合计（V202；无单价为 null）。 */
+  currency: string | null;
+  totalCost: number | null;
+  arrivedAt: string;
+  status: IntakeStatus;
+  note: string | null;
+  total: number;
+  pending: number;
+  passed: number;
+  failed: number;
+  inbound: number;
+  disposed: number;
+  createdBy: string | null;
+  createdAt: string | null;
+}
+export interface IntakeItem {
+  itemType: IntakeItemType;
+  itemNo: string;
+  unitCost: number | null;
+  sn: string | null;
+  model: string | null;
+  qcNo: string | null;
+  qcResult: IntakeQcResult;
+  disposition: IntakeDisposition;
+  dispositionNote: string | null;
+  handledBy: string | null;
+  handledAt: string | null;
+}
+export interface IntakeDetail {
+  intake: Intake;
+  items: IntakeItem[];
+}
+export interface IntakeCreateReq {
+  /** 缺省 ARRIVAL；OPENING 登记即入库。 */
+  kind?: IntakeCreateKind;
+  currency?: string | null;
+  /** 设备号 → 单价。 */
+  unitCosts?: Record<string, number>;
+  warehouseNo: string;
+  supplierNo?: string | null;
+  sourceRef?: string;
+  arrivedAt?: string;
+  note?: string;
+  cabinetNos?: string[];
+  powerbankNos?: string[];
+}
+export interface IntakeItemRef {
+  itemType: IntakeItemType;
+  itemNo: string;
+}
+export interface IntakeDisposeReq {
+  items: IntakeItemRef[];
+  disposition: IntakeDisposal;
+  note: string;
+}
+/** 出库单按商家汇总（GET /api/ops/inventory/issued-summary）。 */
+export interface IssuedSummary {
+  agentNo: string;
+  agentName: string;
+  /** 在出库单、未绑定 */
+  unbound: number;
+  /** 已绑定点位、尚未上线 */
+  bound: number;
+  /** 已上线（含故障） */
+  live: number;
+}
+/**
+ * 绑定（POST /api/ops/devices/{deviceNo}/bind）。`locationNo` 缺省 = 出库单商家的默认站点默认点位。
+ * 点位所属站点的商家必须等于设备名下（已出库待绑定）商家，否则 409。
+ */
+export interface BindReq {
+  locationNo?: string;
+  /** 同时建装机工单 */
+  openInstallWo?: boolean;
+}
+/** 批量绑定（POST /api/ops/devices/bind-batch）。一个事务，任一失败整批回滚。 */
+export interface BindBatchReq extends BindReq {
+  agentNo: string;
+  deviceNos: string[];
+}
+export interface BindResult {
+  cabinet: Cabinet;
+  /** openInstallWo 时生成的装机工单号 */
+  woNo?: string | null;
 }
 
 export type SlotLock = "LOCKED" | "UNLOCKED";
@@ -579,6 +859,173 @@ export interface QcRecord {
   note: string | null;
   inspectedBy: string;
   inspectedAt: string;
+  /** 判定阈值快照（JSON，V194）：改了参数，历史结论仍能解释。 */
+  ruleSnapshot: string | null;
+  /** 所属到仓待检单（V194）。 */
+  intakeNo: string | null;
+  /** 用掉本放行凭证的待检单（V194）；非空即已用。 */
+  consumedBy: string | null;
+}
+
+/** 库存引擎（S3 / S4）：LOCAL 本地设备表 / SERVICE 独立进销存。 */
+export type InventoryEngineKind = "LOCAL" | "SERVICE";
+export interface InventoryEngine {
+  engine: InventoryEngineKind;
+  /** SERVICE 时凭证是否已配。 */
+  configured: boolean;
+  /** 寻址方式：STATIC 固定地址 / DISCOVERY 服务发现（M0 0.3）。 */
+  endpointMode?: InventoryEndpointMode | null;
+  /** SERVICE 且已配置时现探一次的结果；LOCAL 或未配置为 null。 */
+  reachable?: boolean | null;
+  /** 不可达时库存服务侧错误码（如 inventory.unreachable）。 */
+  failure?: string | null;
+}
+export type InventoryEndpointMode = "STATIC" | "DISCOVERY";
+
+/** 一条库存流水（后端 `StockLedgerRow`）：qtyDelta 进仓 +、出仓 −。 */
+export interface StockLedgerRow {
+  id: string;
+  warehouseNo: string | null;
+  itemType: string | null;
+  itemNo: string | null;
+  /** 本地是履历事件（INBOUND / ISSUE …），进销存是单据类型。 */
+  docKind: string | null;
+  docNo: string | null;
+  qtyDelta: number;
+  occurredAt: string | null;
+  operator: string | null;
+}
+
+/** 统一库存视图的阶段（后端 `StockStage.stage`，S6）。 */
+export type StockStageCode =
+  | "INTAKE" | "IN_STOCK" | "IN_TRANSIT" | "DISPATCHED" | "ISSUED" | "BOUND" | "LIVE" | "RENTED" | "FAULT" | "LOST" | "RETIRED";
+
+export interface StockStage {
+  stage: StockStageCode;
+  cabinets: number;
+  powerbanks: number;
+}
+
+/**
+ * 阶段下钻的一台设备（P2 #6，GET /api/ops/inventory/stage-items）。
+ * model：柜为型号、宝为厂商码；agentNo：出库单或绑定商家；locationRef：柜为点位号、宝为所在柜号。
+ */
+export interface StageItem {
+  itemType: IntakeItemType;
+  itemNo: string;
+  model: string | null;
+  warehouseNo: string | null;
+  agentNo: string | null;
+  siteNo: string | null;
+  locationRef: string | null;
+  intakeNo: string | null;
+}
+/** total 为全量；items 最多 2000 台。 */
+export interface StageItems {
+  stage: StockStageCode;
+  itemType: IntakeItemType;
+  total: number;
+  items: StageItem[];
+}
+
+/** 期间报表一行（S6）：期初 + 入 − 出 = 期末。 */
+export interface StockPeriodRow {
+  warehouseNo: string | null;
+  itemType: string | null;
+  opening: number;
+  inQty: number;
+  outQty: number;
+  closing: number;
+  inByReason: Record<string, number>;
+  outByReason: Record<string, number>;
+}
+
+/** 存量迁移候选的去向：IN 只入库 / OUT 入库后出库给商家 / SKIP 不迁。 */
+export type MigrationKind = "IN" | "OUT" | "SKIP";
+
+/** 存量迁移（S7）一台候选（reason 说明为何跳过）。 */
+export interface MigrationCandidate {
+  itemType: string;
+  itemNo: string;
+  kind: MigrationKind;
+  warehouseNo: string | null;
+  agentNo: string | null;
+  siteNo: string | null;
+  claimed: boolean;
+  reason: string | null;
+}
+
+export interface InventoryMigrationPlan {
+  configured: boolean;
+  toInbound: number;
+  toIssue: number;
+  skipped: number;
+  done: number;
+  skippedItems: MigrationCandidate[];
+}
+
+export interface MigrationFailure {
+  itemType: string;
+  itemNo: string;
+  code: string;
+  detail: string;
+}
+
+export interface InventoryMigrationResult {
+  processed: number;
+  failed: number;
+  remaining: number;
+  failures: MigrationFailure[];
+}
+
+/** 盘点单状态（库存服务原样）。 */
+export type StockCountStatus = "OPEN" | "SUBMITTED" | "APPROVED" | "POSTED" | "CANCELLED" | "UNKNOWN";
+
+export interface StockCount {
+  countNo: string;
+  warehouseNo: string | null;
+  status: StockCountStatus;
+  openedAt: string | null;
+}
+
+export interface StockCountLine {
+  itemType: string | null;
+  bookQty: number;
+  countedQty: number | null;
+  diffQty: number | null;
+}
+
+export interface StockCountScan {
+  serialNo: string;
+  verdict: string;
+}
+
+export interface StockCountDetail {
+  count: StockCount;
+  lines: StockCountLine[];
+  exceptions: StockCountScan[];
+  missingSerials: string[];
+}
+
+/** 设备履历事件（与后端 `MovementEvent` 同名同值，V196）。 */
+export type MovementEvent =
+  | "ISSUE" | "CLAIM" | "REDIRECT" | "POOL_RETURN" | "BIND" | "UNBIND" | "SHIP" | "RECEIVE"
+  | "UNDEPLOY" | "RETURN_INTAKE" | "INBOUND" | "REASSIGN" | "RETIRE" | "LOST";
+
+/** 设备履历一行（后端 `MovementRow`）：位置与归属的每一次变化。fromRef / toRef 带前缀 WH: / AGENT: / SITE: / LOC: / TRANSIT / OUT。 */
+export interface DeviceMovement {
+  id: number;
+  itemType: QcItemType;
+  itemNo: string;
+  event: MovementEvent;
+  fromRef: string | null;
+  toRef: string | null;
+  agentBefore: string | null;
+  agentAfter: string | null;
+  reason: string | null;
+  sourceRef: string | null;
+  operatorNo: string;
+  occurredAt: string;
 }
 
 /** 调拨两端的类型（与后端 `TransferEndpointType` 同名同值）：决定 fromRef / toRef 指向仓库、站点还是点位。 */

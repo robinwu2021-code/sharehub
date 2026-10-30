@@ -6,7 +6,6 @@ import ai.neargo.sharehub.dev.CabinetStatus;
 import ai.neargo.sharehub.dev.entity.DevCabinet;
 import ai.neargo.sharehub.dev.mapper.CabinetMapper;
 import ai.neargo.sharehub.dev.service.CabinetLifecycleService;
-import ai.neargo.sharehub.dev.service.CabinetService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Map;
 
 /**
  * 装机工单驱动布放（对齐清单 C5）：装机单完工 →（带了扫码点位且与档案不同则改绑）→ 上线门禁全过即自动上线。
@@ -30,12 +28,13 @@ public class InstallCompletedListener {
     private static final String INSTALL = "INSTALL";
 
     private final CabinetMapper cabinets;
-    private final CabinetService cabinetService;
+    private final ai.neargo.sharehub.dev.service.CabinetBindService bindService;
     private final CabinetLifecycleService lifecycle;
 
-    public InstallCompletedListener(CabinetMapper cabinets, CabinetService cabinetService, CabinetLifecycleService lifecycle) {
+    public InstallCompletedListener(CabinetMapper cabinets, ai.neargo.sharehub.dev.service.CabinetBindService bindService,
+                                    CabinetLifecycleService lifecycle) {
         this.cabinets = cabinets;
-        this.cabinetService = cabinetService;
+        this.bindService = bindService;
         this.lifecycle = lifecycle;
     }
 
@@ -49,7 +48,8 @@ public class InstallCompletedListener {
                 if (c == null || !CabinetStatus.IN_STOCK.name().equals(c.getStatus())) return null;
                 if (e.locationNo() != null && !e.locationNo().equals(c.getLocationNo())) {
                     // 现场扫到的点位与档案不同：以现场为准改绑（改绑会让之前的试借还失效，门禁会提示重做）
-                    cabinetService.save(e.cabinetNo(), Map.of("locationNo", e.locationNo()));
+                    // 与绑定同一校验：点位的商家须 = 出库池商家（I2），不符则抛错、整体回滚，运营在设备页处理
+                    bindService.rebindForInstall(e.cabinetNo(), e.locationNo());
                     log.info("装机扫码改绑点位 cabinetNo={} {} → {}（工单 {}）", e.cabinetNo(), c.getLocationNo(), e.locationNo(), e.woNo());
                 }
                 lifecycle.goLiveIfReady(e.cabinetNo(), "装机工单 " + e.woNo());

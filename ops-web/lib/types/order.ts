@@ -6,7 +6,10 @@ import type { AuditTrail } from "./common";
 import type { WhitelistReason } from "./user";
 
 export type OrderStatus =
-  | "CREATED" | "DISPENSING" | "IN_USE" | "RETURNED" | "SETTLED" | "CLOSED" | "EXCEPTION";
+  | "CREATED" | "DISPENSING" | "IN_USE"
+  // V180：已扣款未归还（超时扣款模型 TIME_LIMIT：到时限已发起最高收费，宝还在用户手里；之后归还只结单、不冲销）
+  | "OVERDUE_CHARGED"
+  | "RETURNED" | "SETTLED" | "CLOSED" | "EXCEPTION";
 export interface RentOrder {
   orderNo: string;
   cUserNo: string;
@@ -51,6 +54,19 @@ export interface RentOrder {
    * 结算时自动请款，失败即欠费；欠费用户借不了下一单，需在 App 补缴。
    */
   payStatus?: "PAID" | "UNPAID" | null;
+  // —— 第 5 批（运营方原文 MON-01 / PAY-01 / RNT-03）——
+  /** 商家与站点：列表按它们筛选。 */
+  agentNo?: string | null;
+  agentName?: string | null;
+  siteNo?: string | null;
+  /** 最高收费额 = 借出时定格的总封顶；null = 方案不封顶。 */
+  maxCharge?: number | null;
+  /** 进行中订单：列表请求那一刻的实时时长与已累计费用（试算，不落库）；非进行中为 null。 */
+  liveDurationMin?: number | null;
+  accruedFee?: number | null;
+  /** 支付单号与渠道（收过款才有）。 */
+  payNo?: string | null;
+  payChannel?: string | null;
 }
 
 // —— 订单人工干预（S1：修 F0 伪实现）——
@@ -217,7 +233,8 @@ export const exceptionHandleActions = (status: OrderExceptionStatus): ExceptionH
 
 /** 处置入参：结论/原因**必填**（无结论的处置事后无从追责，沿用干预/退款审批口径）。 */
 export interface OrderExceptionHandlePayload {
-  result: string;
+  /** 处置结论。键名与后端 ExceptionHandleReq.handleResult 一致（此前叫 result，真后端读不到，结论丢失）。 */
+  handleResult: string;
   operatorName?: string;
   /**
    * 退款申请号。退款记录住在 cs.ts 而 cs.ts 反向依赖订单域，db 层不能反向 import，
@@ -253,7 +270,8 @@ export interface DepositRecord {
 }
 
 /** 催缴渠道（欠费催缴必选，决定走哪条触达通道）。 */
-export type DunChannel = "SMS" | "PUSH" | "PHONE";
+// 与 DDL 列注释 SMS/PUSH/CALL 一致（2026-10-29 对齐：前端曾写 PHONE，后端 DunChannel.of 会拒）
+export type DunChannel = "SMS" | "PUSH" | "CALL";
 
 /** 押金处置动作。`dun` 只留痕不改状态（沿用工单 process 的口径）。 */
 export type DepositAction = "release" | "buyout" | "dun";

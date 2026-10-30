@@ -4,7 +4,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 // 运营端内部角色（单运营方，无平台超管）。AGENT=代理端受限视图。
-export type Role = "ADMIN" | "OPS" | "CS" | "FINANCE" | "BD" | "VIEWER" | "AGENT";
+export type Role = "ADMIN" | "OPS" | "CS" | "FINANCE" | "BD" | "VIEWER" | "AGENT" | "WAREHOUSE";
 
 /** 账号池。**只选走哪套登录，不决定权限**（v4/06 §2.6）。 */
 export type Realm = "STAFF" | "AGENT" | "";

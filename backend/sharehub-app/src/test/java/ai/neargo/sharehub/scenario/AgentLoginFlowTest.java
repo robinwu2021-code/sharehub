@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.scenario;
 
+import ai.neargo.sharehub.support.SelfServiceApplyOpen;
 import ai.neargo.sharehub.support.ApiTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         // 与入驻测试同理：调高而非关闭，限流仍在链路上（/api/auth/otp 也归这道闸管）
         "sharehub.security.apply-rate-per-minute=10000",
 })
+// 走自助注册拿账号 —— 自助入口一期默认关（V155），验的是入口打开时的登录链路
+@SelfServiceApplyOpen
 class AgentLoginFlowTest extends ApiTestSupport {
 
     private static final String OTP = "000000";

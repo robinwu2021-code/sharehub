@@ -40,6 +40,9 @@ public class OtpService {
     /** 开发固定码：只在 dev-mode 开启时可通过校验，且不再作为「发出去的码」。 */
     static final String DEV_MASTER = "000000";
 
+    /** 重发太频繁与当日已达上限说同一句话：对调用方都是「现在别再发了」。 */
+    private static final String TOO_FREQUENT = "发送过于频繁，请稍后再试";
+
     private static final int CODE_DIGITS = 6;
     private static final int CODE_BOUND = 1_000_000;          // 6 位十进制的上界
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -52,6 +55,10 @@ public class OtpService {
     private final Duration resendInterval;
     private final int maxAttempts;
     private final String smsTemplate;
+    private final String emailTemplate;
+
+    /** 邮箱验证码（商家一期 B2，R1 / R4）的码表键前缀 —— 与手机号分开命名空间，同一串字符不会互相顶掉。 */
+    private static final String EMAIL_KEY = "email:";
 
     /**
      * 一次发码的结果。
@@ -65,6 +72,9 @@ public class OtpService {
     }
 
     private final ConcurrentHashMap<String, Entry> codes = new ConcurrentHashMap<>();
+    /** 同一标识当天已发几次（需求方案 §四「同一标识每日上限」）。键 = 码表键，值 = [日期, 次数]。 */
+    private final ConcurrentHashMap<String, long[]> daily = new ConcurrentHashMap<>();
+    private final int dailyLimit;
 
     /** 一次发码：码本身、发出时刻、已校验次数。 */
     private static final class Entry {
@@ -83,7 +93,12 @@ public class OtpService {
                       @Value("${sharehub.auth.otp.resend-interval:60s}") Duration resendInterval,
                       @Value("${sharehub.auth.otp.max-attempts:5}") int maxAttempts,
                       @Value("${sharehub.auth.otp.sms-template:Your ShareHub verification code is {code}. It expires in 5 minutes.}")
-                      String smsTemplate) {
+                      String smsTemplate,
+                      @Value("${sharehub.auth.otp.email-template:Your ShareHub verification code is {code}. It expires in 5 minutes. If you did not request it, ignore this email.}")
+                      String emailTemplate,
+                      @Value("${sharehub.auth.otp.daily-limit:10}") int dailyLimit) {
+        this.dailyLimit = dailyLimit;
+        this.emailTemplate = emailTemplate;
         this.devMode = devMode;
         this.notify = notify;
         this.smsTemplate = smsTemplate;
@@ -114,24 +129,51 @@ public class OtpService {
     }
 
     public Issued issue(String phone, String scene) {
+        return issue(phone, phone, "SMS", smsTemplate, scene);
+    }
+
+    /**
+     * 发邮箱验证码（商家一期 B2）。限流、有效期、次数上限、dev 固定码与手机号同一套。
+     *
+     * @param email <b>必须是 {@link IdentifierNormalizer#email} 的输出</b>（去空格、转小写），
+     *              与 {@link #verifyEmail} 用同一个值
+     */
+    public Issued issueEmail(String email, String scene) {
+        return issue(EMAIL_KEY + email, email, "EMAIL", emailTemplate, scene);
+    }
+
+    /** 校验邮箱验证码；语义同 {@link #verify}。 */
+    public void verifyEmail(String email, String otp) {
+        verify(EMAIL_KEY + email, otp);
+    }
+
+    private Issued issue(String key, String target, String channel, String template, String scene) {
         Instant now = Instant.now();
-        Entry prev = codes.get(phone);
-        if (prev != null && now.isBefore(prev.issuedAt.plus(resendInterval))) {
-            throw new IllegalStateException("发送过于频繁，请稍后再试");
+        Entry prev = codes.get(key);
+        boolean tooSoon = prev != null && now.isBefore(prev.issuedAt.plus(resendInterval));
+        // 每日上限：重发间隔只挡连点，挡不住「每分钟一条、发一整天」地轰炸同一个号或邮箱。
+        // 「一天」按 UTC 切 —— 这是限流窗口，不是业务日期，不需要随业务时区走
+        long today = now.getEpochSecond() / 86_400;
+        long[] sentToday = daily.compute(key, (k, v) -> v == null || v[0] != today ? new long[]{today, 0} : v);
+        synchronized (sentToday) {
+            if (tooSoon || sentToday[1] >= dailyLimit) {
+                throw new IllegalStateException(TOO_FREQUENT);
+            }
+            sentToday[1]++;
         }
         String code = devMode.isEnabled() ? DEV_MASTER : randomCode();
-        codes.put(phone, new Entry(code, now));
+        codes.put(key, new Entry(code, now));
 
         String sc = (scene == null || scene.isBlank()) ? "login" : scene.trim().toLowerCase();
         NotifyPort.Delivery d = notify.sendToTarget(
-                phone, "SMS", "OTP_" + sc, smsTemplate.replace("{code}", code));
+                target, channel, "OTP_" + sc, template.replace("{code}", code));
         if (!d.sent()) {
-            codes.remove(phone);   // 见上：不删就是「收不到又不让重试」
+            codes.remove(key);   // 见上：不删就是「收不到又不让重试」
             // 不打 phone/code：手机号与令牌都属敏感信息（CLAUDE.md 日志规范）。
             // 运维动作：查 notify_log 的 OTP_* 场景与渠道商状态 —— 该场景全量失败则 C 端登录已中断。
-            log.error("OTP 投递失败 scene={} reason={}，该手机号本次无法登录", sc, d.reason());
+            log.error("OTP 投递失败 channel={} scene={} reason={}，该标识本次无法登录", channel, sc, d.reason());
         }
-        return new Issued(phone, code, d.sent(), d.reason());
+        return new Issued(target, code, d.sent(), d.reason());
     }
 
     /**

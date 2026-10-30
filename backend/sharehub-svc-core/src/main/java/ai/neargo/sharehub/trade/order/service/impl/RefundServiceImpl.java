@@ -46,10 +46,16 @@ public class RefundServiceImpl implements RefundService {
 
     private final OrdRefundMapper mapper;
     private final OrderEventLogService eventLog;
+    private final ai.neargo.sharehub.common.event.DomainEventBus events;
+    private final ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices;
 
-    public RefundServiceImpl(OrdRefundMapper mapper, OrderEventLogService eventLog) {
+    public RefundServiceImpl(OrdRefundMapper mapper, OrderEventLogService eventLog,
+                             ai.neargo.sharehub.common.event.DomainEventBus events,
+                             ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices) {
         this.mapper = mapper;
+        this.taxInvoices = taxInvoices;
         this.eventLog = eventLog;
+        this.events = events;
     }
 
     @Override
@@ -115,6 +121,7 @@ public class RefundServiceImpl implements RefundService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public RefundRecord audit(String refundNo, RefundAuditReq req) {
         OrdRefund e = selectByNo(refundNo);
         if (e == null) throw BizException.notFound(refundNo);
@@ -142,6 +149,13 @@ public class RefundServiceImpl implements RefundService {
         //  骨架阶段不接渠道，故停在 APPROVED —— 状态语义正确，不伪造执行结果。
         eventLog.append(e.getOrderNo(), STATUS_PENDING, e.getStatus(),
                 approved ? "REFUND_APPROVE" : "REFUND_REJECT", OrderSupport.currentName());
+        // 批准即冲回分成（V170）：走 outbox，与本次状态变更同事务落发件箱、提交后投递
+        if (approved) {
+            events.publish(new ai.neargo.sharehub.api.core.event.OrderRefundedEvent(
+                    e.getOrderNo(), e.getRefundNo(), e.getAmount(), e.getCurrency()));
+            // 冲红（V181）：按 invoice.credit_note.on_refund；失败只记 ERROR，不挡审批
+            taxInvoices.onRefundApproved(e.getOrderNo(), e.getRefundNo(), e.getAmount(), e.getCurrency());
+        }
         return toVO(selectByNo(refundNo));
     }
 

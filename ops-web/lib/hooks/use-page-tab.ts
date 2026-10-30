@@ -25,7 +25,7 @@ import { useSearchParams } from "next/navigation";
 import { navTabs, type PageTabSpec } from "@/lib/nav";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
-import type { Phase } from "@/lib/phase";
+import { isPhaseLocked, type Phase } from "@/lib/phase";
 
 export interface PageTab {
   key: string;
@@ -80,7 +80,12 @@ export function usePageTab(tabs: PageTab[], onChange?: () => void, opts: PageTab
   const { param = "tab", defaultKey } = opts;
   const sp = useSearchParams();
   const qTab = sp.get(param);
-  const fallback = (defaultKey && tabs.some((t) => t.key === defaultKey) ? defaultKey : tabs[0]?.key) ?? "";
+  // 不传 defaultKey 时落在**第一个未被分期锁住**的 tab，与面包屑、PhaseGuard（routeLockedPhase）同一口径。
+  // 此前取 tabs[0]：首个 tab 被锁时（如 /finance 的账务分录是 L2），裸路径直接撞上「功能尚未开放」，
+  // 而菜单与面包屑都指着后面那个能用的 tab（2026-10-28 拆出结算后撞到）。
+  const fallback = (defaultKey && tabs.some((t) => t.key === defaultKey)
+    ? defaultKey
+    : (tabs.find((t) => !isPhaseLocked(t.phase)) ?? tabs[0])?.key) ?? "";
   const valid = React.useCallback((k: string | null): k is string => !!k && tabs.some((t) => t.key === k), [tabs]);
   const [tab, setTabState] = React.useState(() => (valid(qTab) ? qTab : fallback));
 

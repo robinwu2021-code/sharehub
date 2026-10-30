@@ -830,10 +830,307 @@ def d18():
     g.note(56, 872, "业务只提供三样：操作人上下文（④ ⑦）· 数据范围条件（查待办时）· 锚点（③ ⑩）；回调必须幂等，且不回头调服务。")
     g.save("%s/18-flow-integration.svg" % OUT)
 
+# ── 19–22 服务端架构（第一阶段 · 运营方需求版，2026-10-28）──────────────
+def lines_in(g, x, y, items, size=18, gap=26, fill=None):
+    """在框内逐行写字（左对齐）；返回下一行的 y。"""
+    for t in items:
+        g.text(x, y, t, size, fill or S["ink2"])
+        y += gap
+    return y
+
+
+def card2(g, x, y, w, h, title, sub="", hue="gray", strong=False, tsize=25, ssize=16):
+    """同 card()，但副标题字号更小、离底边留足空间 —— card() 的副标题在 h≤64 的窄卡里会压边。"""
+    stroke, _ = S["hue"][hue]
+    g.o.append('<rect x="%s" y="%s" width="%s" height="%s" rx="9" fill="#FFFFFF" '
+               'stroke="%s" stroke-width="%s"/>' % (x, y, w, h, stroke, 3 if strong else 1.8))
+    if sub:
+        g.text(x + w / 2, y + h * 0.48, title, tsize, S["ink"], weight=700 if strong else 600, anchor="middle")
+        g.text(x + w / 2, y + h - 14, sub, ssize, S["ink3"], anchor="middle")
+    else:
+        g.text(x + w / 2, y + h / 2 + tsize * 0.35, title, tsize, S["ink"], weight=700 if strong else 600,
+               anchor="middle")
+
+
+def d19():
+    """服务端总架构：大单体（两端 API + 两套认证 + 11 业务模块 + 集成适配）+ 设备对接微服务 + 共用支付 / 任务。"""
+    g = Svg("ShareHub 服务端架构（第一阶段）",
+            "大单体 + 分模块 · 设备对接独立微服务 · 支付与任务共用 ai-shop　｜　ADR-020 / 025 / 032")
+    MX, MW = 56, 1000            # 业务大单体
+    RX, RW = 1110, 434           # 独立进程列
+    IX, IW = MX + 20, MW - 40    # 单体内容区
+
+    # ① 端（不画色带，标题自解释）
+    cw = (MW - 32) / 3
+    for i, (t, sb) in enumerate([("运营台 ops-web", "员工 · /api"),
+                                 ("商家视图 ops-web", "商家 · /api"),
+                                 ("C 端 c-app", "App · 小程序 · H5 · /mp")]):
+        card2(g, MX + i * (cw + 16), 138, cw, 64, t, sb, "user")
+        g.arrow(MX + i * (cw + 16) + cw / 2, 204, MX + i * (cw + 16) + cw / 2, 244, accent=True)
+    g.text(RX, 166, "外部回调同样经 nginx 进入：", 18, S["ink3"])
+    g.text(RX, 192, "支付 /pay/callback · 厂商 /gw · /ocpp", 18, S["ink3"])
+
+    # ② 业务大单体
+    box(g, MX, 246, MW, 552, "money")
+    g.text(IX, 280, "sharehub-app · 业务大单体（:8082 · 无状态 · 可多副本）", 24, S["ink"], weight=700)
+
+    g.text(IX, 308, "接入层：两端 API 都在单体内", 18, S["ink3"])
+    aw = (IW - 24) / 3
+    for i, (t, sb) in enumerate([("B 端 API", "/api/** 六前缀 · 运营台与商家"),
+                                 ("C 端 API", "/mp/** · App / 小程序 / H5"),
+                                 ("内部 API", "/internal/** · 服务凭证")]):
+        card2(g, IX + i * (aw + 12), 318, aw, 64, t, sb, "base", strong=(i < 2))
+
+    g.text(IX, 406, "认证：两套方案，共用令牌存储", 18, S["ink3"])
+    hw = (IW - 12) / 2
+    card2(g, IX, 416, hw, 64, "B 端认证", "账号密码 / 手机验证码 · RBAC + 数据范围", "base", strong=True)
+    card2(g, IX + hw + 12, 416, hw, 64, "C 端认证", "手机验证码 · 密码 · Apple · Google · 微信 · 属主校验", "user",
+          strong=True)
+
+    g.text(IX, 504, "业务模块（11 个）", 18, S["ink3"])
+    row_a = [("商家管理", "入驻·档案·账号", "place"), ("网点管理", "场地·站点·合同", "place"),
+             ("设备管理", "台账·库存·采购", "dev"), ("销售管理", "订单·计价·营销", "user"),
+             ("用户管理", "C端用户·钱包", "user"), ("运维管理", "告警·工单·客服", "dev")]
+    row_b = [("财务管理", "账务·对账·应付", "money"), ("结算", "分润·结算单·付款", "money"),
+             ("发票", "租赁票据·结算票据", "money"), ("报表管理", "看板·报表·导出", "base"),
+             ("系统管理", "组织·权限·参数", "base")]
+    w6 = (IW - 5 * 12) / 6
+    for i, (t, sb, hue) in enumerate(row_a):
+        card2(g, IX + i * (w6 + 12), 514, w6, 64, t, sb, hue)
+    w5 = (IW - 4 * 12) / 5
+    for i, (t, sb, hue) in enumerate(row_b):
+        card2(g, IX + i * (w5 + 12), 588, w5, 64, t, sb, hue)
+
+    g.text(IX, 676, "集成适配：调用外部服务的唯一出口", 18, S["ink3"])
+    w4 = (IW - 36) / 4
+    for i, (t, sb) in enumerate([("设备服务客户端", "DeviceCommandPort"), ("支付客户端", "PaymentPort"),
+                                 ("OpsKit 客户端", "流程 · 工单（可选）"), ("会计端口", "Zoho（预留）")]):
+        card2(g, IX + i * (w4 + 12), 686, w4, 60, t, sb, "gray")
+    chips(g, IX, 756, ["事件 Outbox", "任务处理器", "操作审计", "幂等", "链路追踪", "zh / en / ar"], "place")
+
+    # ③ 独立进程列
+    box(g, RX, 318, RW, 152, "dev")
+    g.text(RX + 20, 352, "设备对接服务（独立微服务）", 25, S["ink"], weight=700)
+    lines_in(g, RX + 20, 382, ["sharehub-gateway :8091 · 库 sharehub_gw",
+                               "厂商目录 · 驱动插件 · 指令与事件 · 心跳",
+                               "HTTP/Webhook · TCP · MQTT · OCPP"], size=18, gap=27)
+    box(g, RX, 484, RW, 84, "money", strong=False)
+    g.text(RX + 20, 518, "支付服务 · 共用 ai-shop", 24, S["ink"], weight=700)
+    g.text(RX + 20, 550, "通道 · 预授权 · 请款 · 退款 · 打款", 18, S["ink2"])
+    box(g, RX, 582, RW, 70, "base", strong=False)
+    g.text(RX + 20, 614, "任务调度 · 共用 ai-shop", 24, S["ink"], weight=700)
+    g.text(RX + 20, 640, "按 cron 回调各进程 /internal/job", 17, S["ink2"])
+    ew = (RW - 12) / 2
+    for i, (t, sb) in enumerate([("厂商云 / 柜机", "经设备对接服务"), ("支付通道", "AE 卡 · 经支付服务"),
+                                 ("OpsKit", "流程工单 · 可选"), ("Zoho Books", "会计 · 预留")]):
+        card2(g, RX + (i % 2) * (ew + 12), 666 + (i // 2) * 68, ew, 60, t, sb, "gray", tsize=22)
+
+    # 连线：实线同步、虚线事件 / 回调、青色调度
+    g.arrow(MX + MW + 2, 376, RX - 4, 376)
+    g.arrow(RX - 2, 424, MX + MW + 6, 424, dash=True)
+    g.arrow(MX + MW + 2, 512, RX - 4, 512)
+    g.arrow(RX - 2, 546, MX + MW + 6, 546, dash=True)
+    g.arrow(RX - 2, 617, MX + MW + 6, 617, accent=True)
+
+    # ④ 数据
+    dw = (MW - 32) / 3
+    for i, (t, sb) in enumerate([("sharehub_core", "业务表 · 单体独占"), ("sharehub_auth", "凭据 · 会话"),
+                                 ("sharehub_pii", "个人数据 · PDPL")]):
+        card2(g, MX + i * (dw + 16), 808, dw, 58, t, sb, "gray", tsize=23)
+    card2(g, RX, 808, RW, 58, "各服务自有库", "sharehub_gw · 共用服务的库", "gray", tsize=23)
+    g.note(56, 892, "实线 = 同步调用　虚线 = 事件 / 回调（至少一次 · 消费幂等）　青色 = 调度器回调任务端点　｜　模块明细见 20 · 认证见 21 · 拆分见 22")
+    g.save("%s/19-server-architecture.svg" % OUT)
+
+
+def module_box(g, x, y, w, h, title, pkg, items, hue):
+    box(g, x, y, w, h, hue, strong=False)
+    g.text(x + 16, y + 32, title, 23, S["ink"], weight=700)
+    g.text(x + w - 14, y + 31, pkg, 15, S["ink3"], anchor="end")
+    lines_in(g, x + 16, y + 62, items, size=17, gap=25)
+
+
+def d20():
+    """业务模块目录：11 个业务模块按服务组排列 + 单体公共层；每条能力标实现状态。"""
+    g = Svg("业务模块目录（单体内 · 按服务组）",
+            "同组模块将来一起拆成一个服务　｜　✓ 已实现　◐ 部分　＋ 第一阶段新增　｜　右上角为代码包")
+    CW, GAP = (W - 112 - 4 * 16) / 5, 16
+    MH = 196
+    cols = [
+        ("平台服务组", "sharehub-svc-platform", "place", [
+            ("商家管理", "agent", ["入驻申请 · 审核 ✓", "商家档案 · 账号 · 多主体 ✓", "收款账户 ◐",
+                                   "渠道商户进件 ＋", "商家分润规则 ◐"]),
+            ("网点管理", "loc", ["拓展线索 · 场地方 ✓", "站点 · 点位 · 生命周期 ✓", "进场合同 · 补充协议 ✓",
+                                 "合同到期提醒（可配）◐"]),
+            ("系统管理", "platform", ["组织 · 员工 · 角色 · 菜单 ✓", "字典 · 参数 · 税务设置 ✓",
+                                      "通知模板 · 文件 ✓", "操作审计 ✓"])]),
+        ("交易服务组", "sharehub-svc-core", "user", [
+            ("设备管理", "dev · inv", ["柜机 · 仓位 · 充电宝台账 ✓", "生命周期 · 质检 · 调拨 ✓",
+                                       "采购 · 收货入库 ＋", "设备履历 · 盘点 ＋", "库存余额与变动 ＋"]),
+            ("销售管理", "trade", ["租借订单 · 状态机 ✓", "计费 · 最长时限 · 最高收费 ◐",
+                                   "支付编排 · 退款 ◐", "逾期与扣款失败监控 ＋", "优惠券 · 会员 · 活动 ✓"]),
+            ("用户管理", "user", ["消费者账号 · 身份归并 ✓", "钱包 · 充值 ✓", "信用 · 黑名单 · 免押 ✓",
+                                  "消息 · 反馈 ✓"])]),
+        ("财务服务组", "sharehub-svc-finance", "money", [
+            ("财务管理", "finance", ["复式账务分录 ✓", "业务对账 · 差错处置 ◐", "应付台账（按商家）＋",
+                                     "调整单 · 审批 ◐", "网关手续费 ＋"]),
+            ("结算", "finance", ["分润记录（按商家）✓", "账期结算单 · 对账单 ✓", "付款登记 · 提现审批 ◐",
+                                 "付款来源可切换 ＋"]),
+            ("发票", "finance", ["结算票据（给商家）◐", "租赁票据（给客户）＋", "开票规则 · 自动开具 ＋",
+                                 "贷项通知单 · PDF ＋"])]),
+    ]
+    for c, (gname, mvn, hue, mods) in enumerate(cols):
+        x = 56 + c * (CW + GAP)
+        card2(g, x, 146, CW, 62, gname, mvn, hue, strong=True)
+        for k, (t, pkg, items) in enumerate(mods):
+            module_box(g, x, 218 + k * (MH + 12), CW, MH, t, pkg, items, hue)
+
+    x4 = 56 + 3 * (CW + GAP)
+    card2(g, x4, 146, CW, 62, "运维服务组", "sharehub-svc-ops", "dev", strong=True)
+    module_box(g, x4, 218, CW, MH, "运维管理", "alarm · wo · cs",
+               ["告警规则 · 告警单 ✓", "工单 · 巡检 · SLA ✓", "客服会话 ✓", "逾期 · 扣款失败告警 ＋"], "dev")
+    card2(g, x4, 426, CW, 62, "报表服务组", "新建 sharehub-svc-report", "base", strong=True)
+    module_box(g, x4, 498, CW, MH, "报表管理", "report",
+               ["按角色经营看板 ◐", "设备 · 点位 · 财务报表 ◐", "15 张报表目录 ＋", "导出中心 Excel / PDF ＋"],
+               "base")
+    box(g, x4, 706, CW, 124, "dev")
+    g.text(x4 + 16, 738, "设备对接服务", 23, S["ink"], weight=700)
+    g.text(x4 + CW - 14, 737, "gateway", 15, S["ink3"], anchor="end")
+    lines_in(g, x4 + 16, 768, ["独立微服务 · 不在单体内", "驱动 · 指令 · 事件 · 心跳"], size=17, gap=25)
+
+    x5 = 56 + 4 * (CW + GAP)
+    card2(g, x5, 146, CW, 62, "单体公共层", "sharehub-app · common", "gray", strong=True)
+    module_box(g, x5, 218, CW, MH, "接入层 API", "portal",
+               ["B 端 /api/** 六前缀 ✓", "C 端 /mp/** ✓", "内部 /internal/** ✓", "按端分包 ＋"], "gray")
+    module_box(g, x5, 426, CW, MH, "认证", "auth · iam",
+               ["B 端：员工 · 商家 ✓", "C 端：6 种登录方式 ✓", "令牌存储 MySQL + 缓存 ✓", "抽成独立模块 ＋"],
+               "gray")
+    module_box(g, x5, 634, CW, MH, "集成适配", "integration",
+               ["设备服务客户端 ◐", "支付客户端（现为桩）◐", "OpsKit 流程工单 ◐", "会计端口 Zoho（预留）"], "gray")
+    g.note(56, 878, "设备对接（协议 · 驱动 · 指令 · 在线心跳）不在单体内，是独立微服务；单体的「设备管理」只管资产与业务状态。")
+    g.save("%s/20-business-modules.svg" % OUT)
+
+
+def kv_rows(g, x, y, rows, kw=136, gap=50):
+    """左标签右取值的行；取值可以是多行（list）。"""
+    for label, val in rows:
+        g.text(x, y, label, 18, S["ink3"])
+        vals = val if isinstance(val, list) else [val]
+        for i, v in enumerate(vals):
+            g.text(x + kw, y + i * 25, v, 19, S["ink"])
+        y += gap + (len(vals) - 1) * 25
+    return y
+
+
+def d21():
+    """两种认证方案：B 端（员工 · 商家）与 C 端（消费者），各自一条过滤器链与凭据池。"""
+    g = Svg("两种认证方案：B 端与 C 端",
+            "同一单体内两条过滤器链 · 按身份域分凭据池 · 共用令牌存储　｜　代码：common/auth · platform/iam · user/consumer")
+    PW = (W - 112 - 24) / 2
+    panel(g, 56, 146, PW, 648, "B 端认证 · 运营台与商家视图", "base")
+    kv_rows(g, 80, 214, [
+        ("身份域", "STAFF 员工 · AGENT 商家"),
+        ("登录方式", "员工：账号 + 密码　商家：手机 + 验证码"),
+        ("登录接口", "POST /api/auth/login · /api/auth/otp"),
+        ("令牌", "不透明令牌：员工 stk_ · 商家 atk_"),
+        ("过滤器链", "/api/** → StaffTokenAuthFilter"),
+        ("授权", ["RBAC 权限码（@perm.can）", "+ 数据范围：全部 / 区域 / 站点 / 点位 / 场地 / 商家 / 本人"]),
+        ("菜单", "后端下发菜单与权限码；改权限即时生效"),
+        ("多主体", "一个账号可属多个商家，登录后切换"),
+        ("匿名放行", "登录 · 验证码 · 商家入驻申请"),
+    ])
+    x2 = 56 + PW + 24
+    panel(g, x2, 146, PW, 648, "C 端认证 · App / 小程序 / H5", "user")
+    kv_rows(g, x2 + 24, 214, [
+        ("身份域", "CONSUMER 消费者"),
+        ("登录方式", ["手机验证码 · 密码 · Apple · Google", "微信小程序 · 微信公众号"]),
+        ("登录接口", "POST /mp/auth/login（按 grantType 分发）"),
+        ("令牌", "不透明令牌：ctk_"),
+        ("过滤器链", "/mp/** → ConsumerTokenAuthFilter"),
+        ("授权", ["属主校验：只能访问本人的订单、", "钱包、发票（防越权）；无 RBAC"]),
+        ("登录开关", "登录方式按国家开关"),
+        ("身份归并", "多种登录方式绑定同一消费者"),
+        ("匿名放行", "登录 · 附近网点 · 站点 · 公告"),
+    ])
+    box(g, 56, 808, W - 112, 64, "gray", strong=False)
+    g.text(80, 838, "共用：令牌存储 MySQL + 本地缓存（可选 Redis / 内存）· 令牌前缀与身份域不符直接 401 · 凭据按身份域分池",
+           19, S["ink"])
+    g.text(80, 864, "不属于用户认证：服务间调用（设备服务、支付、调度器、OpsKit 回调）另用内部凭证 X-Internal-Token", 18,
+           S["ink2"])
+    g.save("%s/21-auth-schemes.svg" % OUT)
+
+
+def d22():
+    """合理微服务：第一阶段拆什么、信号出现后拆什么、上限多少。"""
+    g = Svg("合理微服务：现在拆什么，将来按信号拆什么",
+            "按变化的原因拆，不按业务名词拆 · 一套代码两种部署（ADR-017）· 上限 7 个业务服务")
+    CW = 448
+    xs = [56, 56 + CW + 72, 56 + 2 * (CW + 72)]
+    heads = [("第一阶段（现在）", "自有 2 个进程 + 共用 2 个服务", "money"),
+             ("信号出现后（按需逐个拆）", "从单体里拆出，代码不改", "dev"),
+             ("上限（7 个业务服务）", "超过须先回答「哪两个变化原因不同」", "base")]
+    for x, (t, sb, hue) in zip(xs, heads):
+        card2(g, x, 146, CW, 66, t, sb, hue, strong=True)
+
+    # 列 1：现在
+    x = xs[0]
+    box(g, x, 228, CW, 250, "money")
+    g.text(x + 20, 262, "业务大单体 sharehub-app", 23, S["ink"], weight=700)
+    lines_in(g, x + 20, 294, ["平台 · 交易 · 财务 · 运维 · 报表",
+                              "集成适配（OpsKit · 会计预留）",
+                              "B 端 / C 端 API 与两套认证",
+                              "理由：借还要本地事务；单运营方、",
+                              "未规模化，拆开只多运维成本"], size=18, gap=30)
+    box(g, x, 494, CW, 110, "dev")
+    g.text(x + 20, 528, "设备对接服务（独立）", 23, S["ink"], weight=700)
+    lines_in(g, x + 20, 560, ["每接一家厂商变一次 · 长连接技术栈",
+                              "故障不拖累交易（ADR-018）"], size=18, gap=28)
+    box(g, x, 620, CW, 92, "gray", strong=False)
+    g.text(x + 20, 654, "支付 · 任务调度（共用 ai-shop）", 23, S["ink"], weight=700)
+    g.text(x + 20, 686, "代码与实例共用，按 system 隔离（ADR-025）", 18, S["ink2"])
+
+    # 列 2：信号
+    x = xs[1]
+    cands = [("集成服务", "接入 Zoho 等外部 SaaS 时", "限流、超时、凭据轮换不拖累交易"),
+             ("报表服务", "报表 / 导出拖慢交易库时", "读模型独立，可接只读副本"),
+             ("财务服务", "合规要求财务独立部署时", "或批处理窗口与交易高峰冲突"),
+             ("运维服务", "告警事件量需独立扩容时", "处置节奏本就与主链路无关")]
+    for k, (t, sig, why) in enumerate(cands):
+        y = 228 + k * 124
+        box(g, x, y, CW, 110, "dev", strong=False)
+        g.text(x + 20, y + 34, "%d · %s" % (k + 1, t), 23, S["ink"], weight=700)
+        g.text(x + 20, y + 66, "信号：" + sig, 18, S["ink"])
+        g.text(x + 20, y + 94, why, 17, S["ink3"])
+
+    # 列 3：上限
+    x = xs[2]
+    box(g, x, 228, CW, 484, "base")
+    final = [("平台", "不预期拆 · 运营配置面"), ("交易", "不拆 · 借还主链路要本地事务"),
+             ("财务", "信号 3"), ("运维", "信号 4"), ("报表", "信号 2"), ("集成", "信号 1"),
+             ("设备对接", "已独立")]
+    for k, (t, sb) in enumerate(final):
+        y = 268 + k * 58
+        g.text(x + 24, y, "%d  %s" % (k + 1, t), 22, S["ink"], weight=650)
+        g.text(x + CW - 20, y, sb, 18, S["ink3"], anchor="end")
+        if k < len(final) - 1:
+            g.line(x + 20, y + 20, x + CW - 20, y + 20, S["rule"], 1)
+    g.text(x + 24, 688, "+ 共用：支付 · 任务调度", 19, S["ink2"])
+
+    g.arrow(xs[0] + CW + 8, 400, xs[1] - 10, 400, accent=True)
+    g.arrow(xs[1] + CW + 8, 400, xs[2] - 10, 400, accent=True)
+
+    box(g, 56, 730, W - 112, 140, "place", strong=False)
+    g.text(80, 764, "拆分前必须先就绪（缺一不拆）", 21, S["hue"]["place"][0], weight=700)
+    chips(g, 80, 782, ["跨进程链路追踪 traceparent", "Outbox 跨进程投递 + 消费去重", "会话存储入库",
+                       "边界卡口进 CI（跨模块 JOIN / 事务 / 注入）"], "place")
+    g.text(80, 852, "拆分动作 = 换打包方式：模块只经 sharehub-api 契约与事件交互，classpath 决定走本地还是远程实现。", 18,
+           S["ink2"])
+    g.save("%s/22-microservice-split.svg" % OUT)
+
+
 if __name__ == "__main__":
     import glob
     print("生成 PPT 用架构图（1600×900 · 16:9）：")
-    for f in (d00, d01, d02, d03, d04, d05, d06, d07, d08, d09, d10, d11, d12, d13, d14, d17, d18):
+    for f in (d00, d01, d02, d03, d04, d05, d06, d07, d08, d09, d10, d11, d12, d13, d14, d17, d18, d19, d20, d21, d22):
         f()
     print("\n越界自检：")
     ok = True

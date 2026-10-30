@@ -66,8 +66,11 @@ public class OpsController {
                                       @RequestParam(required = false) Integer size,
                                       @RequestParam(required = false) String keyword,
                                       @RequestParam(required = false) String onlineStatus,
-                                      @RequestParam(required = false) String status) {
-        return cabinetService.page(page, size, keyword, onlineStatus, status);
+                                      @RequestParam(required = false) String status,
+                                      // 出库池（V161）：只看出库给某商家的；pool = UNBOUND / BOUND
+                                      @RequestParam(required = false) String issuedAgentNo,
+                                      @RequestParam(required = false) String pool) {
+        return cabinetService.page(page, size, keyword, onlineStatus, status, issuedAgentNo, pool);
     }
 
     @GetMapping("/cabinets/{cabinetNo}")
@@ -130,8 +133,11 @@ public class OpsController {
     public PageResult<Location> locations(@RequestParam(required = false) Integer page,
                                         @RequestParam(required = false) Integer size,
                                         @RequestParam(required = false) String keyword,
-                                          @RequestParam(required = false) Boolean showArchived) {
-        return loc.pageLocations(page, size, keyword, showArchived);
+                                          @RequestParam(required = false) Boolean showArchived,
+                                          // V162：按站点 / 商家取点位（绑定抽屉、商家详情）；默认点位排最前
+                                          @RequestParam(required = false) String siteNo,
+                                          @RequestParam(required = false) String agentNo) {
+        return loc.pageLocations(page, size, keyword, showArchived, siteNo, agentNo);
     }
 
     @PostMapping({"/locations", "/locations/{locationNo}"})
@@ -223,7 +229,7 @@ public class OpsController {
      * 部分成功会让运营不知道该重传全部还是补传剩余，重传已成功的行还会撞唯一键。
      */
     @PostMapping("/cabinets/import")
-    @PreAuthorize("@perm.can('device:cabinet:create')")
+    @PreAuthorize("@perm.can('device:cabinet:import')")
     @SuppressWarnings("unchecked")
     public Object importCabinets(@RequestBody java.util.Map<String, Object> body) {
         Object rows = body == null ? null : body.get("rows");

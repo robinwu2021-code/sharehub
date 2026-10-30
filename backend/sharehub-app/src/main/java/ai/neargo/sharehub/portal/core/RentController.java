@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -35,9 +36,15 @@ public class RentController {
     private final ConsumerOrderAssembler cards;
     private final PaymentService payments;
     private final BizRuleService bizRules;
+    private final ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices;
+    private final ai.neargo.sharehub.portal.finance.TaxInvoiceDocuments taxInvoiceDocs;
 
     public RentController(RentOrderService orders, PaymentService payments, BizRuleService bizRules,
-                          ConsumerOrderAssembler cards) {
+                          ConsumerOrderAssembler cards,
+                          ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices,
+                          ai.neargo.sharehub.portal.finance.TaxInvoiceDocuments taxInvoiceDocs) {
+        this.taxInvoices = taxInvoices;
+        this.taxInvoiceDocs = taxInvoiceDocs;
         this.cards = cards;
         this.orders = orders;
         this.payments = payments;
@@ -96,6 +103,27 @@ public class RentController {
     }
 
     /** 买断：不还了，按 {@code sys_biz_rule} 计费兜底分区的买断价结单（属主鉴权）。 */
+    /** 本人某订单的税务票据（V181，只含已开出的；开关关着时为空列表）。 */
+    @GetMapping("/orders/{orderNo}/invoices")
+    public List<ai.neargo.sharehub.portal.finance.TaxInvoiceView> invoices(@PathVariable String orderNo) {
+        RentOrder o = orders.detailForConsumer(orderNo);
+        ConsumerContext.assertOwner(o.cUserNo());
+        return taxInvoices.listForUser(o.cUserNo(), orderNo).stream()
+                .map(ai.neargo.sharehub.portal.finance.TaxInvoiceView::of).toList();
+    }
+
+    /** 下载本人某张税务票据的 PDF（K8 / RQ-APP-05）。票必须属于这张单，单必须属于本人。 */
+    @GetMapping("/orders/{orderNo}/invoices/{invoiceNo}/pdf")
+    public void invoicePdf(@PathVariable String orderNo, @PathVariable String invoiceNo,
+                           jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        RentOrder o = orders.detailForConsumer(orderNo);
+        ConsumerContext.assertOwner(o.cUserNo());
+        var t = taxInvoices.listForUser(o.cUserNo(), orderNo).stream()
+                .filter(x -> x.getInvoiceNo().equals(invoiceNo)).findFirst()
+                .orElseThrow(() -> ai.neargo.sharehub.common.BizException.notFound(invoiceNo));
+        taxInvoiceDocs.pdf(t).writeTo(response);
+    }
+
     @PostMapping("/orders/{orderNo}/buyout")
     public ConsumerOrderVO buyout(@PathVariable String orderNo) {
         RentOrder o = orders.detailForConsumer(orderNo);

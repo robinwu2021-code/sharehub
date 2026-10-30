@@ -34,4 +34,14 @@ public interface OtpGate {
      *                        否则「收到码了但验不过」
      */
     void verify(String normalizedPhone, String otp);
+
+    /**
+     * 发邮箱验证码（商家一期 B2：邮箱是主登录标识，R1）。限流与有效期同手机号。
+     *
+     * @param normalizedEmail {@code IdentifierNormalizer.email} 的输出；与 {@link #verifyEmail} 用同一个值
+     */
+    String issueEmail(String normalizedEmail);
+
+    /** 校验并消费一次邮箱验证码；不通过抛异常（调用方统一翻成同一句失败文案）。 */
+    void verifyEmail(String normalizedEmail, String otp);
 }

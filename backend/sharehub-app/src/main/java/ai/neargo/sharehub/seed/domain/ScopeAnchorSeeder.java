@@ -61,8 +61,11 @@ public class ScopeAnchorSeeder implements CommandLineRunner {
                  WHERE l.agent_no IS NULL AND s.agent_no IS NOT NULL""");
         int cab = jdbc.update("""
                 UPDATE dev_cabinet c JOIN loc_location l ON l.location_no = c.location_no
-                   SET c.site_no = l.site_no, c.agent_no = l.agent_no
+                   SET c.site_no = l.site_no, c.agent_no = l.agent_no,
+                       c.issued_agent_no = COALESCE(c.issued_agent_no, l.agent_no)
                  WHERE c.site_no IS NULL OR c.agent_no IS NULL""");
+        // ↑ issued_agent_no 一并补：绑在商家点位上的柜子必然在该商家出库池里（V164 chk_cab_bound_issued），
+        //   只补 agent_no 会违反约束
         /*
          * 上面两句（点位、机柜）**重新派生**，下面两句（订单、工单）**只补空**。
          * 这不是不一致，是两种锚点的语义本来就不同：

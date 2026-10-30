@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.scenario;
 
+import ai.neargo.sharehub.support.LegacyShareParams;
 import ai.neargo.sharehub.support.ApiTestSupport;
 import ai.neargo.sharehub.support.FixtureCleanup;
 import ai.neargo.sharehub.trade.pay.StubPaymentPort;
@@ -32,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 已收的单不能再收；App 买断同样请款并分润（此前不发事件，那笔收入不分润）。
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@LegacyShareParams
 class ConsumerArrearsTest extends ApiTestSupport {
 
     @Autowired

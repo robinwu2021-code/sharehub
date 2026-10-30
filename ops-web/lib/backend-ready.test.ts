@@ -18,9 +18,13 @@ describe("运营管理：后端就绪开关", () => {
     }
   });
 
-  it("页内功能同样全部可用（站点暂停 / 单站统计 / 方案启停）", () => {
+  it("页内功能同样全部可用（站点暂停 / 单站统计 / 方案启停）；未上线的只许是登记在案的那几项", () => {
+    // 2026-10-28 设备出库与绑定：后端由商户入驻会话分步实现，上线一项从这里删一项（只许变短）
+    const PENDING = new Set<string>(["app-versions.publish"]);
     for (const f of Object.keys(PARTIAL_READY) as (keyof typeof PARTIAL_READY)[]) {
-      expect(featureReady(f, false), f).toBe(true);
+      expect(featureReady(f, false), f).toBe(!PENDING.has(f));
     }
+    // mock 模式恒可用
+    for (const f of PENDING) expect(featureReady(f as keyof typeof PARTIAL_READY, true), f).toBe(true);
   });
 });

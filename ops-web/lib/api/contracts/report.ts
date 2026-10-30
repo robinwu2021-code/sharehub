@@ -3,16 +3,18 @@
 //
 // 说明：消费者**分层表** `listConsumerSegments` 历史上落在 user 域（端点同在
 // /api/ops/reports/ 下），本批不迁移（会牵动 user 契约与页面），洞察数据落在本域。
-import type { PageQ, ReportQ, ReportTrendQ, ReportCustomQ } from "../query";
+import type { PageQ, ReportQ, ReportTrendQ, ReportCustomQ, ExportFormat, ReportExportQ } from "../query";
 import type {
   PageResult, ReportDevice, ReportLocation, ReportFinance, ReportScreen, ReportCustom,
-  ReportTrend, ReportMetricDef, ScreenBoard, ConsumerInsight,
+  ReportTrend, ReportMetricDef, ScreenBoard, ConsumerInsight, InventoryReport,
 } from "../../types";
 
 export interface ReportApi {
   listReportDevice(q?: ReportQ): Promise<PageResult<ReportDevice>>;
   listReportLocation(q?: ReportQ): Promise<PageResult<ReportLocation>>;
   listReportFinance(q?: ReportQ): Promise<PageResult<ReportFinance>>;
+  /** 后端导出全量（K8 / AC-09），浏览器直接下载；权限同对应报表。 */
+  exportReport(kind: "device" | "location" | "finance", format: ExportFormat, q?: ReportExportQ): Promise<void>;
   listReportScreen(q?: PageQ): Promise<PageResult<ReportScreen>>;
   listReportCustom(q?: ReportCustomQ): Promise<PageResult<ReportCustom>>;
   /** 三张报表共用：kind 决定口径，返回周期桶序列 + 全周期汇总条。 */
@@ -23,4 +25,6 @@ export interface ReportApi {
   listReportMetrics(): Promise<ReportMetricDef[]>;
   /** 消费者洞察：转化漏斗 + 画像分布。 */
   getConsumerInsight(): Promise<ConsumerInsight>;
+  /** 库存报表（V206）：from / to 为 yyyy-MM-dd，空取本月。 */
+  getInventoryReport(q?: { from?: string; to?: string; warehouseNo?: string }): Promise<InventoryReport>;
 }

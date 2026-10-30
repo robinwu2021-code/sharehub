@@ -26,6 +26,8 @@ import ai.neargo.sharehub.api.platform.port.SysParamPort;
 import ai.neargo.sharehub.dev.dto.DevLegacyDtos.Cabinet;
 import ai.neargo.sharehub.dev.entity.DevCabinet;
 import ai.neargo.sharehub.dev.mapper.CabinetMapper;
+import ai.neargo.sharehub.dev.movement.MovementEvent;
+import ai.neargo.sharehub.dev.movement.MovementRecorder;
 import ai.neargo.sharehub.dev.port.PricingProbe;
 import ai.neargo.sharehub.dev.service.CabinetLifecycleService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -54,6 +56,9 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     static final int ONLINE_WINDOW_MIN = 3;
     /** 门禁「站点开着」：筹备中也可以上线（首台上线正是它转营业的触发点）。 */
     private static final Set<String> SITE_OPEN = Set.of("PREPARING", "ACTIVE", "PAUSED");
+    /** 合同 / 勘测门禁开关（V174）：1 强制，0 跳过。一期默认跳过。 */
+    static final String VENUE_GATE = "site.venue_gate.enabled";
+    static final String PHASE1_SKIP = "一期跳过（平台运营直接操作）";
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final CabinetMapper cabinets;
@@ -105,14 +110,16 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
         boolean qc = QcStatus.cleared(c.getQcStatus());
         // 勘测只卡「首台上线」：站点已在营业说明现场早验过了，存量站点不补勘测也能加柜
         boolean firstLive = site != null && "PREPARING".equals(site.status());
-        boolean survey = !firstLive || Boolean.TRUE.equals(site.surveyPassed());
+        // 一期跳过合同 / 勘测（V174 site.venue_gate.enabled=0）：项照列、判通过，二期改参数即恢复强制
+        boolean venueGate = params.intOf(VENUE_GATE, 0) == 1;
+        boolean survey = !venueGate || !firstLive || Boolean.TRUE.equals(site.surveyPassed());
         boolean installed = workOrders.installDoneCabinets(List.of(no)).contains(no);
         Load load = load(c);
         return Checklist.of(List.of(
                 new Checklist.Item("QC", "入库质检", qc, qc ? (c.getQcStatus() == null ? "存量设备免检" : "质检通过")
                         : QcStatus.FAILED.name().equals(c.getQcStatus()) ? "质检不通过" : "未做入库质检", "/devices/detail?no=" + no + "&tab=qc"),
                 new Checklist.Item("SURVEY", "现场勘测", survey,
-                        !firstLive ? "站点已营业，免勘测" : site.surveyPassed() == null ? "站点首台上线须先做现场勘测" : survey ? "勘测通过" : "最近一次勘测不通过",
+                        !venueGate ? PHASE1_SKIP : !firstLive ? "站点已营业，免勘测" : site.surveyPassed() == null ? "站点首台上线须先做现场勘测" : survey ? "勘测通过" : "最近一次勘测不通过",
                         siteHref + "?tab=survey"),
                 new Checklist.Item("INSTALL_WO", "装机工单", installed, installed ? "装机工单已完工" : "没有已完工的装机工单",
                         "/work-orders?view=list&type=INSTALL&cabinetNo=" + no),
@@ -121,8 +128,8 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
                         "/devices/detail?no=" + no + "&tab=overview"),
                 new Checklist.Item("SITE_OPEN", "站点开放", siteOpen,
                         site == null ? "点位所属站点不存在" : siteOpen ? site.status() : "站点状态为 " + site.status() + "，不能上线新设备", siteHref),
-                new Checklist.Item("CONTRACT", "生效合同", contract != null,
-                        contract != null ? contract.contractNo() : "站点没有生效中的合同", "/venues?tab=contracts&siteNo=" + c.getSiteNo()),
+                new Checklist.Item("CONTRACT", "生效合同", !venueGate || contract != null,
+                        contract != null ? contract.contractNo() : !venueGate ? PHASE1_SKIP : "站点没有生效中的合同", "/venues?tab=contracts&siteNo=" + c.getSiteNo()),
                 new Checklist.Item("ONLINE", "设备在线", online,
                         online ? "最近心跳 " + c.getLastHeartbeatAt() : hb == null ? "从未收到心跳" : "最近心跳 " + c.getLastHeartbeatAt() + "，已超过 "
                                 + ONLINE_WINDOW_MIN + " 分钟", "/devices/detail?no=" + no),
@@ -175,6 +182,7 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     public void ship(String cabinetNo, String transferNo) {
         DevCabinet c = require(cabinetNo);
         if (!QcStatus.cleared(c.getQcStatus())) throw BizException.conflict("error.device.qc_not_passed", cabinetNo);
+        move(c, MovementEvent.SHIP, where(c), MovementRecorder.TRANSIT, c.getAgentNo(), c.getAgentNo(), null, transferNo);
         transit(c, "SHIP", u -> { }, x -> { });
         log.info("机柜随调拨发货 cabinetNo={} transferNo={}", cabinetNo, transferNo);
     }
@@ -183,7 +191,46 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     @Transactional
     public void receive(String cabinetNo, String warehouseNo) {
         DevCabinet c = require(cabinetNo);
-        transit(c, "RECEIVE", u -> u.set(DevCabinet::getWarehouseNo, warehouseNo), x -> x.setWarehouseNo(warehouseNo));
+        boolean toWh = warehouseNo != null && !warehouseNo.isBlank();
+        move(c, MovementEvent.RECEIVE, MovementRecorder.TRANSIT, toWh ? MovementRecorder.wh(warehouseNo) : null,
+                c.getIssuedAgentNo(), toWh ? null : c.getIssuedAgentNo(), null, null);
+        // 进仓即离开出库池（V161，I1：库里有 CHECK 保证两者互斥 —— 只写仓不清出库池会被库拒掉）。
+        // 签收到站点 / 点位（warehouseNo 为空）不是进仓，出库池不动
+        boolean intoWarehouse = warehouseNo != null && !warehouseNo.isBlank();
+        transit(c, "RECEIVE", u -> {
+                    u.set(DevCabinet::getWarehouseNo, warehouseNo);
+                    if (intoWarehouse) u.set(DevCabinet::getIssuedAgentNo, null).set(DevCabinet::getIssuedAt, null)
+                            .set(DevCabinet::getIssuedBy, null).set(DevCabinet::getIssuedSiteNo, null)
+                            .set(DevCabinet::getIssueReceiverNo, null).set(DevCabinet::getIssueClaimedAt, null);
+                },
+                x -> {
+                    x.setWarehouseNo(warehouseNo);
+                    if (intoWarehouse) {
+                        x.setIssuedAgentNo(null);
+                        x.setIssuedAt(null);
+                        x.setIssuedBy(null);
+                    }
+                });
+    }
+
+    @Override
+    @Transactional
+    public void receiveForInspection(String cabinetNo) {
+        DevCabinet c = require(cabinetNo);
+        move(c, MovementEvent.RETURN_INTAKE, MovementRecorder.TRANSIT, null, c.getIssuedAgentNo(), null, "到仓待检", null);
+        // 撤机回仓：人已回到仓库，但旧的质检结论不再算数 —— 离开出库池、不进仓、质检打回待检，等待检单复检后入库
+        transit(c, "RECEIVE", u -> u.set(DevCabinet::getWarehouseNo, null).set(DevCabinet::getIssuedAgentNo, null)
+                        .set(DevCabinet::getIssuedAt, null).set(DevCabinet::getIssuedBy, null)
+                        .set(DevCabinet::getIssuedSiteNo, null).set(DevCabinet::getIssueReceiverNo, null)
+                        .set(DevCabinet::getIssueClaimedAt, null)
+                        .set(DevCabinet::getQcStatus, QcStatus.PENDING.name()),
+                x -> {
+                    x.setWarehouseNo(null);
+                    x.setIssuedAgentNo(null);
+                    x.setIssuedAt(null);
+                    x.setIssuedBy(null);
+                    x.setQcStatus(QcStatus.PENDING.name());
+                });
     }
 
     @Override
@@ -206,6 +253,7 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     public Cabinet markFault(String cabinetNo, String reason) {
         String r = requireReason(reason);
         DevCabinet c = require(cabinetNo);
+        AuditChanges.record("故障原因", c.getFaultReason(), r);
         transit(c, "MARK_FAULT", u -> u.set(DevCabinet::getFaultReason, r), x -> x.setFaultReason(r));
         return CabinetServiceImpl.toVO(c);
     }
@@ -214,6 +262,7 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     @Transactional
     public Cabinet repair(String cabinetNo) {
         DevCabinet c = require(cabinetNo);
+        AuditChanges.record("故障原因", c.getFaultReason(), null);
         transit(c, "REPAIR", u -> u.set(DevCabinet::getFaultReason, null), x -> x.setFaultReason(null));
         return CabinetServiceImpl.toVO(c);
     }
@@ -223,14 +272,24 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     public Cabinet undeploy(String cabinetNo, String reason) {
         String r = requireReason(reason);
         DevCabinet c = require(cabinetNo);
-        // 撤机回仓：解绑点位 / 站点（agent_no 是划拨归属，保留）。换点位后试借还随 bound_at 失效
+        // 撤机：解绑点位 / 站点，商家号随点位一起清（V164：agent_no 只由点位派生，I3）。
+        // 出库池归属 issued_agent_no 保留 —— 去向是回出库池就留在原商家那里，回仓则签收进仓时清（V161）。
+        // 换点位后试借还随 bound_at 失效
         AuditChanges.record("所属点位", c.getLocationNo(), null);
+        /*
+         * 原因进审计（D5，2026-10-29）：fault_reason 只存「当前原因」，下一次撤机 / 报废 / 标故障会覆盖它。
+         * 每次变动的原因记进审计改前改后表，移动履历（撤出原因、报废原因）才不会丢。
+         */
+        AuditChanges.record("撤机原因", c.getFaultReason(), r);
+        move(c, MovementEvent.UNDEPLOY, MovementRecorder.loc(c.getLocationNo()), MovementRecorder.pool(c.getIssuedAgentNo(), c.getIssuedSiteNo()),
+                c.getAgentNo(), null, r, null);
         transit(c, "UNDEPLOY", u -> u.set(DevCabinet::getLocationNo, null).set(DevCabinet::getLocationName, null)
-                        .set(DevCabinet::getSiteNo, null).set(DevCabinet::getFaultReason, r),
+                        .set(DevCabinet::getSiteNo, null).set(DevCabinet::getAgentNo, null).set(DevCabinet::getFaultReason, r),
                 x -> {
                     x.setLocationNo(null);
                     x.setLocationName(null);
                     x.setSiteNo(null);
+                    x.setAgentNo(null);
                     x.setFaultReason(r);
                 });
         return CabinetServiceImpl.toVO(c);
@@ -242,6 +301,9 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
         String r = requireReason(reason);
         DevCabinet c = require(cabinetNo);
         LocalDateTime now = LocalDateTime.now();
+        AuditChanges.record("报废原因", c.getFaultReason(), r);
+        move(c, MovementEvent.RETIRE, where(c), MovementRecorder.OUT, c.getAgentNo() != null ? c.getAgentNo() : c.getIssuedAgentNo(),
+                null, r, null);
         transit(c, "RETIRE", u -> u.set(DevCabinet::getRetiredAt, now).set(DevCabinet::getFaultReason, r),
                 x -> {
                     x.setRetiredAt(now);
@@ -251,6 +313,27 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     }
 
     // —— 骨架 ——
+
+    /** 设备履历（V196）：setter 注入，构造参数已经很长。 */
+    private MovementRecorder movements;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setMovements(MovementRecorder movements) {
+        this.movements = movements;
+    }
+
+    private void move(DevCabinet c, MovementEvent event, String from, String to, String agentBefore, String agentAfter,
+                      String reason, String sourceRef) {
+        movements.record(new MovementRecorder.Move(MovementRecorder.CABINET, c.getCabinetNo(), event, from, to,
+                agentBefore, agentAfter, reason, sourceRef));
+    }
+
+    /** 当前位置：点位 › 出库池 › 仓。 */
+    private static String where(DevCabinet c) {
+        if (c.getLocationNo() != null) return MovementRecorder.loc(c.getLocationNo());
+        if (c.getIssuedAgentNo() != null) return MovementRecorder.pool(c.getIssuedAgentNo(), c.getIssuedSiteNo());
+        return MovementRecorder.wh(c.getWarehouseNo());
+    }
 
     private void transit(DevCabinet c, String event, Consumer<LambdaUpdateWrapper<DevCabinet>> sets, Consumer<DevCabinet> local) {
         String from = c.getStatus();

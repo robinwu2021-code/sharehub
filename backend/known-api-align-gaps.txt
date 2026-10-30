@@ -116,6 +116,7 @@ C POST /api/user/push-messages/sweep-due
 #   ops-web 一直在调（client.upload / 带鉴权取字节），只是卡口不认 upload( 这类不带动词名的助手。
 #   卡口已教会（api-align.py 的 HELPER_VERB）。raw 那条保留：它是本地存储的签名直链，前端确实不调。
 C GET /api/platform/files/raw/{}
+C POST /api/agent/assignments     # 2026-10-28 前端划拨改走 /assignments/batch（一个事务，整批成功或不动）；单站点端点保留给脚本与单站收回（REVOKE）
 D SignedUrl GET /api/platform/files/{fileNo}/url
 # 2026-09-25 工单详情 / 运营维度（同上，后端先行）：随 TDD/08 工单页接入后删除
 # 2026-09-25 运营核心流程批次 B（合同会签 / 终止审批 / 补充协议；商机阶段机 / 线索池 / 签约转化）：后端先行，

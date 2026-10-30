@@ -60,6 +60,18 @@ export const regions: Region[] = [
   { regionId: "AE-AJ", name: "阿治曼", parent: "阿联酋", parentId: "AE", level: 2, cityCount: 1 },
 ];
 export const sysParams: SysParam[] = [
+  // 字典化参数（V191）样例：与后端迁移同口径，演示下拉 / 开关 / 范围与「待拍板」筛选
+  { paramKey: "rent.service_fee.amount", label: "服务费（每单）", value: "0", groupName: "计费", updatedAt: iso(0), valueType: "DECIMAL", minValue: 0, maxValue: 100, nullable: false, hint: "C09：0 = 不收；借出时定格。原文举例 0.60 / 0.90", pendingDecision: true },
+  { paramKey: "rent.service_fee.payer", label: "服务费谁付", value: "USER", groupName: "计费", updatedAt: iso(0), valueType: "ENUM", options: [{ value: "USER", label: "用户付（加到应付）" }, { value: "PLATFORM", label: "平台承担（不进订单）" }], nullable: false, hint: "C09", pendingDecision: true },
+  { paramKey: "billing.unit_rounding", label: "计费周期取整缺省", value: "CEIL", groupName: "计费", updatedAt: iso(0), valueType: "ENUM", options: [{ value: "CEIL", label: "不足一个周期按一个收（现行）" }, { value: "FLOOR", label: "不足一个周期不收" }, { value: "HALF_UP", label: "过半按一个收" }], nullable: false, hint: "C03：新建计费方案的缺省", pendingDecision: true },
+  { paramKey: "invoice.b2c.enabled", label: "C 端租赁税务发票", value: "0", groupName: "发票", updatedAt: iso(0), valueType: "BOOL", nullable: false, hint: "C05 / K6：是否每笔租赁自动开税务发票", pendingDecision: true },
+  { paramKey: "approval.compensation.threshold", label: "客服补偿 / 免单审批线", value: "", groupName: "财务", updatedAt: iso(0), valueType: "DECIMAL", minValue: 0, maxValue: 100000, nullable: true, hint: "SEC-03：留空 = 不需要审批", pendingDecision: true },
+  // 库存（V198 / V201 / V207）：仓库页「库存设置」维护
+  { paramKey: "inv.engine", label: "库存引擎：LOCAL 本地设备表 / SERVICE 独立进销存", value: "LOCAL", groupName: "库存", updatedAt: iso(0), valueType: "ENUM", options: [{ value: "LOCAL", label: "本地设备表" }, { value: "SERVICE", label: "独立进销存" }], nullable: false, hint: "S3：切到 SERVICE 前须配好库存服务并完成主数据与存量迁移" },
+  { paramKey: "inv.return_warehouse", label: "撤机回仓默认仓库（空 = 取第一个仓库）", value: "WH001", groupName: "库存", updatedAt: iso(0) },
+  { paramKey: "inv.intake.overdue_days", label: "到仓待检超期天数", value: "7", groupName: "库存", updatedAt: iso(0), valueType: "INT", minValue: 1, maxValue: 90, nullable: false, hint: "到达超过这么多天还没处理完的待检单，给仓管发待办" },
+  { paramKey: "inv.removal.return_grace_minutes", label: "撤机未回仓宽限（分钟）", value: "30", groupName: "库存", updatedAt: iso(0), valueType: "INT", minValue: 1, maxValue: 1440, nullable: false, hint: "撤机完工去向回仓，超过这么久还没有回仓调拨单就给运营发待办" },
+  { paramKey: "inv.qc.powerbank_policy", label: "充电宝质检策略", value: "FULL", groupName: "库存", updatedAt: iso(0), valueType: "ENUM", options: [{ value: "FULL", label: "逐块质检" }, { value: "SKIP", label: "免检（登记即入库）" }], nullable: false, hint: "只影响采购到货的充电宝；机柜始终逐台质检，撤机回仓始终复检" },
   { paramKey: "deposit.default", label: "默认押金", value: "50", groupName: "计费", updatedAt: iso(0) },
   { paramKey: "free.minutes", label: "免费时长(分钟)", value: "5", groupName: "计费", updatedAt: iso(86400_000) },
   { paramKey: "cap.daily", label: "每日封顶", value: "30", groupName: "计费", updatedAt: iso(2 * 86400_000) },
@@ -76,7 +88,21 @@ export const sysParams: SysParam[] = [
   { paramKey: "whatsapp.enabled", label: "WhatsApp通知", value: "true", groupName: "通知", updatedAt: iso(13 * 86400_000) },
   { paramKey: "credit.min", label: "最低信用分", value: "550", groupName: "风控", updatedAt: iso(14 * 86400_000) },
   { paramKey: "invite.reward", label: "邀请奖励(AED)", value: "5", groupName: "营销", updatedAt: iso(15 * 86400_000) },
+  // 商家一期（与后端 V155 同键同默认值）
+  { paramKey: "rent.overdue.mode", label: "超时扣款模型：CAP_AMOUNT 累计触顶买断 / TIME_LIMIT 到时限发起最高收费", value: "CAP_AMOUNT", groupName: "计费", updatedAt: iso(1 * 86400_000) },
+  { paramKey: "finance.share.base_mode", label: "分成基数口径：PRE_TAX 税前 / GROSS 含税实收（只影响之后的订单）", value: "PRE_TAX", groupName: "财务", updatedAt: iso(16 * 86400_000) },
+  { paramKey: "finance.share.tax_country", label: "分成折算税前时取哪个国家的税率", value: "AE", groupName: "财务", updatedAt: iso(16 * 86400_000) },
+  { paramKey: "finance.share.venue_enabled", label: "场地方是否参与分成与结算：1 是 / 0 否（一期为 0）", value: "0", groupName: "财务", updatedAt: iso(16 * 86400_000) },
+  // 一期跳过合同 / 勘测门禁（与后端 V174 同键同默认值）：项照列、判通过，二期改 1 恢复强制
+  { paramKey: "site.venue_gate.enabled", label: "合同 / 勘测门禁：1 强制，0 跳过（一期跳过）", value: "0", groupName: "设备", updatedAt: iso(16 * 86400_000) },
+  { paramKey: "agent.apply.self_service_enabled", label: "商家自助注册入口：1 开 / 0 关（一期只走运营代建）", value: "0", groupName: "商家", updatedAt: iso(16 * 86400_000) },
 ];
+
+/** 读系统参数（mock）。与后端 SysParamPort 同语义：缺失或空串回落默认值。 */
+export function paramOf(key: string, fallback: string): string {
+  const v = sysParams.find((p) => p.paramKey === key)?.value;
+  return v == null || v.trim() === "" ? fallback : v.trim();
+}
 export const openApiApps: OpenApiApp[] = Array.from({ length: 12 }, (_, i) => ({
   appNo: `APP${300 + i}`, name: p(["Careem 集成", "Noon 广告平台", "Emirates NBD 支付", "第三方BI", "场地方门户", "代理商开放平台"], i),
   appKey: `ak_${String(1000000000 + i * 7654321).slice(0, 10)}`, rateLimit: p([100, 300, 500, 1000], i),
@@ -98,7 +124,9 @@ export const marketCountries: MarketCountry[] = [
 export const listNotifyTemplates = (q: PageQuery = {}) => paginate(notifyTemplates, q.page, q.size, (x) => kwHit(q.keyword, x.templateNo, x.name));
 export const listDictEntries = (q: PageQuery = {}) => paginate(dictEntries, q.page, q.size, (x) => kwHit(q.keyword, x.dictNo, x.group, x.code, x.label));
 export const listRegions = (q: PageQuery = {}) => paginate(regions, q.page, q.size, (x) => kwHit(q.keyword, x.regionId, x.name, x.parent));
-export const listSysParams = (q: PageQuery = {}) => paginate(sysParams, q.page, q.size, (x) => kwHit(q.keyword, x.paramKey, x.label, x.groupName));
+export const listSysParams = (q: PageQuery & { groupName?: string; pendingDecision?: string } = {}) =>
+  paginate(sysParams, q.page, q.size, (x) => kwHit(q.keyword, x.paramKey, x.label, x.groupName)
+    && (!q.groupName || x.groupName === q.groupName) && (q.pendingDecision !== "1" || !!x.pendingDecision));
 export const listOpenApiApps = (q: PageQuery = {}) => paginate(openApiApps, q.page, q.size, (x) => kwHit(q.keyword, x.appNo, x.name, x.appKey));
 export const listMarketCountries = (q: PageQuery = {}) => paginate(marketCountries, q.page, q.size, (x) => kwHit(q.keyword, x.countryCode, x.name, x.currency));
 
@@ -760,7 +788,7 @@ export const saveProblem = (x: Partial<ProblemEntry>) => upsert(problems, x, "pr
 // —— §16 税率与发票（阶段 3）——
 // 税号一律占位（`****`）：合规资料不落前端 mock。
 export const taxSettings: TaxSetting[] = [
-  { country: "AE", countryName: "阿联酋", taxName: "VAT", ratePercent: 5, trn: "1000****00003", invoiceTitle: "ShareHub FZ-LLC", includedInPrice: true, effectiveFrom: "2026-01-01" },
+  { country: "AE", countryName: "阿联酋", taxName: "VAT", ratePercent: 5, trn: "1000****00003", invoiceTitle: "ShareHub FZ-LLC", includedInPrice: true, effectiveFrom: "2026-01-01", issuerLegalName: "ShareHub FZ-LLC", issuerAddress: "Dubai Silicon Oasis, Dubai, UAE" },
   { country: "SA", countryName: "沙特", taxName: "ZATCA VAT", ratePercent: 15, trn: "3000****00003", invoiceTitle: "ShareHub Arabia LLC", includedInPrice: true, effectiveFrom: "2026-04-01" },
   { country: "QA", countryName: "卡塔尔", taxName: "VAT（待立法）", ratePercent: 0, trn: "-", invoiceTitle: "ShareHub Qatar", includedInPrice: false, effectiveFrom: "2027-01-01" },
   { country: "KW", countryName: "科威特", taxName: "VAT（待立法）", ratePercent: 0, trn: "-", invoiceTitle: "ShareHub Kuwait", includedInPrice: false, effectiveFrom: "2027-01-01" },

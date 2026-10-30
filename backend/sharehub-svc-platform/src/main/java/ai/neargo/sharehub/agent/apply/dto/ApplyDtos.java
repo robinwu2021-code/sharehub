@@ -59,6 +59,14 @@ public final class ApplyDtos {
     }
 
     /** 提交/审核后的回执。 */
-    public record ApplyResult(String applyNo, String status, String operatorNo) {
+    /**
+     * @param initialPassword 开通时新建凭据才有：<b>一次性明文</b>，只在这次响应里出现（另随邀请邮件发给商家），
+     *                        商家首登必须改（用户 2026-10-28：代录的商家给初始密码，登录后修改）。
+     *                        同一个人开第二家商家时为 null —— 一个人一套口令，不重置
+     */
+    public record ApplyResult(String applyNo, String status, String operatorNo, String initialPassword) {
+        public ApplyResult(String applyNo, String status, String operatorNo) {
+            this(applyNo, status, operatorNo, null);
+        }
     }
 }

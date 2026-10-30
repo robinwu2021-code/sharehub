@@ -23,8 +23,9 @@ export const FOLLOW_CHANNEL_LABEL: Record<LeadFollowChannel, string> = {
   CALL: "电话", VISIT: "拜访", WHATSAPP: "WhatsApp", EMAIL: "邮件", OTHER: "其他",
 };
 
+/** 商机谈判条件与进场合同条款共用这一份（同一枚举 ContractShareMode）。措辞对齐运营核心流程 P2。 */
 export const SHARE_MODE_LABEL: Record<ContractShareMode, string> = {
-  SHARE: "纯分成", ENTRY_FEE: "进场费", GUARANTEE: "保底 + 分成", FREE: "免费",
+  SHARE: "纯分成", GUARANTEE: "保底 + 分成（取高者）", ENTRY_FEE: "固定进场费", FREE: "免费入驻",
 };
 
 /** 「今天该打谁」：下次跟进日相对今天的状态。空 = 未约。 */

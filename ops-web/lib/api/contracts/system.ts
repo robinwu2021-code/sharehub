@@ -23,7 +23,7 @@ export interface SystemApi {
   listNotifyTemplates(q?: PageQ): Promise<PageResult<NotifyTemplate>>;
   listDictEntries(q?: PageQ): Promise<PageResult<DictEntry>>;
   listRegions(q?: PageQ): Promise<PageResult<Region>>;
-  listSysParams(q?: PageQ): Promise<PageResult<SysParam>>;
+  listSysParams(q?: import("../query").SysParamQ): Promise<PageResult<SysParam>>;
   /**
    * 业务时区的候选与当前值（2026-09-28 裁决：UTC+4 阿联酋，可配，改动需管理员权限）。
    *

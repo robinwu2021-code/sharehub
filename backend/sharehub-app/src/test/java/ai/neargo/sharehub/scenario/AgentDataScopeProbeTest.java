@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.scenario;
 
+import ai.neargo.sharehub.support.SelfServiceApplyOpen;
 import ai.neargo.sharehub.support.ApiTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @org.springframework.test.context.TestPropertySource(properties = {
         "sharehub.security.apply-rate-per-minute=10000",
 })
+@SelfServiceApplyOpen
 class AgentDataScopeProbeTest extends ApiTestSupport {
 
     private static final String OTP = "000000";

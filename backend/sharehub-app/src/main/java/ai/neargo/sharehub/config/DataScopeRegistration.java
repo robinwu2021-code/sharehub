@@ -77,9 +77,11 @@ public class DataScopeRegistration implements DataScopeRegistrar {
         registry.register("agt_exit", Map.of("AGENT", "agent_no"));
         registry.register("agt_ops_assessment", Map.of("AGENT", "agent_no"));
 
-        // —— 设备：机柜归属随点位 ——
+        // —— 设备：机柜归属随点位；未绑定的看出库池（V161）——
+        // scope_agent_no = COALESCE(agent_no, issued_agent_no) 是生成列：出库给商家、还没绑定的柜子
+        // agent_no 为空，按 agent_no 收敛商家就看不到自己「待安装」的设备
         registry.register("dev_cabinet", Map.of(
-                "AGENT", "agent_no",
+                "AGENT", "scope_agent_no",
                 "SITE", "site_no",
                 "REGION", "region_id"));
 
@@ -141,6 +143,8 @@ public class DataScopeRegistration implements DataScopeRegistrar {
         // 而多注册的后果只是 fail-closed 方向的「看不到」——两种错的代价不对称。
         registry.register("stl_withdrawal", Map.of("AGENT", "agent_no"));
         registry.register("stl_settlement", Map.of("AGENT", "agent_no"));
+        // 自开票单据（V183，C10）：同提现单，商家只能看到自己的
+        registry.register("stl_self_bill", Map.of("AGENT", "agent_no"));
 
         /*
          * —— 运营核心流程（2026-09-25，TDD-运营核心流程）——

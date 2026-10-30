@@ -27,39 +27,52 @@ class MenuTreeTest extends ApiTestSupport {
         /*
          * ADMIN 持 `*`，所以他看得到**除代理门户外**的全部 ——
          * 门户是排他的（ADR-012：代理只看门户，运营看不到门户），
-         * 所以是 16 个 section 而不是 19。
+         * 所以是 12 个 section 而不是 15。
          *
          * 端点从 P1 起**按权限剪枝**（此前下发完整树、前端自己筛）。
          * 要全量树用 MenuService.tree()，那是给菜单管理界面留的。
          */
         JsonNode t = tree(login("ADMIN"));
-        // 2026-09-28 +1：流程与工单（V136，放在最末）
-        assertThat(t.size()).as("运营侧 section 数（19 个里 3 个是代理门户）").isEqualTo(16);
+        // 2026-09-28 +1：流程与工单（V136，放在最末）；2026-10-28 −1：营销管理并入销售管理（V151）；
+        // 2026-10-28 −2：告警管理、客服管理并入运维管理（V153）；+1：从财务管理拆出结算（V154）；
+        // −2：员工与权限、运营管理并入系统管理（V172）
+        assertThat(t.size()).as("运营侧 section 数（16 个里 3 个是代理门户；V209 拆出库存管理）").isEqualTo(13);
         int leaves = 0;
         for (JsonNode s : t) leaves += s.path("children").size();
         // 2026-09-25 +2：用户管理 › 注销申请 / 开票申请（C 端一直在产生这两类待办，运营端此前没有入口）
         // 2026-09-27 +1：用户管理 › 会员套餐（mbr_plan 此前没有任何写入方，C 端会员页因此永远是空列表）
         // 2026-09-28 +7：流程与工单的 7 个叶子（V136）
-        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(115);  // V139 +2（流程实例 · 流程统计）
+        // V139 +2（流程实例 · 流程统计）；V148 商家管理 +2 −1（经营视图、退出与清算；撤代理收益结算）；
+        // V150 设备管理 +2（库存余额、资产差异；供应商接入是从系统设置搬来，不增减）；
+        // V152 用户管理 −2（财务「用户账」组的用户钱包深链与充值订单撤销，后者并入用户管理 › 充值订单与套餐）
+        // V153 运维管理 −2（客服的退款/补偿、黑名单处理两个跨段快捷入口撤销）
+        // V154 结算 −1（财务管理的「代理分润配置」跨段深链撤销；其余八项从财务、运营管理搬来，不增减）
+        // V156 财务管理 +1（调整单从结算单页签里的视图升为叶子）
+        // V163 设备管理 +1（出库池）；V165 +5（部署与装机、待上线、故障与维修、撤机与回仓、报废与遗失）
+        // V190 设备管理 +1（仓库）；V193 +1（到仓待检，新组「入库与质检」）；V199 +2（库存流水、盘点）
+        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(131);
     }
 
     @Test
     void the_six_new_columns_survive_the_whole_chain() {
         // 实体没映射 / DTO 没带 / JSON 没序列化 —— 三处任一漏掉都只是「少一种修饰」，不报错
         // 门户只在代理的树里，运营的树里没有 —— 所以两个角色各取一棵
-        JsonNode operation = null, myBiz = null;
+        // V172：运营管理（唯一用 modules 的跨模块段）并入系统管理，改用系统管理验 match；
+        // modules 列仍在，但眼下没有 section 用它 —— 再有跨模块段时在这里补回断言
+        JsonNode system = null, myBiz = null;
         for (JsonNode s : tree(login("ADMIN"))) {
-            if ("M_operation".equals(s.path("menuNo").asText())) operation = s;
+            if ("M_system".equals(s.path("menuNo").asText())) system = s;
         }
         for (JsonNode s : tree(login("AGENT"))) {
             if ("M_my-biz".equals(s.path("menuNo").asText())) myBiz = s;
         }
-        assertThat(operation).as("前提：运营管理在运营的树里").isNotNull();
+        assertThat(system).as("前提：系统管理在运营的树里").isNotNull();
         assertThat(myBiz).as("前提：代理门户在代理的树里").isNotNull();
 
-        assertThat(operation.path("module").asText()).isNotBlank();
-        assertThat(operation.path("modules")).as("跨模块 section 的 modules 是数组").hasSize(5);
-        assertThat(operation.path("match")).as("路径归属前缀").hasSize(2);
+        assertThat(system.path("module").asText()).isNotBlank();
+        // /system、/employees、/operation + 流程配置与统计五个路径
+        assertThat(system.path("match")).as("路径归属前缀").hasSize(8);
+        assertThat(system.path("pinBottom").asBoolean()).as("系统管理沉底").isTrue();
         assertThat(myBiz.path("portalFor")).as("专属门户角色").hasSize(1);
         assertThat(myBiz.path("portalFor").get(0).asText()).isEqualTo("AGENT");
     }

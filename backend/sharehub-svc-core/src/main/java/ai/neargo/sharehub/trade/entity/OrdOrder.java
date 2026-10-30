@@ -125,5 +125,8 @@ public class OrdOrder extends BaseEntity {
     private String powerbankNo;
     private String rentStartAt;
     private String rentEndAt;
+
+    /** 超时最高收费发起时刻（V180，TIME_LIMIT 模式）；与真实归还时刻 {@link #rentEndAt} 分开记。 */
+    private java.time.LocalDateTime overdueChargedAt;
     private Integer durationMin;
 }

@@ -198,11 +198,22 @@ SysParam.groupName
 SysParam.label
 SysParam.paramKey
 SysParam.value
+# V191 字典元数据：SysParamServiceImpl.save 里 lockDictionary 一律以库里为准覆盖，请求体带了也不生效
+SysParam.valueType
+SysParam.valueOptions
+SysParam.minValue
+SysParam.maxValue
+SysParam.pattern
+SysParam.nullable
+SysParam.hint
+SysParam.pendingDecision
 SysTaxSetting.country
 SysTaxSetting.countryName
 SysTaxSetting.effectiveFrom
 SysTaxSetting.includedInPrice
 SysTaxSetting.invoiceTitle
+SysTaxSetting.issuerAddress
+SysTaxSetting.issuerLegalName
 SysTaxSetting.ratePercent
 SysTaxSetting.taxName
 SysTaxSetting.trn

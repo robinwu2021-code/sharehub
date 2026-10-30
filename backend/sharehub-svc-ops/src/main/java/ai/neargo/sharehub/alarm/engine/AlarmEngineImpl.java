@@ -239,7 +239,7 @@ public class AlarmEngineImpl implements AlarmEngine {
                     open.setRecoveredAt(null);
                     writeLog(open.getAlarmNo(), "RELAPSE", "防抖期内复发", SYSTEM);
                 }
-                bump(open, f, code, siteMap.get(f.siteNo()), now, false);
+                bump(open, f, code, (f.siteNo() == null ? null : siteMap.get(f.siteNo())), now, false);
                 continue;
             }
             DevAlarmCondition cond = conditions.selectOne(new LambdaQueryWrapper<DevAlarmCondition>()
@@ -255,7 +255,7 @@ public class AlarmEngineImpl implements AlarmEngine {
                 conditions.insert(cond);
             } else if (now.isAfter(cond.getLastSeenAt())) {
                 LocalDateTime from = cond.getLastSeenAt().isBefore(now.minusMinutes(MAX_STEP_MIN)) ? now.minusMinutes(MAX_STEP_MIN) : cond.getLastSeenAt();
-                SiteBrief site = siteMap.get(f.siteNo());
+                SiteBrief site = (f.siteNo() == null ? null : siteMap.get(f.siteNo()));
                 int add = on(code.getBusinessHoursOnly())
                         ? BusinessHours.openMinutes(site == null ? null : site.openHours(), from, now)
                         : (int) Duration.between(from, now).toMinutes();
@@ -265,7 +265,7 @@ public class AlarmEngineImpl implements AlarmEngine {
             }
             int hold = code.getHoldMinutes() == null ? 0 : code.getHoldMinutes();
             if (cond.getHeldMinutes() >= hold) {
-                DevAlarm a = open(f, code, siteMap.get(f.siteNo()), now, cond.getFirstSeenAt());
+                DevAlarm a = open(f, code, (f.siteNo() == null ? null : siteMap.get(f.siteNo())), now, cond.getFirstSeenAt());
                 conditions.deleteById(cond.getId());
                 if (a != null) {
                     c[0]++;

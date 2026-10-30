@@ -24,6 +24,11 @@ public class LocLocation {
     private String siteName;
     private String spotDesc;
     private String status;
+    /**
+     * 站点的默认点位（V162）：1 = 是。建站时由 {@link ai.neargo.sharehub.loc.DefaultPoints} 写，
+     * 不经保存接口改。库里的生成列 default_key 不映射（生成列不许写）。
+     */
+    private Integer isDefault;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     @Version

@@ -54,7 +54,7 @@ raw      = units × unitPrice × scheduleMultiplier
 fee      = min(raw, capDaily × ceil(usedMinutes/1440), capTotal)
 ```
 
-- `fee == capTotal` → **`buyout = true`**，充电宝转 `SOLD`（[db-design §9A.1]），订单进 `EXCEPTION` 走买断流程。
+- `fee == capTotal` → **`buyout = true`**，充电宝转 `SOLD`（[db-design §9A.1]），订单经 RETURN → SETTLE 进 **`SETTLED`**（买断即终局，2026-10-29 按代码校正；此前写的 `EXCEPTION` 与实现不符）。
 - 券在 `fee` 算出后抵扣，**不参与封顶计算**（先封顶再抵扣，否则券会被封顶吃掉）。
 - 免费单（`free_reason` 非空）：`fee = 0` 且 `waived_amount = 本应收的 fee`，**要算出来再减免**，
   否则免费订单的统计口径（月减免总额）拿不到数。

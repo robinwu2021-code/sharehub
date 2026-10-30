@@ -41,6 +41,30 @@ public interface AgentDirectoryPort {
     AgentBrief briefOf(String agentNo);
 
     /**
+     * 商家能否接收设备（V157 / V161）：启用，且核心资料「位置、行业」已补齐。
+     * 出库给商家与划拨共用同一个判据 —— 设备落在没有坐标的商家名下，「找附近」排不到它，且不报错。
+     */
+    boolean readyForDevices(String agentNo);
+
+    /** 商家的默认站点号（V157，补齐位置时系统建）；没有返回 null。绑定不指定点位时落到它的默认点位。 */
+    String defaultSiteNo(String agentNo);
+
+    /**
+     * 商家的税务身份（V183，C10 自开票的供方信息）：名称、地址、VAT 税号。
+     * 商家不存在返回 {@code null}；{@code trn} 为空 = 非 VAT 登记户。
+     */
+    MerchantTaxProfile taxProfileOf(String agentNo);
+
+    record MerchantTaxProfile(String agentNo, String name, String address, String trn) {
+    }
+
+    /**
+     * 商家在 {@code onDate} 生效的「单均固定额」（{@code agt_commission}，dimension=ORDER_COUNT、ACTIVE、
+     * 生效日不晚于当天的最新一条）。没有返回 {@code null}。C11 / SHR-02：此前这一列存得进、从没人读。
+     */
+    java.math.BigDecimal fixedPerOrder(String agentNo, String onDate);
+
+    /**
      * 运维分成系数（批次 F5，裁决 #1）：该代理在 {@code period}（YYYY-MM，订单归属账期）适用的系数 ——
      * 取上一月考核的结果；没有考核记录按 1（不打折）。乘在 OPERATE 分润比例上。
      */

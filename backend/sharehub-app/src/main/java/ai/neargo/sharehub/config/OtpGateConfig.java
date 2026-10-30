@@ -27,6 +27,10 @@ public class OtpGateConfig {
                 return otpService.issue(normalizedPhone, "login").code();
             }
             @Override public void verify(String normalizedPhone, String otp) { otpService.verify(normalizedPhone, otp); }
+            @Override public String issueEmail(String normalizedEmail) {
+                return otpService.issueEmail(normalizedEmail, "login").code();
+            }
+            @Override public void verifyEmail(String normalizedEmail, String otp) { otpService.verifyEmail(normalizedEmail, otp); }
         };
     }
 }

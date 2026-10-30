@@ -137,6 +137,7 @@ public class WoOpsServiceImpl implements WoOpsService {
         e.setWoNo(IdGenerator.next(BizKey.WORK_ORDER));
         e.setTenantId(TENANT_MAIN);
         e.setType(type);
+        if (WorkOrderType.REMOVE.name().equals(type)) e.setRemovalDisposition(ai.neargo.sharehub.wo.RemovalDisposition.ofNullable(draft.disposition()).name());
         e.setSource(source);
         e.setPriority(priority);
         e.setCabinetNo(draft.cabinetNo());
@@ -286,7 +287,8 @@ public class WoOpsServiceImpl implements WoOpsService {
         recordCost(woNo, h.getId(), req);
         // 告警域据此做完工复核（关联告警已恢复 → 自动验收）；wo 不认识 alarm，只发事件
         events.publish(new ai.neargo.sharehub.api.ops.event.WorkOrderCompletedEvent(woNo, type, e.getSource(),
-                e.getSourceRef(), e.getSiteNo(), e.getCabinetNo(), LocalDateTime.now().toString(), scannedLocation, counted));
+                e.getSourceRef(), e.getSiteNo(), e.getCabinetNo(), LocalDateTime.now().toString(), scannedLocation, counted,
+                e.getRemovalDisposition()));
         return toVO(e);
     }
 

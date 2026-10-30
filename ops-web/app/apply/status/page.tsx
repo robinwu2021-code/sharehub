@@ -18,6 +18,7 @@ import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { notify } from "@/lib/notify";
 import { fmtTime } from "@/lib/utils";
 import type { ApplyStatus, MyApplyView } from "@/lib/types";
+import { SelfServiceClosed, isSelfServiceClosed } from "@/components/agent/self-service-closed";
 
 /**
  * 申请人视角的状态文案 —— 与运营端**有意不同**：
@@ -35,11 +36,13 @@ export default function ApplyStatusPage() {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [result, setResult] = useState<MyApplyView | null>(null);
+  // 自助入口关闭时发码返回 404（一期只走运营代建）。只认发码的 404：查询的 404 可能只是没有这张单
+  const [closed, setClosed] = useState(false);
 
   const sendOtp = useMutation({
     mutationFn: () => api.sendApplyOtp(phone),
     onSuccess: (r) => notify.success(r.devCode ? `验证码已发送（联调码 ${r.devCode}）` : "验证码已发送"),
-    onError: (e: Error) => notify.error(e.message),
+    onError: (e: Error) => (isSelfServiceClosed(e) ? setClosed(true) : notify.error(e.message)),
   });
 
   const query = useMutation({
@@ -48,6 +51,8 @@ export default function ApplyStatusPage() {
     // 不区分「没申请过」与「码错了」—— 区分开就是一个查号工具
     onError: () => notify.error("没有查到申请记录，请确认手机号与验证码"),
   });
+
+  if (closed) return <SelfServiceClosed />;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">

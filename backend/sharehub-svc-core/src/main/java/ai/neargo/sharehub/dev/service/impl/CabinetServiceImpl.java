@@ -87,23 +87,13 @@ public class CabinetServiceImpl implements CabinetService {
          * 归属：**只认 locationNo，siteNo/agentNo 一律反查**（见接口注释）。
          * 调用方传来的 siteNo/agentNo 直接忽略 —— 接受它们就等于允许三者互相矛盾。
          */
+        /*
+         * 绑定只经专用动作（V164）：POST /api/ops/devices/{no}/bind · /unbind。
+         * 编辑接口再收 locationNo，就能绕过「只从出库池绑、点位商家 = 出库池商家」这两条（I2）。
+         * 带了且与现值不同 → 400 并指明该去哪；与现值相同（表单原样回传）不算改，放行。
+         */
         if (in.containsKey("locationNo") && !java.util.Objects.equals(str(in.get("locationNo")), e.getLocationNo())) {
-            // 已布放 / 故障的设备换点位 = 搬机，必须先撤机：否则站点门禁、在借订单与试借还结果都会指错地方
-            if (!creating && !CabinetStatus.IN_STOCK.name().equals(e.getStatus())) {
-                throw ai.neargo.sharehub.common.BizException.conflict("error.device.relocate_deployed");
-            }
-            e.setBoundAt(java.time.LocalDateTime.now());   // 试借还结果早于它即失效
-            String locNo = str(in.get("locationNo"));
-            if (locNo == null || locNo.isBlank()) {
-                e.setLocationNo(null); e.setLocationName(null); e.setSiteNo(null); e.setAgentNo(null);
-            } else {
-                var own = locationQuery.ownershipOf(locNo);
-                if (own == null) throw BizException.notFound(locNo);
-                e.setLocationNo(own.locationNo());
-                e.setLocationName(own.locationName());
-                e.setSiteNo(own.siteNo());
-                e.setAgentNo(own.agentNo());
-            }
+            throw ai.neargo.sharehub.common.BizException.badRequest("error.device.bind_via_action", no);
         }
         if (!creating) {
             AuditChanges.record("序列号", oldSn, e.getSn());
@@ -135,6 +125,16 @@ public class CabinetServiceImpl implements CabinetService {
 
     @Override
     public PageResult<Cabinet> page(Integer page, Integer size, String keyword, String onlineStatus, String status) {
+        return page(page, size, keyword, onlineStatus, status, null, null);
+    }
+
+    /**
+     * 出库池筛选（V161）：{@code issuedAgentNo} 只看出库给某商家的；
+     * {@code pool} = UNBOUND（在出库池未绑定）/ BOUND（出库池里已绑定点位）/ 其它或空 = 不按出库池筛。
+     */
+    @Override
+    public PageResult<Cabinet> page(Integer page, Integer size, String keyword, String onlineStatus, String status,
+                                    String issuedAgentNo, String pool) {
         int p = (page == null || page < 1) ? 1 : page;
         int s = (size == null || size < 1) ? 10 : size;
         LambdaQueryWrapper<DevCabinet> w = new LambdaQueryWrapper<>();
@@ -143,6 +143,15 @@ public class CabinetServiceImpl implements CabinetService {
         }
         if (onlineStatus != null && !onlineStatus.isBlank()) w.eq(DevCabinet::getOnlineStatus, onlineStatus);
         if (status != null && !status.isBlank()) w.eq(DevCabinet::getStatus, status);
+        if (issuedAgentNo != null && !issuedAgentNo.isBlank()) w.eq(DevCabinet::getIssuedAgentNo, issuedAgentNo);
+        // UNBOUND = 绑定候选：已签收、未绑定（V195：未签收的不能绑，归 UNCLAIMED）
+        if ("UNBOUND".equalsIgnoreCase(pool)) w.isNotNull(DevCabinet::getIssuedAgentNo).isNull(DevCabinet::getLocationNo)
+                .isNotNull(DevCabinet::getIssueClaimedAt);
+        else if ("BOUND".equalsIgnoreCase(pool)) w.isNotNull(DevCabinet::getIssuedAgentNo).isNotNull(DevCabinet::getLocationNo);
+        // V195：UNCLAIMED = 已发货待签收；MINE = 待我签收（接收人是当前登录人）
+        else if ("UNCLAIMED".equalsIgnoreCase(pool)) w.isNotNull(DevCabinet::getIssuedAgentNo).isNull(DevCabinet::getIssueClaimedAt);
+        else if ("MINE".equalsIgnoreCase(pool)) w.isNotNull(DevCabinet::getIssuedAgentNo).isNull(DevCabinet::getIssueClaimedAt)
+                .eq(DevCabinet::getIssueReceiverNo, ai.neargo.sharehub.auth.SecurityUtils.userNo());
         w.orderByAsc(DevCabinet::getId);
         Page<DevCabinet> r = mapper.selectPage(new Page<>(p, s), w);
         List<Cabinet> rows = r.getRecords().stream().map(CabinetServiceImpl::toVO).toList();
@@ -192,7 +201,9 @@ public class CabinetServiceImpl implements CabinetService {
                 e.getOnlineStatus(), e.getStatus(), e.getFwVersion(), e.getLastHeartbeatAt(),
                 e.getSiteNo(), e.getAgentNo(),
                 e.getArchivedAt() == null ? null : e.getArchivedAt().toString(),
-                e.getQcStatus(), e.getWarehouseNo());
+                e.getQcStatus(), e.getWarehouseNo(),
+                e.getIssuedAgentNo(), e.getIssuedAt() == null ? null : e.getIssuedAt().toString(),
+                e.getIssuedSiteNo(), e.getIssueReceiverNo(), e.getIssueClaimedAt() == null ? null : e.getIssueClaimedAt().toString());
     }
 
     // ── 归档 / 取消归档（前端契约 Archivable）──

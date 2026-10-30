@@ -5,6 +5,7 @@ import { SITE_TRANSITIONS } from "../../types";
 import { fail } from "../../biz-error";
 import { sites, contracts, locations } from "./location";
 import { latestSurveyPassed } from "./location-survey";
+import { venueGateOn, PHASE1_SKIP } from "./device-gate";
 
 /**
  * 撤场提前通知天数（后端参数 `site.withdraw.lead_days`，默认 7）。
@@ -85,12 +86,13 @@ export const listSiteStatusLogs = (no: string): SiteStatusLogItem[] => {
 export function siteOpeningChecklist(no: string): Checklist {
   const s = find(no);
   const o = opsOf(s);
-  const hasContract = contracts.some((c) => c.siteNo === no && c.status === "ACTIVE");
+  const gate = venueGateOn();
+  const hasContract = !gate || contracts.some((c) => c.siteNo === no && c.status === "ACTIVE");
   const hasPoint = locations.some((l) => l.siteNo === no && !l.archivedAt);
   const items: ChecklistItem[] = [
     {
       key: "contract", label: "有生效中的进场合同", passed: hasContract,
-      detail: hasContract ? null : "没有生效中的合同 —— 无合同营业是合规风险",
+      detail: !gate ? PHASE1_SKIP : hasContract ? null : "没有生效中的合同 —— 无合同营业是合规风险",
       fixHref: hasContract ? null : "/venues?tab=contracts",
     },
     {
@@ -107,9 +109,9 @@ export function siteOpeningChecklist(no: string): Checklist {
       // 以最近一次勘测为准；「没勘测过」与「勘测没过」分开说 —— 前者去约人，后者去解决问题
       const surveyed = latestSurveyPassed(no);
       return {
-        key: "survey", label: "现场勘测通过", passed: surveyed === true,
-        detail: surveyed === true ? null : surveyed === null ? "还没有勘测记录" : "最近一次勘测不通过",
-        fixHref: surveyed === true ? null : `/operation/sites?no=${no}&tab=survey`,
+        key: "survey", label: "现场勘测通过", passed: !gate || surveyed === true,
+        detail: !gate ? PHASE1_SKIP : surveyed === true ? null : surveyed === null ? "还没有勘测记录" : "最近一次勘测不通过",
+        fixHref: !gate || surveyed === true ? null : `/operation/sites?no=${no}&tab=survey`,
       };
     })(),
     {
@@ -130,7 +132,7 @@ export function siteCloseGate(no: string): Checklist {
     {
       key: "cabinets", label: "设备已全部撤出", passed: cabinets === 0,
       detail: cabinets === 0 ? null : `还有 ${cabinets} 台设备在站 —— 关站后它们会变成找不到归属的资产`,
-      fixHref: cabinets === 0 ? null : "/devices?tab=inventory",
+      fixHref: cabinets === 0 ? null : "/inventory?tab=transfers",
     },
     {
       key: "contract", label: "合同已终止或到期", passed: !activeContract,

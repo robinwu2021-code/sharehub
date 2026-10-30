@@ -86,8 +86,16 @@ public class AuthController {
      * 字段留着是为了两个前端不必同步改就能继续登录，可在前端改完后删除。
      */
     public record LoginReq(String username, String password, String role, String agentNo,
-                          // —— 代理端实名登录（④）：手机号 + 验证码。两者都给才走代理分支 ——
-                          String phone, String otp) {
+                          // —— 代理端实名登录（④）：标识 + 验证码。带 otp 才走代理分支 ——
+                          // 商家一期 B2：标识是邮箱或手机号（R8），放 identifier；phone 留作旧前端兼容
+                          String phone, String otp, String identifier,
+                          // 账号池：AGENT 且带口令、不带验证码 = 商家口令登录（用户 2026-10-28：代录商家给初始密码）
+                          String realm) {
+
+        /** 代理分支的登录标识：优先 identifier，旧前端只传 phone。 */
+        String agentIdentifier() {
+            return identifier != null && !identifier.isBlank() ? identifier : phone;
+        }
     }
 
     /**
@@ -119,6 +127,9 @@ public class AuthController {
          */
         if (in != null && in.otp() != null && !in.otp().isBlank()) {
             return agentLogin(in);
+        }
+        if (in != null && "AGENT".equalsIgnoreCase(in.realm())) {
+            return agentPasswordLogin(in);
         }
         String username = (in.username() == null || in.username().isBlank()) ? "user" : in.username();
         String role;
@@ -215,8 +226,10 @@ public class AuthController {
      */
     @PostMapping("/password")
     public Map<String, Object> changePassword(@RequestBody Map<String, String> body) {
-        String subject = SecurityUtils.requireUser().userNo();
-        credentials.changePassword(Realm.STAFF.name(), subject,
+        // 账号池跟会话走：商家会话的 userNo 是 principalNo，凭据在 realm=AGENT 下（此前写死 STAFF，商家改不了密）
+        LoginUser me = SecurityUtils.requireUser();
+        String subject = me.userNo();
+        credentials.changePassword((me.realm() == null ? Realm.STAFF : me.realm()).name(), subject,
                 body == null ? null : body.get("oldPassword"),
                 body == null ? null : body.get("newPassword"));
         return Map.of("ok", true);
@@ -224,14 +237,15 @@ public class AuthController {
 
     @PostMapping("/otp")
     public Map<String, Object> loginOtp(@RequestBody Map<String, String> body) {
-        String phone = body == null ? null : body.get("phone");
-        if (phone == null || phone.isBlank()) {
+        // 商家一期 B2：标识是邮箱或手机号（R8）；旧前端只传 phone，照收
+        String identifier = body == null ? null : body.getOrDefault("identifier", body.get("phone"));
+        if (identifier == null || identifier.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "error.auth.phone_required");
         }
         String code;
         try {
-            code = agentLogin.sendLoginOtp(phone);
-        } catch (IllegalArgumentException e) {           // 手机号格式不合法
+            code = agentLogin.sendLoginOtp(identifier);
+        } catch (IllegalArgumentException e) {           // 标识格式不合法
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         } catch (IllegalStateException e) {              // 重发过频（OtpGate 节流）
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, e.getMessage());
@@ -326,11 +340,35 @@ public class AuthController {
         return Map.of("ok", true);
     }
 
+    /**
+     * 商家口令登录：标识（邮箱或手机号）找人 → 按 {@code realm=AGENT} 验口令 → 定主体 → 发 token。
+     *
+     * <p>查无此人、口令错、锁定、没有口令一律回同一句话 —— 区分开就等于告诉爆破者「这个账号存在」。
+     * 一次性初始口令没改过时 {@code mustChange=true}，前端外壳挡住整个应用只留改密表单（与员工同一套）。
+     */
+    private LoginResp agentPasswordLogin(LoginReq in) {
+        String principalNo = agentLogin.resolvePrincipal(in.agentIdentifier() != null ? in.agentIdentifier() : in.username());
+        CredentialService.Check check = principalNo == null ? null
+                : credentials.verify(Realm.AGENT.name(), principalNo, in.password());
+        if (check == null || !check.ok()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "error.auth.bad_credentials");
+        }
+        OperatorMembership m;
+        try {
+            m = (in.agentNo() == null || in.agentNo().isBlank())
+                    ? agentLogin.primaryOf(principalNo)
+                    : agentLogin.requireMembership(principalNo, in.agentNo());
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        }
+        return issueAgentToken(principalNo, m, check.mustChange());
+    }
+
     /** 代理端登录分支：验码 → 定主体 → 发 token。 */
     private LoginResp agentLogin(LoginReq in) {
         String principalNo;
         try {
-            principalNo = agentLogin.verifyLoginOtp(in.phone(), in.otp());
+            principalNo = agentLogin.verifyLoginOtp(in.agentIdentifier(), in.otp());
         } catch (IllegalArgumentException e) {
             // 文案由 service 统一给（不区分「号不存在」与「码不对」）
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, e.getMessage());
@@ -357,6 +395,10 @@ public class AuthController {
      * 加一个字段要改所有构造点，而 {@code userNo} 本来就是「这个会话是谁」。
      */
     private LoginResp issueAgentToken(String principalNo, OperatorMembership m) {
+        return issueAgentToken(principalNo, m, false);
+    }
+
+    private LoginResp issueAgentToken(String principalNo, OperatorMembership m, boolean mustChange) {
         String role = "AGENT";
         String display = (m.displayName() == null || m.displayName().isBlank())
                 ? m.agentName() : m.displayName();
@@ -369,7 +411,7 @@ public class AuthController {
                 m.agentNo(), scope);
         String token = tokenStore.issue(new TokenStore.SessionData(user, List.of(role), permVersion.get()));
         return new LoginResp(token, display, role, m.agentNo(), perms,
-                principalNo, agentLogin.memberships(principalNo));
+                principalNo, agentLogin.memberships(principalNo), mustChange);
     }
 
     /** 仅含角色的主体（resolvePermissions 只看 roles，realm 用占位）。 */

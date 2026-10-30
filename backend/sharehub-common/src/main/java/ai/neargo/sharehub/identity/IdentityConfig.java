@@ -34,6 +34,35 @@ public class IdentityConfig {
         return new IdentifierHasher(effective, version);
     }
 
+    /**
+     * 开发/测试用的固定字段密钥，规则同 {@link #DEV_PEPPER}：只在 dev-mode 生效。
+     * 由固定串派生，**不是**生产可用的密钥。
+     */
+    static final String DEV_PII_KEY_SEED = "dev-only-pii-key-do-not-use-in-production";
+
+    /**
+     * 敏感字段加密（收款账户完整 IBAN 等）。密钥 {@code sharehub.security.pii-key}：32 字节的 base64。
+     * 没配且不在 dev-mode 时加密关闭（见 {@link FieldCipher} 类注释），并在启动日志里说清楚。
+     */
+    @Bean
+    public FieldCipher fieldCipher(DevMode devMode, @Value("${sharehub.security.pii-key:}") String keyB64) {
+        if (keyB64 != null && !keyB64.isBlank()) {
+            return new FieldCipher(java.util.Base64.getDecoder().decode(keyB64.trim()));
+        }
+        if (devMode.isEnabled()) {
+            try {
+                return new FieldCipher(java.security.MessageDigest.getInstance("SHA-256")
+                        .digest(DEV_PII_KEY_SEED.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            } catch (java.security.NoSuchAlgorithmException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+        org.slf4j.LoggerFactory.getLogger(IdentityConfig.class).warn(
+                "未配置 sharehub.security.pii-key：收款账户只存掩码，付款任务无法导出完整账号。"
+                        + "请运维生成 32 字节随机密钥（openssl rand -base64 32）配到该项后重启");
+        return new FieldCipher(null);
+    }
+
     @Bean
     public IdentifierNormalizer identifierNormalizer(
             @Value("${sharehub.security.default-calling-code:}") String callingCode) {

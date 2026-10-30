@@ -52,6 +52,8 @@ export default {
     price: "Price",
     dailyCap: "Daily cap",
     buyout: "Buyout",
+    maxCharge: "Maximum rental charge",
+    lostFee: "Lost device fee",
     deposit: "Deposit",
     freeDeposit: "Deposit-free",
     freeDepositOn: "Card pre-authorization, no deposit",

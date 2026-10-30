@@ -368,6 +368,15 @@ export interface ShareRecord {
   /** 归属结算周期 `2026-07`（= createdAt 所在月，冗余一列便于按周期汇总与筛选）。 */
   period: string;
   createdAt: string;
+  /**
+   * G22：分成基数口径与快照（V155 起有数；之前的旧明细为 null，页面显示「—」）。
+   * `PRE_TAX` 税前：基数 = 实收 ÷ (1 + 税率)；`GROSS` 含税：基数 = 实收。`taxRate` 是**百分数**（5 = 5%）。
+   */
+  baseMode?: "PRE_TAX" | "GROSS" | null;
+  taxRate?: number | null;
+  baseAmount?: number | null;
+  /** 非空 = 退款冲回行（V170，金额为负），值是退款单号。 */
+  refundNo?: string | null;
 }
 // —— 对账 · 差错处理（trade 域 · S2）——
 // `status` 是**比对结果**（跑批算出来的，人改不了）；`handleStatus` 是**处置进度**（人推动的）。
@@ -528,6 +537,107 @@ export type InvoiceAction = "issue" | "void";
 export interface InvoiceView {
   invoice: Invoice;
   orderNos: string[];
+}
+
+/** 租赁税务票据状态（ord_tax_invoice.status，V181）：开票主体不全时 BLOCKED，补齐后重试。 */
+export type TaxInvoiceStatus = "ISSUED" | "BLOCKED";
+export type TaxInvoiceKind = "INVOICE" | "CREDIT_NOTE";
+
+/**
+ * C 端租赁税务票据（V181，运营方原始需求 C01 / RQ-INV）：收款时系统自动开出，退款批准自动冲红。
+ * 主体、税率随票快照 —— 改税务设置只影响之后的票。运营只能看与重试，不能手工改。
+ */
+export interface TaxInvoice {
+  invoiceNo: string;
+  kind: TaxInvoiceKind;
+  /** 贷项通知单冲的那张发票。 */
+  refInvoiceNo: string | null;
+  orderNo: string;
+  cUserNo: string | null;
+  payNo: string | null;
+  refundNo: string | null;
+  issuerCountry: string | null;
+  issuerLegalName: string | null;
+  issuerAddress: string | null;
+  issuerTrn: string | null;
+  issuerTitle: string | null;
+  taxRatePercent: number;
+  taxIncluded: boolean;
+  /** 贷项通知单三项均为负数。 */
+  netAmount: number;
+  taxAmount: number;
+  grossAmount: number;
+  currency: string;
+  lineDesc: string | null;
+  status: TaxInvoiceStatus;
+  /** BLOCKED 的原因，如 ISSUER_MISSING:trn。 */
+  failReason: string | null;
+  issuedAt: string | null;
+  createdAt: string;
+}
+
+/**
+ * 资金操作转审批的回执（SEC-03，V189）：补偿 / 免单、手工凭证 ≥ 阈值时后端不执行、返回这个。
+ * 前端据此提示「已提交审批」而不是「已执行」。
+ */
+export interface PendingApproval {
+  pendingApproval: string;
+  kind: ApprovalKind;
+  amount: number;
+  threshold: number;
+}
+export type ApprovalKind = "ORDER_COMPENSATE" | "ORDER_WAIVE" | "LEDGER_VOUCHER";
+export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED" | "FAILED";
+export interface ApprovalRequest {
+  requestNo: string;
+  kind: ApprovalKind;
+  refNo: string | null;
+  amount: number;
+  currency: string;
+  reason: string | null;
+  status: ApprovalStatus;
+  applicantName: string | null;
+  approverName: string | null;
+  decidedAt: string | null;
+  /** 驳回原因，或批准后重放失败的原因（前提已变）。 */
+  decideNote: string | null;
+  /** 批准后的产物：干预单号 / 凭证号。 */
+  resultRef: string | null;
+  createdAt: string;
+}
+export const isPendingApproval = (r: unknown): r is PendingApproval =>
+  !!r && typeof r === "object" && "pendingApproval" in (r as Record<string, unknown>);
+
+/** 跨期应付一行（SHR-05）：收款方 × 期间。未付 = 应得 − 已付；应得含退款冲回的负数明细。 */
+export interface PayableRow {
+  payeeType: "AGENT" | "VENUE" | string;
+  payeeNo: string;
+  payeeName: string | null;
+  period: string;
+  currency: string;
+  earned: number;
+  settled: number;
+  paid: number;
+  outstanding: number;
+}
+
+/** 商家分成自开票单据（V183，C10）：提现到账时平台代商家开出；供方 = 商家，收货方 = 平台开票主体。 */
+export interface SelfBill {
+  billNo: string;
+  withdrawNo: string;
+  agentNo: string;
+  supplierName: string | null;
+  supplierAddress: string | null;
+  supplierTrn: string | null;
+  recipientName: string | null;
+  recipientTrn: string | null;
+  taxRatePercent: number;
+  netAmount: number;
+  taxAmount: number;
+  grossAmount: number;
+  currency: string;
+  payRef: string | null;
+  issuedAt: string;
 }
 
 export interface Invoice {
@@ -753,3 +863,86 @@ export interface Statement {
 }
 /** 可打印对账单的语言（后端 `statement.html?lang=`，ar 为右到左）。 */
 export type StatementLang = "zh" | "en" | "ar";
+
+// —— 付款任务（V158，商家一期 B4；需求方案 §八）——
+// 平台向商家付款，财务在运营端手动执行，一般三个月一次：选截止日 → 预览 → 生成 → 复核 → 导出 → 银行转账 → 确认到账。
+
+/** 与后端 PayoutTaskStatus 同名同值（V158 列注释为准）。 */
+export type PayoutTaskStatus = "PENDING_REVIEW" | "PENDING_TRANSFER" | "DONE" | "CANCELLED";
+
+/** 预览里「本次不能付款」的原因码；文案由前端出（阿语/英语界面也要看得懂）。 */
+export type PayoutBlockedReason = "NO_ACCOUNT" | "NO_FULL_ACCOUNT" | "SUSPENDED" | "MIXED_CURRENCY";
+
+export interface PayoutPreviewItem {
+  payeeNo: string;
+  payeeName: string;
+  settleNos: string[];
+  periods: string[];
+  amount: number;
+  currency: string;
+  accountMasked: string | null;
+  /** 非空 = 本次不能付，结算单留在可付款范围，下次再带上。 */
+  blockedReason: PayoutBlockedReason | null;
+}
+
+export interface PayoutPreview {
+  cutoffDate: string;
+  currency: string;
+  payableCount: number;
+  payableTotal: number;
+  items: PayoutPreviewItem[];
+}
+
+/** 付款任务里的一笔（一个商家一笔）。账号只给掩码 —— 完整账号只出现在导出文件里。 */
+export interface PayoutTaskItem {
+  seq: number;
+  withdrawNo: string;
+  payeeNo: string;
+  payeeName: string;
+  amount: number;
+  currency: string;
+  accountName: string | null;
+  accountMasked: string | null;
+  status: WithdrawalStatus;
+  settleNos: string[];
+  payRef: string | null;
+  paidAt: string | null;
+  /** 打款失败原因，或复核驳回原因。 */
+  failReason: string | null;
+}
+
+export interface PayoutTask {
+  taskNo: string;
+  cutoffDate: string;
+  currency: string;
+  itemCount: number;
+  totalAmount: number;
+  status: PayoutTaskStatus;
+  createdBy: string | null;
+  createdName: string | null;
+  createdAt: string | null;
+  reviewedName: string | null;
+  reviewedAt: string | null;
+  rejectReason: string | null;
+  bankBatchRef: string | null;
+  transferDate: string | null;
+  confirmedAt: string | null;
+  exportCount: number;
+  /** 列表接口不带明细（空数组），详情才有。 */
+  items: PayoutTaskItem[];
+}
+
+/** 逐笔到账结果。成功时 payRef 可空（服务端用「任务号-序号」）；失败必填 failReason。 */
+export interface PayoutConfirmItem {
+  withdrawNo: string;
+  success: boolean;
+  payRef?: string;
+  failReason?: string;
+}
+
+/** 确认到账。results 为空 = 整批成功；不为空 = 只处理列出的那几笔。 */
+export interface PayoutConfirmPayload {
+  bankBatchRef: string;
+  transferDate: string;
+  results?: PayoutConfirmItem[];
+}

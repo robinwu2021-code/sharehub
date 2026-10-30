@@ -60,7 +60,7 @@ public class AgentMembershipServiceImpl implements AgentMembershipService {
             throw BizException.badRequest("error.agent.login_phone_required", agentNo);
         }
         /*
-         * **邮箱同样必填**，不是可选项：`agt_principal.email_hash` 是 NOT NULL + UNIQUE。
+         * **邮箱同样必填**，不是可选项：`agt_principal.email_hash` 是 NOT NULL，且 V168 起是主登录标识。
          * 这与入驻审核那条路一致（自助申请手机号与邮箱两者都必填）——
          * 自然人有两个登录标识，缺一个这行就建不出来。
          * 不在这里放宽成可空：放宽了会让「建得出但只能用手机号登」的自然人混进来，
@@ -75,19 +75,29 @@ public class AgentMembershipServiceImpl implements AgentMembershipService {
         String phoneHash = hasher.hash(phone);
 
         /*
-         * ① 自然人：按 phone_hash 查，**命中则复用**（同一个人服务多家主体是常态，ADR-030）。
+         * ① 自然人：按邮箱查，**命中则复用**（同一个人服务多家主体是常态，ADR-030）。
+         *    V168 起邮箱是主标识，与入驻审核、登录同一口径：已验证的优先，否则取最早的未验证行 ——
+         *    三处找人口径不一致，就会「开通挂在 A 上、登录进的是 B」。
          *    复用时**绝不动 cred_ref** —— 一个人一套密码，改密一处全主体生效；
          *    在这里顺手重置它，等于把他在别家主体的登录也改了。
          */
+        String emailHash = hasher.hash(email);
         AgtPrincipal principal = principals.selectOne(new LambdaQueryWrapper<AgtPrincipal>()
-                .eq(AgtPrincipal::getPhoneHash, phoneHash).last("limit 1"));
+                .eq(AgtPrincipal::getEmailUk, emailHash).last("limit 1"));
+        if (principal == null) {
+            principal = principals.selectOne(new LambdaQueryWrapper<AgtPrincipal>()
+                    .eq(AgtPrincipal::getEmailHash, emailHash).orderByAsc(AgtPrincipal::getId).last("limit 1"));
+        }
         boolean firstOperatorOfThisPerson = principal == null;
         if (principal == null) {
             principal = new AgtPrincipal();
             principal.setPrincipalNo(BizNoSequence.next(jdbc, "agt_principal", "principal_no", "PR", 4));
             principal.setPhoneHash(phoneHash);
             principal.setPhoneMask(IdentifierNormalizer.mask(phone));
-            principal.setEmailHash(hasher.hash(email));
+            // 运营录入的标识一律未验证（V168 / R3）：邮箱在首登收码时验证，手机号由本人登录后验证
+            principal.setPhoneVerified(0);
+            principal.setEmailVerified(0);
+            principal.setEmailHash(emailHash);
             principal.setEmailMask(IdentifierNormalizer.maskEmail(email));
             principal.setHashVer(hasher.version());
             principal.setStatus(AccountStatus.ACTIVE.name());

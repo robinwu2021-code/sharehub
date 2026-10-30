@@ -106,7 +106,9 @@ public class PriceResolver {
         }
         // 总封顶（= 买断价）随快照定格：0 / 空表示不封顶
         BigDecimal cap = plan.getCapTotal() == null || plan.getCapTotal().signum() <= 0 ? null : plan.getCapTotal();
-        return new Resolved(hit.planNo(), plan.getCurrency(), expand(hit.planNo()), hit, null, cap);
+        // 遗失费（V180，K5）：空 = 与总封顶合一；随快照定格，改方案不影响在途单
+        BigDecimal lost = plan.getLostFee() == null || plan.getLostFee().signum() <= 0 ? null : plan.getLostFee();
+        return new Resolved(hit.planNo(), plan.getCurrency(), expand(hit.planNo()), hit, null, cap, lost);
     }
 
     /**
@@ -251,17 +253,30 @@ public class PriceResolver {
                            Hit hit, BigDecimal multiplier,
                            // 2026-09-25 总封顶（方案的 cap_total，前端叫「买断价」）；null = 不封顶。
                            // 此前结算时总封顶一律传 null —— 借得越久付得越多、永不触顶，「逾期达封顶转买断」也就无从谈起
-                           BigDecimal capTotal) {
+                           BigDecimal capTotal,
+                           // 2026-10-29 遗失费（V180）；null = 与 capTotal 合一
+                           BigDecimal lostFee) {
 
         /** 兼容旧构造点：不封顶。 */
         public Resolved(String planNo, String currency, List<PriceItemSpec> specs, Hit hit, BigDecimal multiplier) {
-            this(planNo, currency, specs, hit, multiplier, null);
+            this(planNo, currency, specs, hit, multiplier, null, null);
+        }
+
+        /** 兼容旧构造点：有总封顶、无独立遗失费。 */
+        public Resolved(String planNo, String currency, List<PriceItemSpec> specs, Hit hit, BigDecimal multiplier,
+                        BigDecimal capTotal) {
+            this(planNo, currency, specs, hit, multiplier, capTotal, null);
+        }
+
+        /** 用户不还（遗失 / 主动买断）收多少：独立遗失费优先，否则就是总封顶。 */
+        public BigDecimal lostCharge() {
+            return lostFee != null ? lostFee : capTotal;
         }
 
         /** 带上时段倍率（下单时解析一次，随快照定格）。 */
         public Resolved withMultiplier(BigDecimal m) {
             return new Resolved(planNo, currency, specs,
-                    hit == null ? null : hit.withMultiplier(m), m, capTotal);
+                    hit == null ? null : hit.withMultiplier(m), m, capTotal, lostFee);
         }
 
         /** 序列化为订单快照。改价不影响在途单的实现手段。 */
@@ -271,6 +286,7 @@ public class PriceResolver {
             m.put("currency", currency);
             m.put("items", specs);
             if (capTotal != null) m.put("capTotal", capTotal.toPlainString());
+            if (lostFee != null) m.put("lostFee", lostFee.toPlainString());
             if (hit != null) {
                 // 命中原因不是可选装饰：没有它，事后只能用**今天的配置**去解释昨天的订单。
                 m.put("hit", Map.of(
@@ -298,6 +314,16 @@ public class PriceResolver {
         return s.isBlank() ? null : new BigDecimal(s);
     }
 
+    /** 从快照读回遗失费（V180）；没有 = 与总封顶合一，返回总封顶。 */
+    @SuppressWarnings("unchecked")
+    public static BigDecimal lostChargeFromSnapshot(String snapshot) {
+        if (snapshot == null || snapshot.isBlank()) return null;
+        Map<String, Object> m = Json.read(snapshot, Map.class);
+        Object v = m == null ? null : m.get("lostFee");
+        String s = v == null ? "" : String.valueOf(v);
+        return s.isBlank() ? capTotalFromSnapshot(snapshot) : new BigDecimal(s);
+    }
+
     /** 从快照读回总封顶；旧快照（2026-09-25 之前）没有这一项 → null，按原口径不封顶。 */
     @SuppressWarnings("unchecked")
     public static BigDecimal capTotalFromSnapshot(String snapshot) {
@@ -306,6 +332,51 @@ public class PriceResolver {
         Object v = m == null ? null : m.get("capTotal");
         String s = v == null ? "" : String.valueOf(v);
         return s.isBlank() ? null : new BigDecimal(s);
+    }
+
+    /**
+     * 服务费（C09，第 6 批）：借出时把当时的配置并进快照 —— 影响钱的配置随订单定格，改了只对之后的单生效。
+     * {@code fee} 为 0 或 null 时不写，快照与此前逐字相同。
+     */
+    @SuppressWarnings("unchecked")
+    public static String withServiceFee(String snapshot, BigDecimal fee, boolean vatApplicable, boolean inShareBase) {
+        if (fee == null || fee.signum() <= 0) return snapshot;
+        Map<String, Object> m = snapshot == null || snapshot.isBlank() ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(Json.read(snapshot, Map.class));
+        m.put("serviceFee", fee.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+        m.put("serviceFeeVat", vatApplicable);
+        m.put("serviceFeeInShareBase", inShareBase);
+        return Json.write(m);
+    }
+
+    /** 本单定格的服务费；没有返回 null。 */
+    public static ServiceFee serviceFeeFromSnapshot(String snapshot) {
+        if (snapshot == null || snapshot.isBlank()) return null;
+        Map<?, ?> m = Json.read(snapshot, Map.class);
+        Object v = m == null ? null : m.get("serviceFee");
+        if (v == null || String.valueOf(v).isBlank()) return null;
+        BigDecimal fee = new BigDecimal(String.valueOf(v));
+        if (fee.signum() <= 0) return null;
+        return new ServiceFee(fee, !Boolean.FALSE.equals(m.get("serviceFeeVat")), Boolean.TRUE.equals(m.get("serviceFeeInShareBase")));
+    }
+
+    /**
+     * @param vatApplicable 是否计 VAT（发票上拆税时是否把它算进应税额）
+     * @param inShareBase   是否进分成基数
+     */
+    public record ServiceFee(BigDecimal amount, boolean vatApplicable, boolean inShareBase) {
+
+        /**
+         * 加到应付上。<b>只在有应付时收</b>：免费时长内归还、全额免单的单不收服务费 —— 一笔没发生的交易没有交易费。
+         */
+        public BigDecimal addTo(BigDecimal payable) {
+            return payable == null || payable.signum() <= 0 ? payable : payable.add(amount);
+        }
+
+        /** 这单的应收里是否已含服务费（应付为正即含，见 {@link #addTo}）。 */
+        public BigDecimal includedIn(BigDecimal amountCharged) {
+            return amountCharged != null && amountCharged.compareTo(amount) >= 0 && amountCharged.signum() > 0 ? amount : BigDecimal.ZERO;
+        }
     }
 
     /** 从订单快照还原规格 —— 结算时用它，**不回读 price_plan**。 */

@@ -22,6 +22,15 @@ public class LocalLocationQuery implements LocationQueryPort {
     }
 
     @Override
+    public String defaultLocationOf(String siteNo) {
+        if (siteNo == null || siteNo.isBlank()) return null;
+        LocLocation l = locations.selectOne(new LambdaQueryWrapper<LocLocation>()
+                .eq(LocLocation::getSiteNo, siteNo).eq(LocLocation::getIsDefault, 1)
+                .isNull(LocLocation::getArchivedAt).last("limit 1"));
+        return l == null ? null : l.getLocationNo();
+    }
+
+    @Override
     public LocationOwnership ownershipOf(String locationNo) {
         if (locationNo == null || locationNo.isBlank()) return null;
         LocLocation l = locations.selectOne(new LambdaQueryWrapper<LocLocation>()

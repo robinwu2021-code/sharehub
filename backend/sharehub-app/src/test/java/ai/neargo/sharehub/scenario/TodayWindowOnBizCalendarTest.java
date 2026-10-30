@@ -30,8 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 所以要走 {@code BizClock#startOfDayAsStored}，把日界折算到存储时区再比。
  *
  * <h2>本用例与时刻无关</h2>
- * 时钟钉在 <b>UTC 2026-09-30T20:30</b>：业务时区（+4）已是 2026-10-01 00:30。
- * 于是业务日界 = 迪拜 2026-10-01 00:00，换算到存储时区就是一个确定的时刻。
+ * 时钟钉在 <b>UTC 2030-06-30T20:30</b>：业务时区（+4）已是 2030-07-01 00:30。
+ * 于是业务日界 = 迪拜 2030-07-01 00:00，换算到存储时区就是一个确定的时刻。
  * 两条夹具行分别落在它**两侧几分钟**，所以无论今天真实日期是哪天都成立。
  */
 @Import(FixedBizClock.class)
@@ -51,10 +51,10 @@ class TodayWindowOnBizCalendarTest extends ApiTestSupport {
     @Test
     @DisplayName("★ 业务日界之前那条不该进「今日」——看服务端统计的增量，不是自己再算一遍")
     void the_today_window_starts_at_the_business_day_boundary() {
-        clock.at = FixedBizClock.JUST_AFTER_BIZ_MIDNIGHT;      // 迪拜 2026-10-01 00:30
+        clock.at = FixedBizClock.JUST_AFTER_BIZ_MIDNIGHT;      // 迪拜 2030-07-01 00:30
 
-        // 业务日 2026-10-01 的起点，表达成存储时区（= 本进程 JVM 时区）的时刻
-        LocalDateTime boundary = java.time.LocalDate.of(2026, 10, 1)
+        // 业务日 2030-07-01 的起点，表达成存储时区（= 本进程 JVM 时区）的时刻
+        LocalDateTime boundary = java.time.LocalDate.of(2030, 7, 1)
                 .atStartOfDay(ZoneId.of("Asia/Dubai"))
                 .withZoneSameInstant(ZoneId.systemDefault())
                 .toLocalDateTime();
@@ -70,12 +70,12 @@ class TodayWindowOnBizCalendarTest extends ApiTestSupport {
          * 要观测的是**服务端的口径**，所以只能拿它的输出做对比：
          * 插一条业务日界之前的，它的 sentToday 不该动。
          */
-        seed("NL-TZ-BEFORE", boundary.minusMinutes(5), "SENT");   // 业务日仍是 09-30
+        seed("NL-TZ-BEFORE", boundary.minusMinutes(5), "SENT");   // 业务日仍是 06-30
         assertThat(sentToday(admin) - base)
                 .as("业务日界**之前** 5 分钟那条被算进了今日 —— 日界没折算到存储时区")
                 .isZero();
 
-        seed("NL-TZ-AFTER", boundary.plusMinutes(5), "SENT");     // 业务日已是 10-01
+        seed("NL-TZ-AFTER", boundary.plusMinutes(5), "SENT");     // 业务日已是 07-01
         assertThat(sentToday(admin) - base)
                 .as("业务日界**之后** 5 分钟那条没被算进今日")
                 .isEqualTo(1);
@@ -83,9 +83,9 @@ class TodayWindowOnBizCalendarTest extends ApiTestSupport {
 
     /*
      * 旧实现（LocalDate.now().atStartOfDay()）在这条用例下必红：
-     * 它的日界是「真实今天的零点」，而两条夹具都落在 2026-10-01 这个**未来**时刻，
+     * 它的日界是「真实今天的零点」，而两条夹具都落在 2030-07-01 这个**未来**时刻，
      * 于是第一条插进去 sentToday 就 +1，上面第一个断言当场不成立。
-     * 与真实日期无关 —— 只要今天不是 2026-10-01 之后。
+     * 与真实日期无关 —— 只要今天不是 2030-07-01 之后。
      */
 
     private long sentToday(String admin) {

@@ -58,8 +58,15 @@ public class NoticeServiceImpl extends AbstractCrudService<MktNotice, NoticeVO> 
         return new String[]{"type", "status"};
     }
 
+    /** 生效期空白归 NULL（= 不限）：DATETIME 列存不进空串，MySQL 会拒（1525）。 */
+    private static void blankTimesToNull(MktNotice e) {
+        if (e.getStartAt() != null && e.getStartAt().isBlank()) e.setStartAt(null);
+        if (e.getEndAt() != null && e.getEndAt().isBlank()) e.setEndAt(null);
+    }
+
     @Override
     protected void beforeCreate(MktNotice e) {
+        blankTimesToNull(e);
         if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus("DRAFT");
         // 发布人按当前登录人回填，不接受客户端传 —— 公告是推给 C 端全体用户的，
         // 署名冒名了不报错也看不出来。
@@ -75,9 +82,11 @@ public class NoticeServiceImpl extends AbstractCrudService<MktNotice, NoticeVO> 
 
         LambdaQueryWrapper<MktNotice> w = new LambdaQueryWrapper<MktNotice>()
                 .eq(MktNotice::getStatus, "PUBLISHED")
-                // 生效期两端可空 = 不限；字符串时间按 ISO 前缀可比，与列的 DATETIME 字典序一致
-                .and(q -> q.isNull(MktNotice::getStartAt).or().eq(MktNotice::getStartAt, "").or().le(MktNotice::getStartAt, now))
-                .and(q -> q.isNull(MktNotice::getEndAt).or().eq(MktNotice::getEndAt, "").or().ge(MktNotice::getEndAt, now))
+                // 生效期两端可空 = 不限；字符串时间按 ISO 前缀可比，与列的 DATETIME 字典序一致。
+                // 不再比 `= ''`：列是 DATETIME，存不进空串（写入侧已把空白归 NULL，见 blankTimesToNull），
+                // 而 MySQL 对 DATETIME 列比空串直接报错（1525），整个公告接口 500 —— MariaDB 时代被静默容忍
+                .and(q -> q.isNull(MktNotice::getStartAt).or().le(MktNotice::getStartAt, now))
+                .and(q -> q.isNull(MktNotice::getEndAt).or().ge(MktNotice::getEndAt, now))
                 .orderByDesc(MktNotice::getPinned)
                 .orderByDesc(MktNotice::getId)
                 .last("limit " + n);
@@ -110,6 +119,7 @@ public class NoticeServiceImpl extends AbstractCrudService<MktNotice, NoticeVO> 
     /** 发布人是首次发布时的审计事实，编辑不改它（同 {@code FreeWhitelistServiceImpl.grantedBy}）。 */
     @Override
     protected void beforeUpdate(MktNotice e, MktNotice current) {
+        blankTimesToNull(e);
         e.setPublishedBy(current.getPublishedBy());
         // 归档走 /notices/{no}/archive|unarchive，盖的是时间戳。
         // 保存端点也能写它 = 给归档开了第二条不走审计的路。

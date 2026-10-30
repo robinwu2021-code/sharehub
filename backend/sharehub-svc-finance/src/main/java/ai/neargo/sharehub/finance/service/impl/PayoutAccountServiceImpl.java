@@ -104,8 +104,14 @@ public class PayoutAccountServiceImpl implements PayoutAccountService {
         e.setPayeeNo(req.payeeNo());
         e.setBankCode(req.bankCode());
         e.setAccountName(req.accountName().trim());
-        // 入参给的是明文，这里只落掩码；明文入 pii（PDPL）——本批不建 pii 库，先不落明文
-        e.setAccountMasked(mask(req.accountMasked()));
+        // 入参给的是明文（字段名历史原因叫 accountMasked）：掩码给人看，完整账号明文存（V173，
+        // 用户裁决收款账号不属于敏感信息）—— 付款任务导出银行转账文件要原文。
+        // 传回来的若已是掩码（编辑时没改账号），不动已存的完整账号
+        String raw = req.accountMasked();
+        if (raw != null && !raw.contains("*")) {
+            e.setAccountFull(raw.replaceAll("\\s", "").toUpperCase(java.util.Locale.ROOT));
+        }
+        e.setAccountMasked(mask(raw));
         e.setCurrency(req.currency() == null || req.currency().isBlank() ? "AED" : req.currency());
 
         /*

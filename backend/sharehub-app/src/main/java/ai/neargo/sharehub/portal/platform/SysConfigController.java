@@ -167,8 +167,10 @@ public class SysConfigController {
     public PageResult<SysParamEntry> sysParams(@RequestParam(required = false) Integer page,
                                                @RequestParam(required = false) Integer size,
                                                @RequestParam(required = false) String keyword,
-                                               @RequestParam(required = false) String groupName) {
-        return sysParams.page(page, size, keyword, Map.of("groupName", nz(groupName)));
+                                               @RequestParam(required = false) String groupName,
+                                               // V191：1 = 只看运营方待拍板的参数
+                                               @RequestParam(required = false) String pendingDecision) {
+        return sysParams.page(page, size, keyword, Map.of("groupName", nz(groupName), "pendingDecision", nz(pendingDecision)));
     }
 
     /**

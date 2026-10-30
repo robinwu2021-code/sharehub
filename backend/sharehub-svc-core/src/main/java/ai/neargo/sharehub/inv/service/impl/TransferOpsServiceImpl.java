@@ -71,6 +71,29 @@ public class TransferOpsServiceImpl implements TransferOpsService {
     private final PowerbankMapper powerbanks;
     private final CabinetLifecycleService lifecycle;
     private final SysParamPort params;
+    /** 默认回仓规则的唯一实现（与出库池退回共用）。 */
+    private ai.neargo.sharehub.inv.WarehouseDirectory warehouseDirectory;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setWarehouseDirectory(ai.neargo.sharehub.inv.WarehouseDirectory warehouseDirectory) {
+        this.warehouseDirectory = warehouseDirectory;
+    }
+
+    /** 库存账（引擎路由）：仓到仓调拨在独立进销存引擎下要同步调出 / 调入。 */
+    private ai.neargo.sharehub.inv.port.InventoryPort inventory;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setInventory(ai.neargo.sharehub.inv.port.InventoryPort inventory) {
+        this.inventory = inventory;
+    }
+
+    /** 撤机回仓签收后进到仓待检（D §2.4 ⑤）。 */
+    private ai.neargo.sharehub.inv.service.IntakeService intakes;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setIntakes(ai.neargo.sharehub.inv.service.IntakeService intakes) {
+        this.intakes = intakes;
+    }
 
     public TransferOpsServiceImpl(InvTransferMapper transfers, InvTransferItemMapper items, InvAssetDiffMapper diffs,
                                   InvWarehouseMapper warehouses, InvTransferStateMachine sm, CabinetMapper cabinets,
@@ -148,6 +171,8 @@ public class TransferOpsServiceImpl implements TransferOpsService {
         if (CABINET.equals(t.getItemType())) {
             for (InvTransferItem i : list) lifecycle.ship(i.getCabinetNo(), transferNo);
         }
+        inventory.transferShip(transferNo, t.getItemType(), warehouseOf(t.getFromType(), t.getFromRef()),
+                list.stream().map(TransferOpsServiceImpl::itemNo).toList());
         log.info("调拨发货 transferNo={} items={}", transferNo, list.size());
         return detail(transferNo);
     }
@@ -173,10 +198,15 @@ public class TransferOpsServiceImpl implements TransferOpsService {
                 .set(InvTransfer::getReceivedBy, me).set(InvTransfer::getReceiveNote, note == null || note.isBlank() ? null : note.trim()));
         if (n == 0) throw BizException.conflict("error.common.state_changed");
 
-        String warehouseNo = TransferEndpointType.WAREHOUSE.name().equals(t.getToType()) ? t.getToRef() : null;
+        String warehouseNo = warehouseOf(t.getToType(), t.getToRef());
+        // 撤机回仓：签收不直接进仓，先进到仓待检，复检合格才入库
+        boolean returnForQc = warehouseNo != null && CABINET.equals(t.getItemType())
+                && TransferSource.REMOVAL.name().equals(t.getSourceType());
+        List<String> forQc = new ArrayList<>();
         List<String> missing = new ArrayList<>();
         List<AssetDiff> out = new ArrayList<>();
         int received = 0;
+        List<String> intoStock = new ArrayList<>();
         for (InvTransferItem i : list) {
             String no = itemNo(i);
             if (!got.contains(no)) {
@@ -186,13 +216,20 @@ public class TransferOpsServiceImpl implements TransferOpsService {
             }
             received++;
             items.update(null, new LambdaUpdateWrapper<InvTransferItem>().eq(InvTransferItem::getId, i.getId()).set(InvTransferItem::getChecked, 1));
-            if (CABINET.equals(t.getItemType())) {
+            if (returnForQc) {
+                lifecycle.receiveForInspection(no);
+                forQc.add(no);
+            } else if (CABINET.equals(t.getItemType())) {
                 lifecycle.receive(no, warehouseNo);
+                intoStock.add(no);
             } else if (warehouseNo != null) {
                 powerbanks.update(null, new LambdaUpdateWrapper<DevPowerbank>().eq(DevPowerbank::getPowerbankNo, no)
                         .set(DevPowerbank::getWarehouseNo, warehouseNo));
+                intoStock.add(no);
             }
         }
+        if (!forQc.isEmpty()) intakes.openReturn(warehouseNo, t.getSourceRef(), "回仓调拨 " + transferNo, forQc);
+        inventory.transferReceive(transferNo, t.getItemType(), warehouseOf(t.getFromType(), t.getFromRef()), warehouseNo, intoStock);
         List<String> extra = got.stream().filter(no -> !expected.contains(no)).toList();
         for (String no : extra) out.add(vo(diff("TRANSFER", transferNo, AssetDiffKind.EXTRA, t.getItemType(), no, null, 0, 1)));
         if (!out.isEmpty()) {
@@ -277,13 +314,7 @@ public class TransferOpsServiceImpl implements TransferOpsService {
     }
 
     private InvWarehouse returnWarehouse() {
-        // 配了且存在就用配的仓；否则取第一个仓 —— 单仓运营时不必额外配置
-        String configured = params.textOf("inv.return_warehouse", null);
-        if (configured != null) {
-            InvWarehouse w = warehouses.selectOne(new LambdaQueryWrapper<InvWarehouse>().eq(InvWarehouse::getWarehouseNo, configured).last("limit 1"));
-            if (w != null) return w;
-        }
-        return warehouses.selectOne(new LambdaQueryWrapper<InvWarehouse>().orderByAsc(InvWarehouse::getId).last("limit 1"));
+        return warehouseDirectory.defaultReturn();
     }
 
     // —— 工具 ——
@@ -310,6 +341,11 @@ public class TransferOpsServiceImpl implements TransferOpsService {
         d.setStatus(AssetDiffStatus.OPEN.name());
         diffs.insert(d);
         return d;
+    }
+
+    /** 调拨端点是仓时取仓号，站点 / 点位不在库存账上。 */
+    private static String warehouseOf(String type, String ref) {
+        return TransferEndpointType.WAREHOUSE.name().equals(type) ? ref : null;
     }
 
     private InvTransfer require(String transferNo) {

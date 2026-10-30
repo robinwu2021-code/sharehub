@@ -82,7 +82,7 @@ export const ALARM_DISPOSITION: StatusMap<AlarmDisposition> = {
 
 export const ALARM_SUBJECT: Record<AlarmSubjectType, string> = {
   SITE: "站点", CABINET: "机柜", SLOT: "仓位", POWERBANK: "充电宝", ORDER: "订单", USER: "用户",
-  AGENT: "代理", PAYEE: "分成方", CONTRACT: "合同", PAYMENT: "支付", WORK_ORDER: "工单",
+  AGENT: "代理", PAYEE: "分成方", CONTRACT: "合同", PAYMENT: "支付", WORK_ORDER: "工单", INTAKE: "到仓待检单", WAREHOUSE: "仓库",
 };
 
 /** 主体类型 → RefLink 种类；没有详情页的主体（充电宝 / 用户 / 支付…）不给链接。 */

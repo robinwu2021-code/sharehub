@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <h2>修之前是什么后果</h2>
  * {@code period} 取 {@code LocalDate.now()}（服务器时区，生产是 {@code Asia/Shanghai}）。
- * 迪拜 9-30 20:00 之后签的合同，归属月直接变成 {@code 2026-10} ——
+ * 迪拜 6-30 20:00 之后签的合同，归属月直接变成 {@code 2030-07} ——
  * **每月有 4 小时签的合同，牵线费记错月份**，而结算单上看不出任何异常。
  * 同一处还有 {@code onDate}：用它筛「这天生效的责任行」，错一天会把
  * 有效期到 9-30 的牵线人漏掉，那笔钱谁也拿不到，而日志只会说「没配对价」。
@@ -49,13 +49,13 @@ class ReferFeePeriodOnBizCalendarTest extends ApiTestSupport {
     @Test
     @DisplayName("★ 业务日历跨月的那一瞬签约 → 牵线费记在业务月，不是服务器月")
     void period_follows_the_business_calendar() {
-        // UTC 20:30 → 迪拜 2026-10-01 00:30。而真实日期（服务器月份）是别的月 ——
+        // UTC 20:30 → 迪拜 2030-07-01 00:30。而真实日期（服务器月份）是别的月 ——
         // 两者不同才是这条用例的观察点；相同的话它什么也证明不了。
         clock.at = FixedBizClock.JUST_AFTER_BIZ_MIDNIGHT;
         String serverMonth = LocalDate.now().toString().substring(0, 7);
         assertThat(serverMonth)
-                .as("前提：真实（服务器）月份必须与钉住的业务月 2026-10 不同，否则本用例无法区分对错")
-                .isNotEqualTo("2026-10");
+                .as("前提：真实（服务器）月份必须与钉住的业务月 2030-07 不同，否则本用例无法区分对错")
+                .isNotEqualTo("2030-07");
 
         String admin = login("ADMIN");
         String site = newSite(admin);
@@ -67,8 +67,8 @@ class ReferFeePeriodOnBizCalendarTest extends ApiTestSupport {
                     "SELECT period FROM share_record WHERE source_no=? AND basis='REFER' AND deleted=0",
                     String.class, no);
             assertThat(period)
-                    .as("牵线费的归属月该是业务日历的 2026-10，而不是服务器月 %s", serverMonth)
-                    .isEqualTo("2026-10");
+                    .as("牵线费的归属月该是业务日历的 2030-07，而不是服务器月 %s", serverMonth)
+                    .isEqualTo("2030-07");
         } finally {
             jdbc.update("DELETE FROM share_record WHERE payee_no=?", REFERRER);
             drop(admin, site, id);

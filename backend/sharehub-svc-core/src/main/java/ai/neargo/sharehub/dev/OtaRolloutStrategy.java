@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.dev;
 
+import ai.neargo.sharehub.common.BizException;
+
 /**
  * OTA 投放策略（{@code dev_ota_rollout.strategy}，DDL 注释 {@code 'GRAY 灰度/FULL 全量'}）。
  *
@@ -14,13 +16,13 @@ public enum OtaRolloutStrategy {
     /** 全量：一次推给范围内全部设备。 */
     FULL;
 
-    /** 宽松解析：非法值抛 {@link IllegalArgumentException}（全局映射 400）。 */
+    /** 宽松解析：非法值抛 {@link BizException}（400，文案走 i18n key —— 中文字面量会原样送到英文 / 阿语界面）。 */
     public static OtaRolloutStrategy of(String v) {
-        if (v == null || v.isBlank()) throw new IllegalArgumentException("投放策略必填");
+        if (v == null || v.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "strategy");
         try {
             return valueOf(v.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("投放策略非法: " + v + "（仅 GRAY/FULL）");
+            throw BizException.badRequest("error.common.invalid_value", v + " (GRAY/FULL)");
         }
     }
 }

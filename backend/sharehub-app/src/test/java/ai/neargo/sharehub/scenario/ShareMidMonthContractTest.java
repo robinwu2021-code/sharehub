@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.scenario;
 
+import ai.neargo.sharehub.support.LegacyShareParams;
 import ai.neargo.sharehub.api.core.event.OrderSettledEvent;
 import ai.neargo.sharehub.finance.service.ShareGenerator;
 import ai.neargo.sharehub.support.ApiTestSupport;
@@ -20,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 9 月的单一律查不到合同 —— 场地方整月拿不到钱，而日志只有一句「没有可用比例」。
  * 现在按每单的<b>结算日</b>（{@code OrderSettledEvent.settledOn}，业务日历）找合同。
  */
+// 验场地方按进场合同分成 —— 场地方分成一期默认关（V155），验的是开关打开时的逻辑
+@LegacyShareParams
 class ShareMidMonthContractTest extends ApiTestSupport {
 
     @Autowired

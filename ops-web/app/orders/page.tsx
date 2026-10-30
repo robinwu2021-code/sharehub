@@ -20,6 +20,8 @@ import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
+import { ApprovalsPanel } from "@/components/finance/approvals-panel";
 import { OrderStatusBadge } from "@/components/status";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { money, fmtTime } from "@/lib/utils";
@@ -27,7 +29,9 @@ import { useCan } from "@/lib/hooks/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
-import { ORDER_INTERVENTIONS, interveneActions, depositActions, exceptionHandleActions, EXCEPTION_HANDLINGS } from "@/lib/types";
+import { PaymentChannelsTab } from "@/components/system/payment-channels-tab";
+import { MemberPlansTab, MembersTab } from "@/components/user/membership";
+import { ORDER_INTERVENTIONS, interveneActions, depositActions, exceptionHandleActions, EXCEPTION_HANDLINGS, isPendingApproval } from "@/lib/types";
 import type {
   RentOrder, OrderException, OrderExceptionStatus, ExceptionHandleAction, DepositRecord,
   OrderComplaint, RefundRecord, ComplaintIssueType, ComplaintResolution,
@@ -36,9 +40,14 @@ import type {
   Reservation, FreeOrder, WhitelistReason,
 } from "@/lib/types";
 
-// 顺序对齐 lib/nav.ts 的深链顺序（交易流水 → 售后 → 特殊单据）
-// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
-const TAB_KEYS = ["list", "reservations", "exceptions", "complaints", "refunds", "free", "deposit"] as const;
+// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
+// 2026-10-28 本页归「销售管理」（OM04），顺序与菜单分组一致：订单 → 支付 → 售后 → 会员。
+// 支付渠道（自系统设置）、会员套餐与会员 / 次卡（自用户管理）搬来这里，组件见 components/system、components/user。
+// 计费（/operation/fee-*）与营销、广告（/marketing）是同一 L1 下的其它页面，不在本页的 tab 里。
+const TAB_KEYS = ["list", "reservations", "deposit", "free",
+  "payment-channels",
+  "exceptions", "complaints", "refunds",
+  "plans", "members"] as const;
 
 // —— 预约订单（规格 §3）：竞品是电车预约充电桩，充电宝映射为「预约取宝 / 预约还位」——
 const RES_TYPE: StatusMap<Reservation["type"]> = {
@@ -64,7 +73,8 @@ const isExpiringSoon = (r: Reservation) => {
  *  已创建/弹出中必须在列——远程弹出干预会把订单落到「弹出中」，筛不出来就找不回。 */
 const ORDER_STATUS_FILTER = [
   { value: "CREATED", label: "已创建" }, { value: "DISPENSING", label: "弹出中" },
-  { value: "IN_USE", label: "使用中" }, { value: "SETTLED", label: "已结算" },
+  { value: "IN_USE", label: "使用中" }, { value: "OVERDUE_CHARGED", label: "已扣款未归还" },
+  { value: "SETTLED", label: "已结算" },
   { value: "RETURNED", label: "已归还" }, { value: "EXCEPTION", label: "异常" },
   { value: "CLOSED", label: "已关闭" },
 ];
@@ -146,7 +156,7 @@ const IV_PERM: Record<OrderInterventionAction, string> = {
 
 // —— 押金处置（S1：押金页原先纯只读）——
 const DEP_ACTION_LABEL: Record<DepositAction, string> = { release: "解冻", buyout: "买断", dun: "催缴" };
-const DUN_CHANNEL_LABEL: Record<DunChannel, string> = { SMS: "短信", PUSH: "App 推送", PHONE: "电话" };
+const DUN_CHANNEL_LABEL: Record<DunChannel, string> = { SMS: "短信", PUSH: "App 推送", CALL: "电话" };
 
 const EXC_TYPE_LABEL: Record<OrderException["type"], string> = {
   NOT_EJECTED: "未弹出",
@@ -189,6 +199,18 @@ function OrdersInner() {
   useEffect(() => { if (qKeyword != null) { setKeyword(qKeyword); paging.reset(); } }, [qKeyword]);
   const [status, setStatus] = useState("");
   const [payStatus, setPayStatus] = useState("");
+  // 第 5 批筛选（RNT-03 / R02 / MON-06）：借出日期、商家、站点、设备 —— 后端筛，不是当前页里挑
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [agentNo, setAgentNo] = useState("");
+  const [siteNo, setSiteNo] = useState("");
+  const [cabinetNo, setCabinetNo] = useState("");
+  const orderFilter = {
+    keyword, status: status || undefined, payStatus: payStatus || undefined, from: from || undefined, to: to || undefined,
+    agentNo: agentNo.trim() || undefined, siteNo: siteNo.trim() || undefined, cabinetNo: cabinetNo.trim() || undefined,
+  };
+  // 导出走后端全量（此前导出的是当前页 CSV）；mutation 只为接上全局错误弹窗与处理中态
+  const exportOrders = useMutation({ mutationFn: (format: "xlsx" | "pdf") => api.exportOrders(format, orderFilter) });
   const [detail, setDetail] = useState<RentOrder | null>(null);
   // 干预确认抽屉：原因必填（沿用退款审批口径），补偿另需金额
   const [iv, setIv] = useState<{ order: RentOrder; action: OrderInterventionAction } | null>(null);
@@ -196,9 +218,8 @@ function OrdersInner() {
   const [ivAmount, setIvAmount] = useState("");
 
   const listQ = useQuery({
-    queryKey: ["orders", paging.page, paging.size, keyword, status, payStatus],
-    queryFn: () => api.listOrders({ page: paging.page, size: paging.size, keyword, status: status || undefined,
-      payStatus: payStatus || undefined }),
+    queryKey: ["orders", paging.page, paging.size, keyword, status, payStatus, from, to, agentNo, siteNo, cabinetNo],
+    queryFn: () => api.listOrders({ page: paging.page, size: paging.size, ...orderFilter }),
     placeholderData: keepPreviousData,
     enabled: tab === "list",
   });
@@ -226,6 +247,13 @@ function OrdersInner() {
     mutationFn: (v: { no: string; action: OrderInterventionAction; reason: string; amount?: number }) =>
       api.interveneOrder(v.no, v.action, { reason: v.reason, amount: v.amount }),
     onSuccess: (r, v) => {
+      if (isPendingApproval(r)) {
+        // 超过审批阈值（SEC-03）：没有执行，等财务在「审批待办」里批准
+        notify.success(`${IV_LABEL[v.action]}金额 ${r.amount} 达到审批线 ${r.threshold}，已提交财务审批（${r.pendingApproval}），批准后生效`);
+        qc.invalidateQueries({ queryKey: ["approvals"] });
+        setIv(null);
+        return;
+      }
       notify.success(`${IV_LABEL[v.action]}已执行 · ${r.intervention.interventionNo} · 状态 ${t(`orderStatus.${r.intervention.beforeStatus}`)} → ${t(`orderStatus.${r.intervention.afterStatus}`)}`);
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["order-interventions"] });
@@ -256,7 +284,7 @@ function OrdersInner() {
   const [excResult, setExcResult] = useState("");
   const handleExc = useMutation({
     mutationFn: (v: { no: string; action: ExceptionHandleAction; result: string }) =>
-      api.handleOrderException(v.no, v.action, { result: v.result }),
+      api.handleOrderException(v.no, v.action, { handleResult: v.result }),
     onSuccess: (r, v) => {
       notify.success(
         v.action === "work_order" ? `已转工单 ${r.workOrderNo}`
@@ -529,8 +557,27 @@ function OrdersInner() {
     { header: "用户", cell: (o) => <span className="text-muted-foreground tabular-nums">{o.cUserNo}</span> },
     { header: "借出柜机", cell: (o) => <span className="tabular-nums">{o.cabinetNo}</span> },
     { header: "点位", cell: (o) => <span className="text-muted-foreground">{o.locationName}</span> },
-    { header: "时长", className: "text-right", cell: (o) => <span className="tabular-nums">{o.durationMin != null ? `${o.durationMin} 分` : "-"}</span> },
-    { header: "费用", className: "text-right", cell: (o) => <span className="tabular-nums">{money(o.feeAmount, o.currency)}</span> },
+    { header: "商家", cell: (o) => <span className="text-muted-foreground">{o.agentName ?? o.agentNo ?? "-"}</span> },
+    // 进行中订单：实时时长与已累计费用是列表请求那一刻的试算（MON-01），最高收费 = 借出时定格的总封顶
+    {
+      header: "时长", className: "text-right",
+      cell: (o) => {
+        const live = o.liveDurationMin != null;
+        const m = live ? o.liveDurationMin : o.durationMin;
+        return <span className="tabular-nums">{m != null ? `${m} 分` : "-"}{live && <span className="ms-1 text-muted-foreground">进行中</span>}</span>;
+      },
+    },
+    {
+      header: "费用", className: "text-right",
+      cell: (o) => (
+        <span className="tabular-nums">
+          {money(o.accruedFee ?? o.feeAmount, o.currency)}
+          {o.accruedFee != null && <span className="ms-1 text-muted-foreground">已累计</span>}
+          {o.maxCharge != null && <span className="block text-muted-foreground">封顶 {money(o.maxCharge, o.currency)}</span>}
+        </span>
+      ),
+    },
+    { header: "支付", cell: (o) => o.payNo ? <span className="tabular-nums text-muted-foreground">{o.payNo}<span className="block">{o.payChannel ?? "-"}</span></span> : <span className="text-muted-foreground">-</span> },
     {
       header: "状态",
       cell: (o) => (
@@ -708,20 +755,22 @@ function OrdersInner() {
             search={keyword}
             onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder="搜索订单号 / 用户"
-            onExport={() => exportCsv<RentOrder>("订单列表", [
-              { header: "订单号", value: (o) => o.orderNo },
-              { header: "用户", value: (o) => o.cUserNo },
-              { header: "借出柜机", value: (o) => o.cabinetNo },
-              { header: "点位", value: (o) => o.locationName },
-              { header: "时长(分)", value: (o) => o.durationMin },
-              { header: "费用", value: (o) => o.feeAmount },
-              { header: "币种", value: (o) => o.currency },
-              { header: "状态", value: (o) => t(`orderStatus.${o.status}`) },
-            ], listQ.data?.list ?? [])}
+            onExport={() => exportOrders.mutate("xlsx")}
+            exportLabel={exportOrders.isPending ? "导出中…" : "导出 Excel"}
           >
             <FilterSelect value={status} onChange={(v) => { setStatus(v); paging.reset(); }} allLabel="全部状态" options={ORDER_STATUS_FILTER} />
             <FilterSelect value={payStatus} onChange={(v) => { setPayStatus(v); paging.reset(); }} allLabel="全部收款" options={PAY_STATUS_FILTER} />
+            <Button variant="outline" disabled={exportOrders.isPending} onClick={() => exportOrders.mutate("pdf")}>导出 PDF</Button>
           </Toolbar>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="txt-body text-muted-foreground">借出日期</span>
+            <DateInput aria-label="借出起始日" className="w-40" value={from} onChange={(e) => { setFrom(e.target.value); paging.reset(); }} />
+            <span className="text-muted-foreground">~</span>
+            <DateInput aria-label="借出截止日" className="w-40" value={to} onChange={(e) => { setTo(e.target.value); paging.reset(); }} />
+            <Input aria-label="商家编号" className="w-36" placeholder="商家编号" value={agentNo} onChange={(e) => { setAgentNo(e.target.value); paging.reset(); }} />
+            <Input aria-label="站点编号" className="w-36" placeholder="站点编号" value={siteNo} onChange={(e) => { setSiteNo(e.target.value); paging.reset(); }} />
+            <Input aria-label="设备（机柜号）" className="w-36" placeholder="机柜号" value={cabinetNo} onChange={(e) => { setCabinetNo(e.target.value); paging.reset(); }} />
+          </div>
           <DataTable
             rowKey={(o: RentOrder) => o.orderNo}
             columns={listCols}
@@ -888,6 +937,10 @@ function OrdersInner() {
         </>
       )}
 
+      {/* 客服补偿 / 免单超审批线的待办（SEC-03）：财务在这里批，与退款审批同一个工作台 */}
+      {tab === "refunds" && allow("order:refund:audit") && (
+        <ApprovalsPanel kinds={["ORDER_COMPENSATE", "ORDER_WAIVE"]} title="补偿 / 免单审批" />
+      )}
       {tab === "refunds" && (
         <>
           <Toolbar
@@ -967,6 +1020,10 @@ function OrdersInner() {
           {depQ.data && <Pagination page={depPaging.page} size={depPaging.size} total={depQ.data.total} onPage={depPaging.setPage} onSize={depPaging.setSize} />}
         </>
       )}
+
+      {tab === "payment-channels" && <PaymentChannelsTab />}
+      {tab === "plans" && <MemberPlansTab />}
+      {tab === "members" && <MembersTab />}
 
       {/* 代客登记投诉抽屉：客服接到电话/线下投诉时手工入队。
           投诉号/提交时间/状态由服务端决定（新登记一律「待处理」），故表单里没有这几项。 */}

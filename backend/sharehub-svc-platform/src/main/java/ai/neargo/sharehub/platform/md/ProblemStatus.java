@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.platform.md;
 
+import ai.neargo.sharehub.common.BizException;
+
 /**
  * 问题条目的上架状态（{@code md_problem.status}，DDL 注释 {@code 'ENABLED/DISABLED'}）。
  *
@@ -18,13 +20,13 @@ public enum ProblemStatus {
     /** 下架：运营端仍可编辑，C 端查不到。 */
     DISABLED;
 
-    /** 宽松解析：非法值抛 {@link IllegalArgumentException}（全局映射 400）。 */
+    /** 宽松解析：非法值抛 {@link BizException}（400，文案走 i18n key —— 中文字面量会原样送到英文 / 阿语界面）。 */
     public static ProblemStatus of(String v) {
-        if (v == null || v.isBlank()) throw new IllegalArgumentException("问题状态必填");
+        if (v == null || v.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "status");
         try {
             return valueOf(v.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("问题状态非法: " + v + "（仅 ENABLED/DISABLED）");
+            throw BizException.badRequest("error.common.invalid_value", v + " (ENABLED/DISABLED)");
         }
     }
 }

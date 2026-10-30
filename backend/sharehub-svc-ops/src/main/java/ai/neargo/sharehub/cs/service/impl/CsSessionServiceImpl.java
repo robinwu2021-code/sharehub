@@ -1,8 +1,6 @@
 package ai.neargo.sharehub.cs.service.impl;
 
 import ai.neargo.sharehub.common.BizException;
-import ai.neargo.common.core.ServerException;
-import ai.neargo.common.core.ErrorCode;
 import ai.neargo.sharehub.cs.CsSenderType;
 import ai.neargo.sharehub.cs.CsSessionStatus;
 
@@ -77,7 +75,7 @@ public class CsSessionServiceImpl implements CsSessionService {
                 .eq(CsSession::getSessionNo, sessionNo).last("limit 1"));
         if (session == null) throw BizException.notFound(sessionNo);
         if (CsSessionStatus.CLOSED.name().equals(session.getStatus())) {
-            throw ServerException.of(ErrorCode.CONFLICT, "会话已关闭，不能回复: " + sessionNo);
+            throw BizException.conflict("error.cs.session_closed", sessionNo);
         }
 
         CsMessage m = new CsMessage();
@@ -180,7 +178,7 @@ public class CsSessionServiceImpl implements CsSessionService {
         }
         CsSession session = requireMine(cUserNo, sessionNo);
         if (CsSessionStatus.CLOSED.name().equals(session.getStatus())) {
-            throw ServerException.of(ErrorCode.CONFLICT, "会话已关闭，不能再发送: " + sessionNo);
+            throw BizException.conflict("error.cs.session_closed", sessionNo);
         }
 
         CsMessage m = new CsMessage();

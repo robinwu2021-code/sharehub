@@ -1,0 +1,11 @@
+-- ============================================================
+-- V177 删除 dev_ota_release.version 孤儿列（TableFieldOrphanTest）
+--
+-- 这一列已经没有任何代码写它：
+--   · 固件版本号在 V141 挪到 fw_version（VARCHAR）—— 原来落在这个 BIGINT 列上，非纯数字版本号一写就 500；
+--   · 乐观锁在 V42 就让位到 version_col（实体自持审计列，不继承 BaseEntity）。
+-- 留着的代价是误导：下一个人看到 version / fw_version / version_col / version_code 四列并存，
+-- 会去找「什么时候写哪一个」，而答案是「其中一个从来没被写过」。值恒为默认 0，删除不丢信息。
+-- 本文件只用 MySQL 与 MariaDB 都认的语法。
+-- ============================================================
+ALTER TABLE dev_ota_release DROP COLUMN version;

@@ -31,6 +31,8 @@ import java.util.Set;
 public class AgentAssignmentServiceImpl implements AgentAssignmentService {
 
     private static final Set<String> TARGET_TYPES = Set.of("CABINET", "LOCATION", "SITE");
+    /** 一期唯一还受理的划拨粒度（V165）。 */
+    private static final String SITE = "SITE";
     private static final Set<String> ACTIONS = Set.of("ASSIGN", "REVOKE");
     private static final String TENANT_MAIN = "MAIN";
 
@@ -49,6 +51,17 @@ public class AgentAssignmentServiceImpl implements AgentAssignmentService {
     private final AgentMapper agentMapper;
     private final CabinetQueryPort cabinetQuery;
     private final LocMappers.SiteMapper siteMapper;
+
+    /**
+     * 站点责任行（整站换商家时同事务改 OPERATE，V165 / 技术设计 §3.7）。setter 注入：
+     * 责任行服务反过来依赖代理名录端口，构造注入容易在装配期绕成环。
+     */
+    private ai.neargo.sharehub.loc.ext.service.SiteAgentService siteAgents;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setSiteAgents(ai.neargo.sharehub.loc.ext.service.SiteAgentService siteAgents) {
+        this.siteAgents = siteAgents;
+    }
 
     public AgentAssignmentServiceImpl(AgtAssignmentMapper mapper, AgentOwnershipSync ownershipSync,
                                       AgentMapper agentMapper, CabinetQueryPort cabinetQuery,
@@ -92,6 +105,14 @@ public class AgentAssignmentServiceImpl implements AgentAssignmentService {
         if (!TARGET_TYPES.contains(req.targetType())) {
             throw new IllegalArgumentException("划拨对象类型非法: " + req.targetType());
         }
+        /*
+         * 只剩整站换商家（V165；技术设计 §2.5 / §3.7）：机柜与点位的商家都由站点派生，
+         * 单独划一台柜子或一个点位会让「谁看得到」（agent_no）与「谁分到钱」（站点责任行）分开。
+         * 设备换商家走「解绑 → 出库池退回 → 出库给新商家 → 绑定」。存量流水保留。
+         */
+        if (!SITE.equals(req.targetType())) {
+            throw BizException.badRequest("error.assign.granularity_retired", req.targetType());
+        }
         if (!ACTIONS.contains(req.action())) {
             throw new IllegalArgumentException("划拨动作非法: " + req.action());
         }
@@ -103,6 +124,7 @@ public class AgentAssignmentServiceImpl implements AgentAssignmentService {
         if ("ASSIGN".equals(req.action()) && !"ENABLED".equals(agent.getStatus())) {
             throw new IllegalArgumentException("代理商已停用，不可划入资产: " + req.agentNo());
         }
+        requireCoreProfile(agent, req);
 
         AgtAssignment e = new AgtAssignment();
         e.setAssignNo(IdGenerator.next(ASSIGN_PREFIX));
@@ -119,8 +141,74 @@ public class AgentAssignmentServiceImpl implements AgentAssignmentService {
         // 级联规则与「为何不回写 ord_order/wo_order」见 AgentOwnershipSync 类注释。
         String target = "ASSIGN".equals(req.action()) ? req.agentNo() : null;
         ownershipSync.apply(req.targetType(), req.targetNo(), target);
+        syncOperate(req.targetNo(), target);
 
         return toVO(e);
+    }
+
+    /**
+     * 划拨门禁（V157，需求方案 §六「位置、行业补齐后才能划拨设备」，验收 AC-04）。
+     *
+     * <p>位置决定默认站点的地图落点，行业决定报表口径；缺了就划设备，
+     * 设备会落在一个没有坐标的商家名下，「找附近」排不到，按行业的统计也漏掉它，而且不报错。
+     *
+     * <p>例外是商家自己的默认站点：它正是补齐位置那一刻由系统建出来并划给商家的，此时行业可能还没填。
+     * 收回（REVOKE）不受限 —— 资料不全不该妨碍把设备收回来。
+     */
+    private static void requireCoreProfile(AgtAgent agent, AssignReq req) {
+        if (!"ASSIGN".equals(req.action())) return;
+        // 站点号与机柜号、点位号前缀不同，只比编号就够了（不比 targetType，免得多一处裸类型字面量）
+        if (req.targetNo().equals(agent.getDefaultSiteNo())) return;
+        boolean located = agent.getAddress() != null && !agent.getAddress().isBlank()
+                && agent.getLng() != null && agent.getLat() != null;
+        boolean classified = agent.getIndustry() != null && !agent.getIndustry().isBlank();
+        if (!located || !classified) {
+            throw BizException.badRequest("error.agent.core_profile_incomplete", agent.getAgentNo());
+        }
+    }
+
+    /**
+     * 站点的 OPERATE 责任行随归属走（同事务）：旧商家那行结束（effectiveTo = 现在），新商家开一行；
+     * 收回为直营则只结束不新开。数据范围读 agent_no、分润读责任行 —— 只改一处两者就分开了。
+     *
+     * <p>同一商家在同一站点同一责任只能有一行（uk_site_agent_role）：换回曾经的商家时重开那一行，而不是新插。
+     */
+    private void syncOperate(String siteNo, String newAgentNo) {
+        String now = LocalDateTime.now().toString();
+        boolean have = false;
+        for (var r : siteAgents.ofSite(siteNo)) {
+            if (!ai.neargo.sharehub.loc.ext.SiteAgentRole.OPERATE.name().equals(r.role())) continue;
+            boolean active = r.effectiveTo() == null || r.effectiveTo().isBlank();
+            if (newAgentNo != null && newAgentNo.equals(r.agentNo())) {
+                have = true;
+                if (!active) siteAgents.upsert(siteNo, copy(r, now, null, "整站换商家：重新接手"));
+            } else if (active) {
+                siteAgents.upsert(siteNo, copy(r, r.effectiveFrom(), now, "整站换商家：移交"));
+            }
+        }
+        if (newAgentNo != null && !have) {
+            siteAgents.upsert(siteNo, new ai.neargo.sharehub.loc.ext.dto.SiteAgentDtos.SiteAgentRow(null, siteNo,
+                    newAgentNo, null, null, ai.neargo.sharehub.loc.ext.SiteAgentRole.OPERATE.name(), null, null,
+                    now, null, "站点归商家"));
+        }
+    }
+
+    private static ai.neargo.sharehub.loc.ext.dto.SiteAgentDtos.SiteAgentRow copy(
+            ai.neargo.sharehub.loc.ext.dto.SiteAgentDtos.SiteAgentRow r, String from, String to, String remark) {
+        return new ai.neargo.sharehub.loc.ext.dto.SiteAgentDtos.SiteAgentRow(r.id(), r.siteNo(), r.agentNo(), r.agentName(),
+                r.agentType(), r.role(), r.ruleNo(), r.oneOffAmount(), from, to, remark);
+    }
+
+    /** 批量整站换商家（V165）：一个事务，任一站点不满足整批不动（替代前端逐个发请求）。 */
+    @Override
+    @Transactional
+    public List<AssignmentLog> assignBatch(String agentNo, List<String> siteNos, String action, String operator) {
+        List<String> nos = siteNos == null ? List.of()
+                : siteNos.stream().filter(n -> n != null && !n.isBlank()).map(String::trim).distinct().toList();
+        if (nos.isEmpty()) throw BizException.badRequest("error.common.missing_parameter", "siteNos");
+        List<AssignmentLog> out = new java.util.ArrayList<>();
+        for (String no : nos) out.add(assign(new AssignReq(agentNo, SITE, no, action, operator)));
+        return out;
     }
 
     /** 可划拨资产候选池：机柜经 Port 取（core 的表），站点读 platform 自己的 {@code loc_site}。 */

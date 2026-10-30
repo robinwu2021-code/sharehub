@@ -194,6 +194,11 @@ public class CredentialServiceImpl implements CredentialService {
         }
     }
 
+    @Override
+    public boolean exists(String realm, String subjectNo) {
+        return find(realm, subjectNo) != null;
+    }
+
     private CredCredential find(String realm, String subjectNo) {
         if (subjectNo == null || subjectNo.isBlank()) return null;
         return creds.selectOne(new LambdaQueryWrapper<CredCredential>()

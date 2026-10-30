@@ -103,6 +103,7 @@ class VocabularyWriteCoverageTest {
             "notify_template.status",                            // NotifyTemplateStatus.of
             "dev_alarm_rule.channel", "dev_alarm_rule.method", "dev_alarm_rule.status",
             "wo_sla_rule.wo_type",                               // WorkOrderType.of
+            "wo_sla_rule.priority",                              // WoPriority.of，外加「*」= 类型默认的哨兵（SlaRuleServiceImpl）
             "loc_lead.stage", "loc_lead.owner_type",             // checkStage / checkOwnerType
             // 服务端全权（第三种答案）：创建写常量、编辑抄 current、状态迁移走专门端点
             "notify_blacklist.status", "usr_free_whitelist.status",
@@ -178,12 +179,47 @@ class VocabularyWriteCoverageTest {
              * 没有进过这一列。
              */
             "stl_withdrawal.approval_state",
+            // ord_tax_invoice（V181）：无任何请求体能写它，kind/status 只由 TaxInvoiceServiceImpl 用常量赋值
+            "ord_tax_invoice.kind", "ord_tax_invoice.status",
+            // ops_approval_request（V189）：请求体里没有这两列，kind/status 只由 ApprovalGate 用常量赋值
+            "ops_approval_request.kind", "ops_approval_request.status",
+            // sys_param.value_type（V191）：只由迁移写；SysParamServiceImpl.save 的 lockDictionary 以库里为准覆盖请求体
+            "sys_param.value_type",
+            // inv_intake / inv_intake_item（V192 到仓待检）：kind / status / item_type 只由 IntakeServiceImpl 用常量赋值
+            //（登记入参是 cabinetNos / powerbankNos 两个列表，类型由列表决定）；qc_result 取 QcService 的结论（QcStatus.name()）；
+            // disposition 来自请求体，但写库前经 DISPOSALS 白名单（RETURN_SUPPLIER / SCRAP），不在白名单 400
+            "inv_intake.kind", "inv_intake.status",
+            // V202：currency 是 ISO 4217 币种码，服务端只做 trim + 大写，不是枚举
+            "inv_intake.currency",
+            // inv_disposal / inv_disposal_item（V203 处置出库）：kind / reason_code 经 DisposalKind / DisposalReason 校验，item_type 用常量
+            "inv_disposal.kind", "inv_disposal.reason_code", "inv_disposal_item.item_type",
+            // V204 安全库存：item_type 经 StockThresholdServiceImpl.TYPES 白名单校验
+            "inv_stock_threshold.item_type",
+            // V205 发货物流：doc_type 用 ShipmentDocType 常量，item_type 来自所属单据
+            "inv_shipment.doc_type", "inv_shipment_item.item_type",
+            // V210 物料：category / tracking_mode / kind / purpose / reason_code 经 MaterialCategory / MaterialTracking /
+            // MaterialDocPurpose（kind 由用途派生）/ DisposalReason 校验；device_type 只由迁移种入
+            "inv_material.category", "inv_material.tracking_mode", "inv_material.device_type",
+            "inv_material_doc.kind", "inv_material_doc.purpose", "inv_material_doc.reason_code", "inv_material_doc.currency",
+            "inv_intake_item.item_type", "inv_intake_item.qc_result", "inv_intake_item.disposition",
+            // dev_movement_log（V196 设备履历）：event 只由 MovementEvent 枚举的 name() 写入，item_type 只取 MovementRecorder 常量
+            // 或待检单明细已校验的类型；没有外部写入口（Mapper 只许 MovementRecorder 用，ArchitectureTest 守）
+            "dev_movement_log.event", "dev_movement_log.item_type",
+            // inventory_inbox.status（V198）：只由 InventoryEventPuller 用 InboxStatus 枚举写，无外部写入口
+            "inventory_inbox.status",
 
             // ——— 2026-09-28 第六批：钱那一侧剩下的 21 列，全部是「读代码核实」，一处新缺口都没有 ———
             // 这一批一个真缺口都没查出来，值得记一笔：finance 域的守法很统一 ——
             // 要么枚举 .name()、要么写在方法开头的白名单（ACTION_RESULT / PAY_CHANNELS /
             // DEBIT-CREDIT 的 else-throw），而白名单**离 setter 有十几行远**。
             "share_record.basis",                    // 派生自 share_rule.basis（已覆盖）/ 常量 REFER
+            "share_record.base_mode",                // V155：ShareGeneratorImpl 写 ShareBaseMode.name()；参数值写坏时 parse 回落 PRE_TAX，无外部写入口
+            // ——— 商家一期（V157 / V158）———
+            "agt_agent.industry",                    // AgentServiceImpl.applyCoreProfile 调 VenueIndustry.of，词表外 400；正反对照见 Phase1MerchantProfileTest
+            "stl_payout_task.status",                // PayoutTaskServiceImpl 只写 PayoutTaskStatus.name()，无外部写入口
+            "stl_withdrawal.origin",                 // 只由 PayoutTaskServiceImpl 写 WithdrawalOrigin.PAYOUT_TASK.name()
+            "stl_payout_export.format",              // 只写常量 CSV（一期唯一导出格式），无外部写入口
+            "wo_order.removal_disposition",          // V164：WoOpsServiceImpl.create 调 RemovalDisposition.ofNullable，词表外 400；只对撤机单写
             "stl_withdrawal.pay_channel",            // PAY_CHANNELS 白名单（在 setPayChannel 上面五行）
             "acct_ledger.direction",                 // DEBIT/CREDIT，校验在写入循环之前，非法值 else-throw
             "usr_wallet_txn.direction",              // amount.signum() > 0 ? IN : OUT

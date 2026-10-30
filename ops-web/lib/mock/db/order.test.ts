@@ -211,7 +211,7 @@ describe("押金状态机", () => {
     expect(r1.dunCount).toBe(1);
     expect(r1.lastDunChannel).toBe("SMS");
     expect(r1.lastDunAt).toBeTruthy();
-    const r2 = dunArrears(d.depositNo, { channel: "PHONE", note: "已联系用户本人" });
+    const r2 = dunArrears(d.depositNo, { channel: "CALL", note: "已联系用户本人" });
     expect(r2.dunCount).toBe(2);
     expect(r2.note).toBe("已联系用户本人");
   });
@@ -297,7 +297,7 @@ describe("异常单处置状态机定义", () => {
 describe("异常单处置真落库", () => {
   it("直接关闭：PENDING → HANDLED，并记 handledBy/handledAt/handleResult", () => {
     const e = exception("PENDING");
-    const r = handleOrderException(e.orderNo, "close", { result: RESULT, operatorName: "Sara Ahmed" });
+    const r = handleOrderException(e.orderNo, "close", { handleResult: RESULT, operatorName: "Sara Ahmed" });
     expect(r.status).toBe("HANDLED");
     expect(r.handleAction).toBe("close");
     expect(r.handleResult).toBe(RESULT);
@@ -310,7 +310,7 @@ describe("异常单处置真落库", () => {
   it("转工单：PENDING → HANDLING，真的落一条工单并回填工单号", () => {
     const e = exception("PENDING", { type: "NOT_EJECTED" });
     const before = workOrders.length;
-    const r = handleOrderException(e.orderNo, "work_order", { result: "柜机卡宝，转运维检修" });
+    const r = handleOrderException(e.orderNo, "work_order", { handleResult: "柜机卡宝，转运维检修" });
     expect(r.status).toBe("HANDLING");
     expect(workOrders.length).toBe(before + 1);
     const wo = workOrders.find((w) => w.woNo === r.workOrderNo);
@@ -324,21 +324,21 @@ describe("异常单处置真落库", () => {
 
   it("计费类异常转的是投诉单（不是故障单）", () => {
     const e = exception("PENDING", { type: "DOUBLE_CHARGE" });
-    const r = handleOrderException(e.orderNo, "work_order", { result: "重复扣款，转客服核账" });
+    const r = handleOrderException(e.orderNo, "work_order", { handleResult: "重复扣款，转客服核账" });
     expect(workOrders.find((w) => w.woNo === r.workOrderNo)!.type).toBe("COMPLAINT");
   });
 
   it("发起退款：挂上退款号并转 HANDLING（退款申请由 API 层先落库再回填）", () => {
     const e = exception("PENDING");
-    const r = handleOrderException(e.orderNo, "refund", { result: "确认重复扣款，退回用户", refundNo: "RFD80999" });
+    const r = handleOrderException(e.orderNo, "refund", { handleResult: "确认重复扣款，退回用户", refundNo: "RFD80999" });
     expect(r.status).toBe("HANDLING");
     expect(r.refundNo).toBe("RFD80999");
   });
 
   it("先转工单、后发起退款：两个下游单号并存，状态仍是 HANDLING", () => {
     const e = exception("PENDING");
-    handleOrderException(e.orderNo, "work_order", { result: "先转运维排查" });
-    const r = handleOrderException(e.orderNo, "refund", { result: "排查确认资损，同时退款", refundNo: "RFD80998" });
+    handleOrderException(e.orderNo, "work_order", { handleResult: "先转运维排查" });
+    const r = handleOrderException(e.orderNo, "refund", { handleResult: "排查确认资损，同时退款", refundNo: "RFD80998" });
     expect(r.status).toBe("HANDLING");
     expect(r.workOrderNo).toBeTruthy();
     expect(r.refundNo).toBe("RFD80998");
@@ -348,43 +348,43 @@ describe("异常单处置真落库", () => {
 describe("异常单非法处置被拒", () => {
   it("终态不可再处置：已处置的单三种方式全部抛错，且状态不动", () => {
     const e = exception("HANDLED", { handleResult: "已结案", handledBy: "admin", handledAt: "2026-07-11T12:00:00Z" });
-    expect(() => handleOrderException(e.orderNo, "close", { result: RESULT })).toThrow(OrderExceptionError);
-    expect(() => handleOrderException(e.orderNo, "work_order", { result: RESULT })).toThrow(OrderExceptionError);
-    expect(() => handleOrderException(e.orderNo, "refund", { result: RESULT, refundNo: "RFD1" })).toThrow(OrderExceptionError);
+    expect(() => handleOrderException(e.orderNo, "close", { handleResult: RESULT })).toThrow(OrderExceptionError);
+    expect(() => handleOrderException(e.orderNo, "work_order", { handleResult: RESULT })).toThrow(OrderExceptionError);
+    expect(() => handleOrderException(e.orderNo, "refund", { handleResult: RESULT, refundNo: "RFD1" })).toThrow(OrderExceptionError);
     expect(e.status).toBe("HANDLED");
     expect(e.handleResult).toBe("已结案"); // 失败不覆盖既有留痕
   });
 
   it("处置结论必填：空白结论一律拒绝，状态与留痕都不动", () => {
     const e = exception("PENDING");
-    expect(() => handleOrderException(e.orderNo, "close", { result: "  " })).toThrow(/必须填写处置结论/);
-    expect(() => handleOrderException(e.orderNo, "work_order", { result: "" })).toThrow(/必须填写处置结论/);
+    expect(() => handleOrderException(e.orderNo, "close", { handleResult: "  " })).toThrow(/必须填写处置结论/);
+    expect(() => handleOrderException(e.orderNo, "work_order", { handleResult: "" })).toThrow(/必须填写处置结论/);
     expect(e.status).toBe("PENDING");
     expect(e.handledAt).toBeNull();
   });
 
   it("不可重复转工单 / 重复发起退款（重复开单、重复退款是真实资损）", () => {
     const e = exception("PENDING");
-    handleOrderException(e.orderNo, "work_order", { result: "转运维" });
+    handleOrderException(e.orderNo, "work_order", { handleResult: "转运维" });
     const woNo = e.workOrderNo;
     const before = workOrders.length;
-    expect(() => handleOrderException(e.orderNo, "work_order", { result: "再转一次" })).toThrow(/已转工单/);
+    expect(() => handleOrderException(e.orderNo, "work_order", { handleResult: "再转一次" })).toThrow(/已转工单/);
     expect(workOrders.length).toBe(before); // 没有多开一张
     expect(e.workOrderNo).toBe(woNo);
 
-    handleOrderException(e.orderNo, "refund", { result: "退款", refundNo: "RFD80997" });
-    expect(() => handleOrderException(e.orderNo, "refund", { result: "再退一次", refundNo: "RFD80996" })).toThrow(/已发起退款申请/);
+    handleOrderException(e.orderNo, "refund", { handleResult: "退款", refundNo: "RFD80997" });
+    expect(() => handleOrderException(e.orderNo, "refund", { handleResult: "再退一次", refundNo: "RFD80996" })).toThrow(/已发起退款申请/);
     expect(e.refundNo).toBe("RFD80997");
   });
 
   it("退款号缺失被拒（API 层必须先落退款申请再回填）", () => {
     const e = exception("PENDING");
-    expect(() => handleOrderException(e.orderNo, "refund", { result: "退款" })).toThrow(/退款申请号缺失/);
+    expect(() => handleOrderException(e.orderNo, "refund", { handleResult: "退款" })).toThrow(/退款申请号缺失/);
     expect(e.status).toBe("PENDING");
   });
 
   it("异常单不存在直接抛错", () => {
-    expect(() => handleOrderException("ORD_NOT_EXIST", "close", { result: RESULT })).toThrow(/不存在/);
+    expect(() => handleOrderException("ORD_NOT_EXIST", "close", { handleResult: RESULT })).toThrow(/不存在/);
   });
 });
 

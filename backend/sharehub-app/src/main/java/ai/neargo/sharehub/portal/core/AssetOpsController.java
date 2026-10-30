@@ -34,22 +34,28 @@ public class AssetOpsController {
 
     private final QcService qc;
     private final TransferOpsService transfers;
+    private final ai.neargo.sharehub.dev.movement.MovementRecorder movements;
+    private final ai.neargo.sharehub.inv.service.ShipmentService shipments;
 
-    public AssetOpsController(QcService qc, TransferOpsService transfers) {
+    public AssetOpsController(QcService qc, TransferOpsService transfers,
+                              ai.neargo.sharehub.dev.movement.MovementRecorder movements,
+                              ai.neargo.sharehub.inv.service.ShipmentService shipments) {
+        this.shipments = shipments;
         this.qc = qc;
         this.transfers = transfers;
+        this.movements = movements;
     }
 
     // —— 入库质检 ——
 
     @PostMapping("/devices/{cabinetNo}/qc")
-    @PreAuthorize("@perm.can('device:cabinet:update')")
+    @PreAuthorize("@perm.can('device:qc:inspect')")
     public QcRecord inspectCabinet(@PathVariable String cabinetNo, @RequestBody QcReq r) {
         return qc.inspectCabinet(cabinetNo, r);
     }
 
     @PostMapping("/powerbanks/{powerbankNo}/qc")
-    @PreAuthorize("@perm.can('device:powerbank:update')")
+    @PreAuthorize("@perm.can('device:qc:inspect')")
     public QcRecord inspectPowerbank(@PathVariable String powerbankNo, @RequestBody QcReq r) {
         return qc.inspectPowerbank(powerbankNo, r);
     }
@@ -58,6 +64,13 @@ public class AssetOpsController {
     @PreAuthorize("@perm.can('device:cabinet:read')")
     public List<QcRecord> qcRecords(@RequestParam String itemNo) {
         return qc.records(itemNo);
+    }
+
+    /** 设备履历（V196，仓外段）：位置与归属的每一次变化，新的在前。 */
+    @GetMapping("/device-movements")
+    @PreAuthorize("@perm.can('device:cabinet:read')")
+    public List<ai.neargo.sharehub.dev.dto.DeviceOpsDtos.DeviceMovement> movements(@RequestParam String itemNo) {
+        return movements.of(itemNo);
     }
 
     // —— 调拨作业 ——
@@ -70,8 +83,13 @@ public class AssetOpsController {
 
     @PostMapping("/inventory-transfers/{transferNo}/ship")
     @PreAuthorize("@perm.can('device:inventory:transfer')")
-    public InventoryTransferDetail ship(@PathVariable String transferNo) {
-        return transfers.ship(transferNo);
+    public InventoryTransferDetail ship(@PathVariable String transferNo, @RequestBody(required = false) ai.neargo.sharehub.inv.dto.ShipmentDtos.ShipInfo ship) {
+        // 物流可选（V205）：先校验，发出成功后按明细记一条
+        shipments.validate(ship);
+        InventoryTransferDetail d = transfers.ship(transferNo);
+        shipments.record(ai.neargo.sharehub.inv.ShipmentDocType.TRANSFER, transferNo, java.util.Map.of(d.transfer().itemType(),
+                d.items().stream().map(ai.neargo.sharehub.inv.dto.InvDtos.TransferItem::itemNo).toList()), ship);
+        return d;
     }
 
     @PostMapping("/inventory-transfers/{transferNo}/receive")
@@ -91,7 +109,7 @@ public class AssetOpsController {
     }
 
     @PostMapping("/asset-diffs/{diffNo}/resolve")
-    @PreAuthorize("@perm.can('device:inventory:transfer')")
+    @PreAuthorize("@perm.can('device:inventory:diff')")
     public AssetDiff resolve(@PathVariable String diffNo, @RequestBody ResolveReq r) {
         return transfers.resolveDiff(diffNo, r == null ? null : r.note());
     }

@@ -18,15 +18,12 @@
 # 只在 service 层校验的码会被误报成"声明未强制"，遇到请在此注明后登记。
 
 声明未强制 device:cabinet:export
-声明未强制 device:cabinet:import
 声明未强制 device:command:batch
-声明未强制 device:inventory:stocktake
 声明未强制 device:ota:publish
 声明未强制 device:ota:rollback
 声明未强制 device:slot:read
 声明未强制 finance:share_rule:update
 声明未强制 marketing:campaign:create
-声明未强制 order:order:export
 声明未强制 order:reservation:cancel
 声明未强制 org:dept:update
 声明未强制 org:role:assign

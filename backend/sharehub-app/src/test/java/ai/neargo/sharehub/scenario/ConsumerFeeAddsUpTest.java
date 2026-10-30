@@ -44,9 +44,7 @@ class ConsumerFeeAddsUpTest extends ApiTestSupport {
     @Test
     @DisplayName("借还一单：明细逐项相加 = 合计，且押金不在明细里")
     void feeLinesSumToPayable() {
-        String cabinetNo = jdbc.queryForObject(
-                "select cabinet_no from dev_cabinet where deleted=0 and available_count>0 "
-                        + "and online_status='ONLINE' and status<>'FAULT' limit 1", String.class);
+        String cabinetNo = ai.neargo.sharehub.support.RentFixture.rentable(jdbc);
         assertThat(cabinetNo).as("测试库里得有一台在线、非故障、有宝的柜机").isNotBlank();
 
         String phone = "+97150" + (System.nanoTime() % 10000000L);

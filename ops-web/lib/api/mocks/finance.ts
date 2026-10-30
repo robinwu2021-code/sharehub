@@ -1,10 +1,13 @@
 // 覆盖范围：分账规则与流水、总账、结算、提现审批、对账、发票、分润统计、充值订单。
 import * as db from "../../mock/db";
 import * as sa from "../../mock/db/settlement-adjust";
+import * as pt from "../../mock/db/payout-task";
+import { currentAuth } from "../../auth";
 // 走具体模块不改变行为——同一份模块级状态，只是绕过桶文件
 import type { FinanceApi } from "../contracts/finance";
-import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ, WithdrawalQ } from "../query";
+import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ, TaxInvoiceQ, SelfBillQ, PayableQ, ApprovalQ, ReportQ, WithdrawalQ } from "../query";
 import { wait } from "./_wait";
+import { fail } from "../../biz-error";
 
 export const financeMock: FinanceApi = {
   // 收款账户（B3）：写操作走 db 层（「恰好一个默认」与「默认不能直接停」都在那强制）
@@ -52,6 +55,23 @@ export const financeMock: FinanceApi = {
   listInvoices: (q: InvoiceQ = {}) => wait(db.listInvoices(q)),
   // async：理由同 getInventoryTransfer —— 同步抛出的 404 不会变成 rejected promise
   getInvoice: async (invoiceNo) => wait(db.getInvoice(invoiceNo)),
+  listTaxInvoices: (q: TaxInvoiceQ = {}) => wait(db.listTaxInvoices(q)),
+  getTaxInvoice: async (invoiceNo) => wait(db.getTaxInvoice(invoiceNo)),
+  retryTaxInvoice: async (invoiceNo) => wait(db.retryTaxInvoice(invoiceNo)),
+  // 文件由后端生成；演示数据模式如实拒绝，不下载假文件
+  exportTaxInvoices: async () => fail("演示数据模式不生成文件，接真后端后可导出", "Export needs the real backend; not available in demo mode"),
+  listSelfBills: (q: SelfBillQ = {}) => wait(db.listSelfBills(q)),
+  listPayables: (q: PayableQ = {}) => wait(db.listPayables(q)),
+  // 演示数据模式阈值缺省关，补偿 / 凭证都即时生效，所以审批待办恒为空；批 / 驳一张不存在的单按 404
+  listApprovals: (q: ApprovalQ = {}) => wait(db.paginate([], q.page, q.size)),
+  approveApproval: async (no) => fail(`审批单 ${no} 不存在`, `Approval ${no} not found`),
+  rejectApproval: async (no) => fail(`审批单 ${no} 不存在`, `Approval ${no} not found`),
+  issueSelfBill: async (withdrawNo) => wait(db.issueSelfBill(withdrawNo)),
+  // 演示数据模式的自开票只由「补出」产生、默认为空；真后端按会话商家号收敛
+  listMySelfBills: (q: PageQ = {}) => wait(db.listSelfBills(q)),
+  downloadMySelfBillPdf: async () => fail("演示数据模式不生成文件，接真后端后可下载", "Download needs the real backend; not available in demo mode"),
+  downloadSelfBillPdf: async () => fail("演示数据模式不生成文件，接真后端后可下载", "Download needs the real backend; not available in demo mode"),
+  downloadTaxInvoicePdf: async () => fail("演示数据模式不生成文件，接真后端后可下载", "Download needs the real backend; not available in demo mode"),
   // async：让校验抛的 ApiError 变成 rejected promise，交给全局 MutationCache 弹错
   //（同 saveSite 的理由——同步抛出时那条「请选择分成方」根本到不了界面上）
   saveShareRule: async (x) => wait(db.saveShareRule(x), 350),
@@ -68,4 +88,13 @@ export const financeMock: FinanceApi = {
   // 财务 B5：分润统计（维度/周期/排序在 db 层处理）/ 充值订单
   listShareSummaries: (q: ShareSummaryQ = {}) => wait(db.listShareSummaries(q)),
   listRechargeOrders: (q: RechargeQ = {}) => wait(db.listRechargeOrders(q)),
+
+  // 付款任务（V158）：发起人 / 复核人 / 确认人取当前会话 —— 四眼判定靠它，不从入参取
+  previewPayoutTask: (cutoff) => wait(pt.previewPayoutTask(cutoff), 300),
+  createPayoutTask: (cutoff) => wait(pt.createPayoutTask(cutoff, currentAuth()?.username ?? ""), 400),
+  listPayoutTasks: (q = {}) => wait(pt.listPayoutTasks(q)),
+  getPayoutTask: (no) => wait(pt.getPayoutTask(no)),
+  auditPayoutTask: (no, approve, reason) => wait(pt.auditPayoutTask(no, approve, reason, currentAuth()?.username ?? ""), 400),
+  exportPayoutTask: (no) => wait(pt.exportPayoutTask(no), 300),
+  confirmPayoutTask: (no, body) => wait(pt.confirmPayoutTask(no, body, currentAuth()?.username ?? ""), 400),
 };

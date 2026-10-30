@@ -97,6 +97,15 @@ public class RentOrderServiceImpl implements RentOrderService {
     /** 结算即请款、补缴（C-BL-04）。 */
     private final ai.neargo.sharehub.trade.pay.service.PaymentService payments;
 
+    /** 订单列表的商家名与支付渠道（第 5 批）：批量取，不逐行回表。 */
+    private final ObjectProvider<ai.neargo.sharehub.api.platform.port.AgentDirectoryPort> agentDirectory;
+    private final ai.neargo.sharehub.trade.pay.mapper.PayOrderMapper payOrders;
+    /** 服务费等借出时定格的配置（C09，rent.service_fee.*）。 */
+    private final ai.neargo.sharehub.api.platform.port.SysParamPort params;
+
+    /** C 端税务发票（V181）：收款即开 / 结单才开，按 invoice.b2c.* 配置；失败不影响收款。 */
+    private final ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices;
+
     public RentOrderServiceImpl(OrdMapper mapper, OrdStateMachine stateMachine,
                                 OrdRentExtMapper rentExtMapper, InterventionMapper interventionMapper,
                                 PriceResolver priceResolver, PriceEngine priceEngine,
@@ -112,8 +121,16 @@ public class RentOrderServiceImpl implements RentOrderService {
                                 ai.neargo.sharehub.common.time.BizClock clock,
                                 ai.neargo.sharehub.dev.port.CabinetCommandPort cabinetCommands,
                                 ai.neargo.sharehub.trade.EjectSimulation ejectSimulation,
-                                ai.neargo.sharehub.trade.pay.service.PaymentService payments) {
+                                ai.neargo.sharehub.trade.pay.service.PaymentService payments,
+                                ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices,
+                                ObjectProvider<ai.neargo.sharehub.api.platform.port.AgentDirectoryPort> agentDirectory,
+                                ai.neargo.sharehub.trade.pay.mapper.PayOrderMapper payOrders,
+                                ai.neargo.sharehub.api.platform.port.SysParamPort params) {
+        this.params = params;
+        this.agentDirectory = agentDirectory;
+        this.payOrders = payOrders;
         this.payments = payments;
+        this.taxInvoices = taxInvoices;
         this.cabinetCommands = cabinetCommands;
         this.ejectSimulation = ejectSimulation;
         this.clock = clock;
@@ -143,13 +160,33 @@ public class RentOrderServiceImpl implements RentOrderService {
 
     @Override
     public PageResult<RentOrder> pageAdmin(Integer page, Integer size, String keyword, String status, String payStatus) {
+        return pageAdmin(page, size, new OrderFilter(keyword, status, payStatus, null, null, null, null, null));
+    }
+
+    private static boolean has(String v) {
+        return v != null && !v.isBlank();
+    }
+
+    @Override
+    public PageResult<RentOrder> pageAdmin(Integer page, Integer size, OrderFilter f) {
         int p = pg(page), s = sz(size);
         LambdaQueryWrapper<OrdOrder> w = new LambdaQueryWrapper<>();
+        String keyword = f.keyword();
         if (keyword != null && !keyword.isBlank()) {
             w.and(q -> q.like(OrdOrder::getOrderNo, keyword).or().like(OrdOrder::getCUserNo, keyword));
         }
-        if (status != null && !status.isBlank()) w.eq(OrdOrder::getStatus, status);
-        if (payStatus != null && !payStatus.isBlank()) w.eq(OrdOrder::getPayStatus, payStatus);
+        if (has(f.status())) w.eq(OrdOrder::getStatus, f.status());
+        if (has(f.payStatus())) w.eq(OrdOrder::getPayStatus, f.payStatus());
+        if (has(f.agentNo())) w.eq(OrdOrder::getAgentNo, f.agentNo().trim());
+        if (has(f.siteNo())) w.eq(OrdOrder::getSiteNo, f.siteNo().trim());
+        // 设备：借出柜或归还柜任一命中 —— 查「这台柜子经手的单」，两头都算
+        if (has(f.cabinetNo())) {
+            String c = f.cabinetNo().trim();
+            w.and(q -> q.eq(OrdOrder::getCabinetNo, c).or().eq(OrdOrder::getReturnCabinetNo, c));
+        }
+        // 借出日期按业务日（迪拜）界，折到存储时区再比 —— 同 BizClock.startOfDayAsStored 的理由
+        if (f.from() != null) w.ge(OrdOrder::getStartedAt, clock.startOfDayAsStored(f.from()));
+        if (f.to() != null) w.lt(OrdOrder::getStartedAt, clock.startOfDayAsStored(f.to().plusDays(1)));
         w.orderByDesc(OrdOrder::getId);
         Page<OrdOrder> r = mapper.selectPage(new Page<>(p, s), w);
         return new PageResult<>(enrich(r.getRecords()), r.getTotal());
@@ -215,14 +252,41 @@ public class RentOrderServiceImpl implements RentOrderService {
                         i.getCreatedAt() == null ? null : i.getCreatedAt().toString());
             }
         }
+        // 商家名、支付渠道：各一次批量查
+        var dir = agentDirectory.getIfAvailable();
+        java.util.Map<String, ai.neargo.sharehub.api.platform.dto.AgentBrief> briefs = dir == null ? java.util.Map.of()
+                : dir.briefsOf(rows.stream().map(OrdOrder::getAgentNo).filter(java.util.Objects::nonNull).distinct().toList());
+        List<String> payNos = rows.stream().map(OrdOrder::getPayNo).filter(java.util.Objects::nonNull).distinct().toList();
+        java.util.Map<String, String> channels = new java.util.HashMap<>();
+        if (!payNos.isEmpty()) {
+            for (var po : payOrders.selectList(new LambdaQueryWrapper<ai.neargo.sharehub.trade.pay.entity.PayOrder>()
+                    .in(ai.neargo.sharehub.trade.pay.entity.PayOrder::getPayNo, payNos))) {
+                if (po.getChannelCode() != null) channels.put(po.getPayNo(), po.getChannelCode());
+            }
+        }
         return rows.stream().map(e -> {
             RentOrder base = toVO(e);
+            boolean live = OrderStatus.IN_USE.name().equals(e.getStatus());
+            ai.neargo.sharehub.trade.dto.TradeLegacyDtos.FeeEstimate est = null;
+            if (live) {
+                try {
+                    est = estimateNow(e.getOrderNo());
+                } catch (RuntimeException ex) {
+                    // 试算失败（快照残缺等）不该让整页列表挂掉：这一行不显示累计费用
+                    log.warn("进行中订单试算失败，列表该行不显示累计费用 orderNo={}", e.getOrderNo(), ex);
+                }
+            }
+            var brief = e.getAgentNo() == null ? null : briefs.get(e.getAgentNo());
             return new RentOrder(base.orderNo(), base.cUserNo(), base.cabinetNo(), base.returnCabinetNo(),
                     base.powerbankNo(), base.locationName(), base.status(), base.rentStartAt(),
                     base.rentEndAt(), base.durationMin(), base.feeAmount(), base.depositAmount(),
                     base.currency(), e.getWaivedAmount(),
                     compensate.get(e.getOrderNo()), ejects.getOrDefault(e.getOrderNo(), 0),
-                    lastEject.get(e.getOrderNo()), e.getCouponAmount(), e.getMemberDiscountAmount(), e.getPayStatus());
+                    lastEject.get(e.getOrderNo()), e.getCouponAmount(), e.getMemberDiscountAmount(), e.getPayStatus(),
+                    e.getAgentNo(), brief == null ? null : brief.name(), e.getSiteNo(),
+                    PriceResolver.capTotalFromSnapshot(e.getPriceSnapshot()),
+                    est == null ? null : est.durationMin(), est == null ? null : est.payable(),
+                    e.getPayNo(), e.getPayNo() == null ? null : channels.get(e.getPayNo()));
         }).toList();
     }
 
@@ -244,12 +308,24 @@ public class RentOrderServiceImpl implements RentOrderService {
 
     @Override
     public RentOrder buyout(String orderNo, java.math.BigDecimal buyoutPrice) {
+        /*
+         * 用户主动买断（不还了）按**本单计费方案快照**收：独立遗失费优先，否则总封顶（V180，K5）。
+         * 此前一律收调用方传来的系统默认买断价 —— 借出确认页显示的、自动买断实扣的、这里收的是三个来源（D4）。
+         * 快照里两者都没有（老单）才用调用方给的兜底价。
+         */
+        return buyoutAt(orderNo, null, buyoutPrice);
+    }
+
+    /** {@code exact} 非空 = 就按它收（逾期触顶买断收总封顶）；否则按快照的遗失费 / 总封顶，再否则 {@code fallback}。 */
+    private RentOrder buyoutAt(String orderNo, java.math.BigDecimal exact, java.math.BigDecimal fallback) {
         return DataScopeContext.executeWithoutScope(() -> {
             OrdOrder e = require(orderNo);
             if (!"IN_USE".equals(e.getStatus())) {
                 throw BizException.conflict("error.order.buyout_only_in_use", e.getStatus());
             }
-            java.math.BigDecimal price = buyoutPrice == null ? java.math.BigDecimal.ZERO : buyoutPrice;
+            java.math.BigDecimal fromPlan = PriceResolver.lostChargeFromSnapshot(e.getPriceSnapshot());
+            java.math.BigDecimal chosen = exact != null ? exact : fromPlan != null ? fromPlan : fallback;
+            java.math.BigDecimal price = withServiceFee(e, chosen == null ? java.math.BigDecimal.ZERO : chosen);
             e.setRentEndAt(nowUtc());
             e.setAmount(price);
             e.setFeeAmount(price.doubleValue());   // 过渡期双写，同 returnOrder
@@ -258,7 +334,7 @@ public class RentOrderServiceImpl implements RentOrderService {
             String beforeBuyout = e.getStatus();
             e.setStatus(stateMachine.next(e.getStatus(), "RETURN"));
             e.setStatus(stateMachine.next(e.getStatus(), "SETTLE"));
-            mapper.updateById(e);
+            updateOrConflict(e);   // D2：与归还并发时只能有一方落库，输的一方在请款之前停下
             // 买断是两跳一次做完，只记一条 BUYOUT —— 记成 RETURN+SETTLE 会让时间线
             // 看起来像「他还了柜子然后结算」，而事实是他没还
             appendEvent(orderNo, beforeBuyout, e.getStatus(), "BUYOUT", e.getCUserNo());
@@ -368,7 +444,11 @@ public class RentOrderServiceImpl implements RentOrderService {
         // 时段倍率按**下单时刻**解析一次并随快照定格（ADR-028 §四：跨时段长单不分段）。
         priced = priced.withMultiplier(multipliers.resolve(pq.regionId(), pq.at()));
         e.setPricePlanNo(priced.planNo());
-        e.setPriceSnapshot(priced.toSnapshot());
+        // 服务费（C09）：payer=USER 才向用户收；PLATFORM 由平台承担，不进本单
+        java.math.BigDecimal serviceFee = "USER".equalsIgnoreCase(params.textOf("rent.service_fee.payer", "USER").trim())
+                ? params.decimalOf("rent.service_fee.amount", java.math.BigDecimal.ZERO) : java.math.BigDecimal.ZERO;
+        e.setPriceSnapshot(PriceResolver.withServiceFee(priced.toSnapshot(), serviceFee,
+                params.intOf("rent.service_fee.vat_applicable", 1) == 1, params.intOf("rent.service_fee.in_share_base", 0) == 1));
         e.setCurrency(priced.currency() == null ? CURRENCY : priced.currency());
 
         /*
@@ -527,6 +607,9 @@ public class RentOrderServiceImpl implements RentOrderService {
     private OkResult settleReturn(String orderNo, String returnCabinetNo, java.time.LocalDateTime endUtc,
                                   boolean trackBank) {
         OrdOrder e = require(orderNo);
+        if (OrderStatus.OVERDUE_CHARGED.name().equals(e.getStatus())) {
+            return returnAfterOverdueCharge(e, returnCabinetNo, endUtc, trackBank);
+        }
         String beforeReturn = e.getStatus();
         e.setStatus(stateMachine.next(e.getStatus(), "RETURN"));   // IN_USE→RETURNED，非法迁移拒
         appendEvent(orderNo, beforeReturn, e.getStatus(), "RETURN", OPERATOR_SYSTEM);
@@ -592,7 +675,7 @@ public class RentOrderServiceImpl implements RentOrderService {
             charged = chargeChain.charge(gross, multiplier, member, null, capTotal, waiver);
         }
 
-        e.setAmount(charged.payable());
+        e.setAmount(withServiceFee(e, charged.payable()));
         // 与 couponNo/couponAmount 同一套路：等级答「凭什么打折」，金额答「折了多少」。
         // 后者事后推不出来 —— 权益配置会改，而折扣额还取决于当时的应收
         e.setMemberLevel(rights == null ? null : rights.level());
@@ -603,7 +686,7 @@ public class RentOrderServiceImpl implements RentOrderService {
         e.setFeeAmount(charged.payable().doubleValue());   // 过渡期双写，待前端与报表切到 amount 后移除
         String beforeSettle = e.getStatus();
         e.setStatus(stateMachine.next(e.getStatus(), "SETTLE"));   // RETURNED→SETTLED；请款见 collect
-        mapper.updateById(e);
+        updateOrConflict(e);   // D2：同上，与逾期买断并发时不重复请款
         appendEvent(orderNo, beforeSettle, e.getStatus(), "SETTLE", OPERATOR_SYSTEM);
 
         collect(e, "RENT");   // 收到钱才发结算事件（分润），见 #collect
@@ -641,7 +724,7 @@ public class RentOrderServiceImpl implements RentOrderService {
                     PriceResolver.multiplierFromSnapshot(e.getPriceSnapshot()),
                     memberOf(rights), couponOf(e, false), capTotal, waiverOf(e, false));
             return new ai.neargo.sharehub.trade.dto.TradeLegacyDtos.FeeEstimate(
-                    (int) min, charged.payable(), charged.couponUsed(), charged.waivedAmount(),
+                    (int) min, withServiceFee(e, charged.payable()), charged.couponUsed(), charged.waivedAmount(),
                     charged.buyout(), e.getCurrency());
         });
     }
@@ -669,7 +752,13 @@ public class RentOrderServiceImpl implements RentOrderService {
             ChargeChain.Charged charged = chargeChain.charge(gross, PriceResolver.multiplierFromSnapshot(e.getPriceSnapshot()),
                     null, cap, null);
             if (!charged.buyout()) return false;
-            buyout(orderNo, cap);   // 买断也是收入：请款与分润在 buyout 里（collect）
+            try {
+                buyoutAt(orderNo, cap, null);   // 触顶买断收的就是总封顶；请款与分润在里面（collect）
+            } catch (BizException lost) {
+                // 读到 IN_USE 之后用户恰好归还（或别处已结）：那边已经请过款，这里不再扣
+                log.info("逾期买断让位于并发的归还/结算 orderNo={} reason={}", orderNo, lost.getMessage());
+                return false;
+            }
             log.info("逾期达封顶自动买断 orderNo={} minutes={} cap={}", orderNo, min, cap);
             return true;
         }));
@@ -727,6 +816,71 @@ public class RentOrderServiceImpl implements RentOrderService {
      * <p>资金来源一期统一走通道（桩恒成功；接 nearpay 后由通道扣卡 / 扣预授权）。
      * 押金、预授权、钱包三个来源的前提都还不存在，见 TDD-欠费补缴与结算请款.md §6。
      */
+    /**
+     * 带乐观锁的落库：0 行 = 这期间别处已改过这张单（典型是逾期买断与用户归还同时到达），抛冲突。
+     *
+     * <p>D2（2026-10-29）：此前 {@code updateById} 的返回值没人看 —— 输掉竞争的一方状态没写进去，
+     * 却照常往下走到 {@link #collect}，于是同一单请款两次，而 {@code pay_order} 没有唯一约束兜底。
+     * 冲突必须在请款**之前**抛出。
+     */
+    /**
+     * 已扣款未归还的单被归还（V180）：只更新归还信息并结单，**不重新计费、不冲销已收的最高收费**
+     * —— 原文 RQ-BIL-04 / AC-03「超时扣费后归还不自动冲销」。退不退、退多少走退款审批，不在这里自动做。
+     */
+    private OkResult returnAfterOverdueCharge(OrdOrder e, String returnCabinetNo, java.time.LocalDateTime endUtc,
+                                              boolean trackBank) {
+        String before = e.getStatus();
+        e.setStatus(stateMachine.next(before, "RETURN"));
+        e.setStatus(stateMachine.next(e.getStatus(), "SETTLE"));
+        e.setReturnCabinetNo(returnCabinetNo);
+        e.setRentEndAt(endUtc == null ? nowUtc() : endUtc.toString());
+        e.setDurationMin((int) durationMinutes(e.getRentStartAt(), e.getRentEndAt()));
+        updateOrConflict(e);
+        appendEvent(e.getOrderNo(), before, e.getStatus(), "RETURN_AFTER_OVERDUE_CHARGE", OPERATOR_SYSTEM);
+        if (trackBank) powerbankTracker.returned(e.getPowerbankNo(), returnCabinetNo, null);
+        taxInvoices.onSettled(e.getOrderNo());
+        log.info("已扣款未归还的单归还 orderNo={}，不冲销已收的最高收费 amount={}", e.getOrderNo(), e.getAmount());
+        return new OkResult(true);
+    }
+
+    @Override
+    public boolean chargeOverdueIfDue(String orderNo, int hours) {
+        if (hours <= 0) return false;
+        return Boolean.TRUE.equals(DataScopeContext.executeWithoutScope(() -> {
+            OrdOrder e = mapper.selectOne(new LambdaQueryWrapper<OrdOrder>().eq(OrdOrder::getOrderNo, orderNo).last("limit 1"));
+            if (e == null || !OrderStatus.IN_USE.name().equals(e.getStatus())) return false;
+            if (durationMinutes(e.getRentStartAt(), nowUtc()) < hours * 60L) return false;
+            java.math.BigDecimal max = PriceResolver.capTotalFromSnapshot(e.getPriceSnapshot());
+            if (max == null || max.signum() <= 0) {
+                // 方案没配总封顶就没有「最高收费」可收 —— 不猜一个数，留给运营在逾期视图里处理
+                log.warn("超时到限但计费方案无总封顶，未发起最高收费 orderNo={}，请运营给该方案配总封顶", orderNo);
+                return false;
+            }
+            String before = e.getStatus();
+            e.setStatus(stateMachine.next(before, "OVERDUE_CHARGE"));
+            java.math.BigDecimal charge = withServiceFee(e, max);
+            e.setAmount(charge);
+            e.setFeeAmount(charge.doubleValue());   // 过渡期双写，同 returnOrder
+            e.setOverdueChargedAt(java.time.LocalDateTime.now());
+            try {
+                updateOrConflict(e);
+            } catch (BizException lost) {
+                return false;   // 同一刻用户归还了：那边已经结算，这里不再收
+            }
+            appendEvent(orderNo, before, e.getStatus(), "OVERDUE_CHARGE", OPERATOR_SYSTEM);
+            // 宝不转 SOLD：用户还可能还回来（AC-03）。请款与分润同买断（collect，幂等键 SETTLE-订单号）
+            collect(e, "RENT");
+            log.info("超时到限发起最高收费 orderNo={} hours={} amount={}", orderNo, hours, max);
+            return true;
+        }));
+    }
+
+    private void updateOrConflict(OrdOrder e) {
+        if (mapper.updateById(e) == 0) {
+            throw BizException.conflict("error.common.state_changed");
+        }
+    }
+
     private void collect(OrdOrder e, String payType) {
         java.math.BigDecimal due = e.getAmount() == null ? java.math.BigDecimal.ZERO : e.getAmount();
         if (due.signum() <= 0) {
@@ -768,6 +922,8 @@ public class RentOrderServiceImpl implements RentOrderService {
         e.setPayNo(payNo);
         mapper.updateById(e);
         publishSettled(e);
+        // 已扣款未归还（OVERDUE_CHARGED）的收款还没结单：ON_SETTLE 模式下等归还再开
+        taxInvoices.onPaid(e.getOrderNo(), payNo, !OrderStatus.OVERDUE_CHARGED.name().equals(e.getStatus()));
     }
 
     private static final String PAY_PAID = "PAID";
@@ -862,7 +1018,20 @@ public class RentOrderServiceImpl implements RentOrderService {
                 e.getOrderNo(), e.getCabinetNo(),
                 cab == null ? null : cab.getSiteNo(),
                 cab == null ? null : cab.getAgentNo(),
-                e.getAmount(), e.getCurrency(), period, settledOn.toString()));
+                shareGross(e), e.getCurrency(), period, settledOn.toString()));
+    }
+
+    /** 服务费（C09）：按本单快照加到应付上；没有服务费原样返回。 */
+    private static java.math.BigDecimal withServiceFee(OrdOrder e, java.math.BigDecimal payable) {
+        PriceResolver.ServiceFee f = PriceResolver.serviceFeeFromSnapshot(e.getPriceSnapshot());
+        return f == null ? payable : f.addTo(payable);
+    }
+
+    /** 分成基数：服务费不进基数（rent.service_fee.in_share_base=0，快照定格）时从应收里扣掉。 */
+    private static java.math.BigDecimal shareGross(OrdOrder e) {
+        PriceResolver.ServiceFee f = PriceResolver.serviceFeeFromSnapshot(e.getPriceSnapshot());
+        if (f == null || f.inShareBase() || e.getAmount() == null) return e.getAmount();
+        return e.getAmount().subtract(f.includedIn(e.getAmount()));
     }
 
     /**
@@ -927,6 +1096,8 @@ public class RentOrderServiceImpl implements RentOrderService {
 
         OrdOrder e = require(orderNo);
         String before = e.getStatus();
+        java.math.BigDecimal amountBefore = e.getAmount();
+        String payBefore = e.getPayStatus();
         if (!rule.from().contains(OrderStatus.of(before)))
             throw new IllegalArgumentException("状态 " + before + " 不允许 " + req.action() + "，允许自: " + rule.from());
         String after = rule.to() == null ? before : rule.to().name();
@@ -937,6 +1108,13 @@ public class RentOrderServiceImpl implements RentOrderService {
             e.setStatus(after);
             mapper.updateById(e);
         }
+
+        // 字段级改前改后进操作审计（SEC-09，第 6 批）：干预记录答「做了什么动作」，这里答「哪些字段从什么变成什么」
+        OrdOrder now = require(orderNo);
+        ai.neargo.sharehub.audit.AuditChanges.record("状态", before, now.getStatus());
+        ai.neargo.sharehub.audit.AuditChanges.record("应收", amountBefore, now.getAmount());
+        ai.neargo.sharehub.audit.AuditChanges.record("收款状态", payBefore, now.getPayStatus());
+        if (req.amount() != null) ai.neargo.sharehub.audit.AuditChanges.record(req.action() + " 金额", null, req.amount());
 
         OrdIntervention log = new OrdIntervention();
         log.setInterventionNo(IdGenerator.next(BizKey.ORDER_INTERVENTION));

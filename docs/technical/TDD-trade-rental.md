@@ -1,5 +1,7 @@
 # TDD — 租借交易闭环（trade-rental）
 
+> **支付通道（2026-10-29 校正）**：ADR-025 已改为复用 ai-shop pay，不再委托 nearpay。下文的 nearpay 读作「支付通道」；库表与字段名里的 `nearpay_*` 沿用不改。
+
 状态：草稿 / 待确认
 关联需求：[PRD-trade-rental.md](../requirements/PRD-trade-rental.md)
 关联：[architecture.md §7](./architecture.md) · [db-design.md §5](./db-design.md) · [api/README §5](../api/README.md) · [TDD-access-gateway](./TDD-access-gateway.md)
@@ -98,7 +100,7 @@ POST /mp/trade/orders/rent
 | 配置 | 位置 | 默认 |
 |------|------|------|
 | 免费时长/单位/封顶 | `price_plan`（租户配）| 免费 5min / 30min 单位 / 日封顶 / 买断价 |
-| 超时买断阈值 | Nacos `trade.overdue.*` | 72h 或达总封顶 |
+| 超时扣款模型 | `sys_param` `rent.overdue.mode`（V180） | `CAP_AMOUNT`（缺省）累计达总封顶即买断；`TIME_LIMIT` 到最长时限（`billing.overdueHours`）发起最高收费、进 `OVERDUE_CHARGED`。2026-10-29 按代码校正：此前写的「72h 或达总封顶」两条件并存从未实现 |
 | capture 重试 | Nacos `trade.capture.*` | 3 次退避 |
 | PaymentPort 实现 | profile/config `trade.payment.provider` | `stub`（MVP）/ `nearpay`（延后）|
 

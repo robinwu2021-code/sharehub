@@ -393,6 +393,12 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
                 "releaseNo", releaseNo, "fwVersion", "VOCAB1.0.0",
                 "strategy", "GRAY", "scope", "ALL"), t);
         assertThat(okRo.status).as("合法投放单应当能存：%s", okRo.msg()).isEqualTo(200);
+        assertThat(okRo.okData().path("fwVersion").asText()).as("版本号取版本库，不认手填").isEqualTo("VOCAB1.0.0");
+        // 缺版本库 → 400（此前库约束兜底成 500）；按设备 / 点位投放却没给对象 → 400
+        assertThat(post("/api/ops/ota-rollouts", Map.of("fwVersion", "X", "strategy", "GRAY"), t).status).isEqualTo(400);
+        assertThat(post("/api/ops/ota-rollouts", Map.of("releaseNo", releaseNo, "scope", "DEVICE"), t).status).isEqualTo(400);
+        var manualVersion = post("/api/ops/ota-rollouts", Map.of("releaseNo", releaseNo, "fwVersion", "HAND9.9", "scope", "ALL"), t);
+        assertThat(manualVersion.okData().path("fwVersion").asText()).isEqualTo("VOCAB1.0.0");
 
         /*
          * scope 写错 = 这次投放打给了错的一批设备；strategy 写错 = 本该灰度的一次全量推了出去。

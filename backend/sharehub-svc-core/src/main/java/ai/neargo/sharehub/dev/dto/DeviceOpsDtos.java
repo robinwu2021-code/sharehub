@@ -19,7 +19,14 @@ public final class DeviceOpsDtos {
     }
 
     public record QcRecord(String qcNo, String itemType, String itemNo, Boolean powerOn, Boolean slotsOk, Integer battery,
-                           Integer cycles, String result, String note, String inspectedBy, LocalDateTime inspectedAt) {
+                           Integer cycles, String result, String note, String inspectedBy, LocalDateTime inspectedAt,
+                           String ruleSnapshot, String intakeNo, String consumedBy) {
+    }
+
+    /** 设备履历一行（V196）。fromRef / toRef 带前缀：WH: / AGENT: / SITE: / LOC: / TRANSIT / OUT。 */
+    public record DeviceMovement(Long id, String itemType, String itemNo, String event, String fromRef, String toRef,
+                              String agentBefore, String agentAfter, String reason, String sourceRef, String operatorNo,
+                              LocalDateTime occurredAt) {
     }
 
     public record ReasonReq(String reason) {

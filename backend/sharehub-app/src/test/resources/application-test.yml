@@ -78,6 +78,14 @@ sharehub:
     # 断言变成随机失败。生产的 pepper 走 SHAREHUB_IDENTITY_PEPPER 环境变量，与此无关。
     identity-pepper: test-only-pepper-do-not-use-in-any-real-environment
     identity-pepper-version: 1
+    # 登录接口单 IP 每分钟上限（主配置默认 30）：整套用例都从 127.0.0.1 登录，按生产值会互相挡。
+    # 限流本身由 LoginRateLimitTest 单独打开验证
+    login-rate-per-minute: 100000
+  auth:
+    otp:
+      # 同一标识每日发码上限（主配置默认 10）：Spring 会复用上下文，整套用例对同几个测试手机号发码远超 10 次。
+      # 上限本身由 OtpServiceTest / LoginRateLimitTest 单独压低来验
+      daily-limit: 100000
 
 logging:
   level:

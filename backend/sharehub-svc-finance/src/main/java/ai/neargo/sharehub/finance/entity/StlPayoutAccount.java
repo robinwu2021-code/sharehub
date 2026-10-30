@@ -53,6 +53,15 @@ public class StlPayoutAccount extends BaseEntity {
      */
     private String accountMasked;
 
+    /**
+     * 完整账号（IBAN，去空格大写），明文（V173）。用户 2026-10-28 裁决：收款账号不属于敏感信息。
+     * 付款任务导出转账文件读它；空 = 需补录。
+     */
+    private String accountFull;
+
+    /** 完整账号密文（V158，FieldCipher）。V173 起不再写，只作老数据回落。 */
+    private byte[] accountEnc;
+
     private String currency;
 
     /**

@@ -27,18 +27,18 @@ describe("菜单管理（mock）", () => {
       .rejects.toThrow();
   });
 
-  it("藏掉「员工与权限」要拒并回滚——那是回得来的唯一一扇门", async () => {
-    await expect(updateMenu("M_org", { visible: 0 }, catalog())).rejects.toThrow();
+  it("藏掉「系统管理」要拒并回滚——菜单管理在它下面，那是回得来的唯一一扇门（V172 起）", async () => {
+    await expect(updateMenu("M_system", { visible: 0 }, catalog())).rejects.toThrow();
     const tree = await visibleMenus(["*"], "ADMIN");
-    expect(tree.map((s) => s.menuNo)).toContain("M_org");
+    expect(tree.map((s) => s.menuNo)).toContain("M_system");
   });
 
   it("藏别的可以，且真的从「我看得到的」那棵里消失", async () => {
-    await updateMenu("M_marketing", { visible: 0 }, catalog());
-    expect((await visibleMenus(["*"], "ADMIN")).map((s) => s.menuNo)).not.toContain("M_marketing");
+    await updateMenu("M_report", { visible: 0 }, catalog());
+    expect((await visibleMenus(["*"], "ADMIN")).map((s) => s.menuNo)).not.toContain("M_report");
     // 但管理树里还在 —— 否则藏了就再也找不回来
-    expect((await allMenus()).map((s) => s.menuNo)).toContain("M_marketing");
-    await updateMenu("M_marketing", { visible: 1 }, catalog());
+    expect((await allMenus()).map((s) => s.menuNo)).toContain("M_report");
+    await updateMenu("M_report", { visible: 1 }, catalog());
   });
 
   it("不存在的菜单要拒，而不是凭空造一个", async () => {

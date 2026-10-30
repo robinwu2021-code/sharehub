@@ -20,9 +20,12 @@ import { RefLink } from "@/components/ref-link";
 import { CabinetStatusBadge, OnlineBadge } from "@/components/status";
 import { useCabinetActions } from "@/components/device/cabinet-actions";
 import { QcDrawer, QcRecords, type QcTarget } from "@/components/device/qc";
+import { MovementTable } from "@/components/device/movements";
 import { TrialRentPanel } from "@/components/device/trial-rents";
 import { ProtectionPanel, useSlotProtections } from "@/components/device/protections";
 import { SignalCodesTable } from "@/components/device/signal-codes";
+import { OwnershipCard } from "@/components/device/ownership-card";
+import { LifecycleBar } from "@/components/device/lifecycle-bar";
 import { PROTECTION_ACTION, QC_STATUS } from "@/components/device/device-maps";
 import { fmtTime, cn } from "@/lib/utils";
 import { useCan } from "@/lib/hooks/use-can";
@@ -39,6 +42,7 @@ const TABS = [
   { key: "trial", label: "试借还" },
   { key: "protections", label: "保护" },
   { key: "qc", label: "入库质检" },
+  { key: "movements", label: "时间轴" },
   { key: "signals", label: "设备信号" },
 ];
 /** 后端 fixHref 里出现过、但本页不单列的页签 → 落到哪一格。 */
@@ -130,31 +134,32 @@ function Overview({ cabinet, gateQ, onQc }: {
   onQc: () => void;
 }) {
   const canUpdate = useCan()("device:cabinet:update");
+  // 质检单独判 device:qc:inspect（V186）：仓管能质检，但不该因此拿到上线 / 改设备
+  const canQc = useCan()("device:qc:inspect");
   const qcQ = useQuery({ queryKey: ["qc-records", cabinet.cabinetNo], queryFn: () => api.listQcRecords(cabinet.cabinetNo) });
   const lastQc = qcQ.data?.[0];
   return (
     <div className="space-y-6">
+      {/* 生命周期：在哪一环、下一步谁做（设计 §五.3） */}
+      <LifecycleBar cabinet={cabinet} />
       <Card>
         <CardContent className="grid grid-cols-2 gap-4 pt-5 md:grid-cols-4">
           <Field label="点位" className="mb-0">{cabinet.locationName ?? "未上架"}</Field>
-          {/* 归属站点（偏差 A1）：站点号 + 点位号一起给，排障时能一路查到站点与合同 */}
-          <Field label="归属站点" className="mb-0">
-            {cabinet.siteNo ? <RefLink kind="site" no={cabinet.siteNo} /> : "未归属"}
-            {cabinet.locationNo && <span className="text-muted-foreground"> · {cabinet.locationNo}</span>}
-          </Field>
           <Field label="供应商 / 型号" className="mb-0">{cabinet.vendorCode} · {cabinet.model}</Field>
           <Field label="SN" className="mb-0"><span className="tabular-nums">{cabinet.sn}</span></Field>
           <Field label="固件" className="mb-0">{cabinet.fwVersion}</Field>
           <Field label="在线" className="mb-0"><OnlineBadge s={cabinet.onlineStatus} /></Field>
           <Field label="可借 / 仓位" className="mb-0">{`${cabinet.availableCount} / ${cabinet.slotTotal}`}</Field>
           <Field label="最后心跳" className="mb-0">{fmtTime(cabinet.lastHeartbeatAt)}</Field>
-          <Field label="归属代理" className="mb-0">{cabinet.agentNo ? <RefLink kind="agent" no={cabinet.agentNo} /> : "平台直营"}</Field>
           {/* 质检状态后端机柜出参没有，取最近一条质检记录；没有记录 = 质检上线前入库的存量，免检 */}
           <Field label="入库质检" className="mb-0">
             {lastQc ? <StatusBadge map={QC_STATUS} value={lastQc.result} /> : <span className="text-muted-foreground">无记录（存量免检）</span>}
           </Field>
         </CardContent>
       </Card>
+
+      {/* 归属站点 / 归属代理 两格挪进归属卡：与出库单、分成对象并排看（开发计划 F0-2） */}
+      <OwnershipCard cabinet={cabinet} />
 
       {cabinet.status === "IN_STOCK" ? (
         <Card>
@@ -166,7 +171,7 @@ function Overview({ cabinet, gateQ, onQc }: {
               passedHint="门禁全部通过，可以点右上角「上线」"
               blockedHint="还差 {n} 项，逐条处理后再上线；每条都给了去处"
             />
-            {canUpdate && (
+            {canQc && (
               <div className="flex justify-end">
                 <Button size="sm" variant="outline" onClick={onQc}>做入库质检</Button>
               </div>
@@ -293,7 +298,7 @@ function CabinetDetail() {
                   <div className="txt-caption text-muted-foreground">
                     入库质检只在在库时做；质检未过的柜子不能发货调拨，也过不了上线门禁。
                   </div>
-                  {allow("device:cabinet:update") && (
+                  {allow("device:qc:inspect") && (
                     <Button size="sm" disabled={cabinet.status !== "IN_STOCK"}
                       title={cabinet.status !== "IN_STOCK" ? "只有在库的柜子能做入库质检；已布放的出问题走标记故障 / 修复" : undefined}
                       onClick={() => setQcTarget({ itemType: "CABINET", itemNo: cabinet.cabinetNo })}>
@@ -304,6 +309,7 @@ function CabinetDetail() {
                 <QcRecords itemNo={cabinet.cabinetNo} />
               </div>
             )}
+            {tab === "movements" && <MovementTable itemNo={cabinet.cabinetNo} />}
             {tab === "signals" && (
               <div className="space-y-3">
                 <div className="txt-caption text-muted-foreground">

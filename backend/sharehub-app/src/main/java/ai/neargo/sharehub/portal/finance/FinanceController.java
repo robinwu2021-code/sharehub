@@ -46,13 +46,28 @@ public class FinanceController {
     private final PayoutAccountService payoutAccountService;
     private final ReconcileService reconcileService;
     private final InvoiceService invoiceService;
+    private final ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoiceService;
+    private final TaxInvoiceDocuments taxInvoiceDocs;
+    private final ai.neargo.sharehub.finance.service.SelfBillService selfBills;
+    private final ai.neargo.sharehub.finance.service.PayableReportService payables;
+    private final ai.neargo.sharehub.portal.approval.ApprovalGate approvals;
 
     public FinanceController(ShareService shareService, SettlementService settlementService,
                              WithdrawalService withdrawalService,
                              PayoutAccountService payoutAccountService, ReconcileService reconcileService,
                              InvoiceService invoiceService,
                              ai.neargo.sharehub.finance.service.LedgerService ledgerService,
-                             ai.neargo.sharehub.trade.order.service.DepositService depositService) {
+                             ai.neargo.sharehub.trade.order.service.DepositService depositService,
+                             ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoiceService,
+                             TaxInvoiceDocuments taxInvoiceDocs,
+                             ai.neargo.sharehub.finance.service.SelfBillService selfBills,
+                             ai.neargo.sharehub.finance.service.PayableReportService payables,
+                             ai.neargo.sharehub.portal.approval.ApprovalGate approvals) {
+        this.approvals = approvals;
+        this.payables = payables;
+        this.selfBills = selfBills;
+        this.taxInvoiceService = taxInvoiceService;
+        this.taxInvoiceDocs = taxInvoiceDocs;
         this.ledgerService = ledgerService;
         this.depositService = depositService;
         this.shareService = shareService;
@@ -367,6 +382,128 @@ public class FinanceController {
         return invoiceService.save(withInvoiceNo(body, invoiceNo)); // 路径为准，防越权改他人发票
     }
 
+    // ——————————— 租赁税务发票（C 端，V181）：自动开出，运营只看与重试 ———————————
+
+    @GetMapping("/api/trade/tax-invoices")
+    @PreAuthorize("@perm.can('finance:invoice:read')")
+    public PageResult<TaxInvoiceView> taxInvoices(@RequestParam(required = false) Integer page,
+                                                  @RequestParam(required = false) Integer size,
+                                                  @RequestParam(required = false) String orderNo,
+                                                  @RequestParam(required = false) String kind,
+                                                  @RequestParam(required = false) String status) {
+        PageResult<ai.neargo.sharehub.trade.order.entity.OrdTaxInvoice> r = taxInvoiceService.page(orderNo, kind, status,
+                page == null ? 1 : page, size == null ? 20 : size);
+        return new PageResult<>(r.getList().stream().map(TaxInvoiceView::of).toList(), r.getTotal());
+    }
+
+    @GetMapping("/api/trade/tax-invoices/{invoiceNo}")
+    @PreAuthorize("@perm.can('finance:invoice:read')")
+    public TaxInvoiceView taxInvoice(@PathVariable String invoiceNo) {
+        return TaxInvoiceView.of(taxInvoiceService.get(invoiceNo));
+    }
+
+    /**
+     * 导出（K8 / RQ-INV-07~08）：{@code format=xlsx|pdf} 出登记表，{@code format=zip} 把区间内已开出的票逐张出 PDF 打包。
+     * 日期是业务日（含两端）。登记表上限 {@link ai.neargo.sharehub.portal.shared.ExportSupport#MAX_ROWS} 行，
+     * 打包上限 {@link TaxInvoiceDocuments#MAX_ZIP} 张 —— 超了 400，让人缩小区间，而不是悄悄少给。
+     * 静态段 {@code /export} 优先于 {@code /{invoiceNo}} 匹配。
+     */
+    @GetMapping("/api/trade/tax-invoices/export")
+    @PreAuthorize("@perm.can('finance:invoice:read')")
+    public void exportTaxInvoices(@RequestParam(required = false) String format,
+                                  @RequestParam(required = false) String orderNo,
+                                  @RequestParam(required = false) String kind,
+                                  @RequestParam(required = false) String status,
+                                  @RequestParam(required = false) String from,
+                                  @RequestParam(required = false) String to,
+                                  jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        java.time.LocalDate f = day(from, "from");
+        java.time.LocalDate t = day(to, "to");
+        String filter = java.util.stream.Stream.of(orderNo, kind, status, from == null ? null : from + " ~ " + (to == null ? "" : to))
+                .filter(v -> v != null && !v.isBlank()).collect(java.util.stream.Collectors.joining(" · "));
+        if ("zip".equalsIgnoreCase(format == null ? "" : format.trim())) {
+            var list = taxInvoiceService.listForExport(orderNo, kind, ai.neargo.sharehub.trade.order.service.TaxInvoiceService.ISSUED, f, t, TaxInvoiceDocuments.MAX_ZIP + 1);
+            if (list.size() > TaxInvoiceDocuments.MAX_ZIP) {
+                throw ai.neargo.sharehub.common.BizException.badRequest("error.export.too_many", TaxInvoiceDocuments.MAX_ZIP);
+            }
+            taxInvoiceDocs.zip(list, "tax-invoices-" + (from == null ? "all" : from) + (to == null ? "" : "_" + to)).writeTo(response);
+            return;
+        }
+        int cap = ai.neargo.sharehub.portal.shared.ExportSupport.MAX_ROWS;
+        var list = taxInvoiceService.listForExport(orderNo, kind, status, f, t, cap + 1);
+        boolean truncated = list.size() > cap;
+        taxInvoiceDocs.register(ai.neargo.sharehub.common.export.ExportFormat.of(format),
+                truncated ? list.subList(0, cap) : list, truncated, filter).writeTo(response);
+    }
+
+    // ——————————— 跨期应付（SHR-05，第 6 批）：收款方 × 期间 的 应得 / 已出结算单 / 已付 / 未付 ———————————
+
+    @GetMapping("/api/trade/payables")
+    @PreAuthorize("@perm.can('finance:share_record:read')")
+    public PageResult<ai.neargo.sharehub.finance.service.PayableReportService.PayableRow> payables(
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String payeeType, @RequestParam(required = false) String payeeNo,
+            @RequestParam(required = false) String fromPeriod, @RequestParam(required = false) String toPeriod,
+            @RequestParam(required = false) Boolean onlyOutstanding) {
+        return payables.page(page, size, payeeType, payeeNo, fromPeriod, toPeriod, Boolean.TRUE.equals(onlyOutstanding));
+    }
+
+    // ——————————— 商家分成自开票（C10，V183）———————————
+
+    @GetMapping("/api/trade/self-bills")
+    @PreAuthorize("@perm.can('finance:invoice:read')")
+    public PageResult<SelfBillView> selfBills(@RequestParam(required = false) Integer page,
+                                              @RequestParam(required = false) Integer size,
+                                              @RequestParam(required = false) String agentNo,
+                                              @RequestParam(required = false) String keyword) {
+        var r = selfBills.page(page, size, agentNo, keyword);
+        return new PageResult<>(r.getList().stream().map(SelfBillView::of).toList(), r.getTotal());
+    }
+
+    @GetMapping("/api/trade/self-bills/{billNo}/pdf")
+    @PreAuthorize("@perm.can('finance:invoice:read')")
+    public void selfBillPdf(@PathVariable String billNo,
+                            jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        taxInvoiceDocs.selfBillPdf(selfBills.get(billNo)).writeTo(response);
+    }
+
+    /** 补出：开关当时关着、商家后补了税号、或自动出单失败时，对一笔已到账的提现补一张。已出过则原样返回。 */
+    @PostMapping("/api/trade/self-bills/issue")
+    @PreAuthorize("@perm.can('finance:invoice:issue')")
+    public SelfBillView issueSelfBill(@RequestBody SelfBillIssueReq body) {
+        if (body == null || body.withdrawNo() == null || body.withdrawNo().isBlank()) {
+            throw ai.neargo.sharehub.common.BizException.badRequest("error.common.missing_parameter", "withdrawNo");
+        }
+        return SelfBillView.of(selfBills.issueFor(body.withdrawNo().trim()));
+    }
+
+    public record SelfBillIssueReq(String withdrawNo) {
+    }
+
+    /** 单张票 PDF（RQ-INV-06）。BLOCKED 的票 409。 */
+    @GetMapping("/api/trade/tax-invoices/{invoiceNo}/pdf")
+    @PreAuthorize("@perm.can('finance:invoice:read')")
+    public void taxInvoicePdf(@PathVariable String invoiceNo,
+                              jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        taxInvoiceDocs.pdf(taxInvoiceService.get(invoiceNo)).writeTo(response);
+    }
+
+    private static java.time.LocalDate day(String v, String name) {
+        if (v == null || v.isBlank()) return null;
+        try {
+            return java.time.LocalDate.parse(v.trim());
+        } catch (java.time.format.DateTimeParseException e) {
+            throw ai.neargo.sharehub.common.BizException.badRequest("error.common.invalid_value", name);
+        }
+    }
+
+    /** BLOCKED（开票主体不全）的票在补齐主体后重开；ISSUED 的不可动。 */
+    @PostMapping("/api/trade/tax-invoices/{invoiceNo}/retry")
+    @PreAuthorize("@perm.can('finance:invoice:issue')")
+    public TaxInvoiceView retryTaxInvoice(@PathVariable String invoiceNo) {
+        return TaxInvoiceView.of(taxInvoiceService.retry(invoiceNo));
+    }
+
     /** record 不可变，改键只能重建一个（比让 DTO 变可变类划算）。 */
     private static FinDtos.InvoiceSaveReq withInvoiceNo(FinDtos.InvoiceSaveReq b, String invoiceNo) {
         return new FinDtos.InvoiceSaveReq(invoiceNo, b.payeeType(), b.payeeNo(), b.payeeName(),
@@ -382,8 +519,8 @@ public class FinanceController {
     @PostMapping("/api/trade/ledger/vouchers")
     @PreAuthorize("@perm.can('finance:ledger:create')")
     public Object createVoucher(@RequestBody FinDtos.LedgerPostReq body) {
-        String voucherNo = ledgerService.post(body);
-        return java.util.Map.of("voucherNo", voucherNo);
+        // 借方合计 ≥ approval.voucher.threshold 时转审批（SEC-03），返回 {pendingApproval}；否则照旧即时入账
+        return approvals.postVoucher(body);
     }
 
     /**

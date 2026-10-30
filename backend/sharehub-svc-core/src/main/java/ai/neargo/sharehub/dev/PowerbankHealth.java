@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.dev;
 
+import ai.neargo.sharehub.common.BizException;
+
 /**
  * 充电宝健康（{@code dev_powerbank.health}）。
  *
@@ -17,13 +19,13 @@ public enum PowerbankHealth {
     /** 老化待报废：循环次数超限，不再借出。 */
     AGED;
 
-    /** 宽松解析：非法值抛 {@link IllegalArgumentException}（全局映射 400）。 */
+    /** 宽松解析：非法值抛 {@link BizException}（400，文案走 i18n key —— 中文字面量会原样送到英文 / 阿语界面）。 */
     public static PowerbankHealth of(String v) {
-        if (v == null || v.isBlank()) throw new IllegalArgumentException("健康状态必填");
+        if (v == null || v.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "health");
         try {
             return valueOf(v.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("健康状态非法: " + v + "（仅 OK/FAULT/AGED）");
+            throw BizException.badRequest("error.common.invalid_value", v + " (OK/FAULT/AGED)");
         }
     }
 

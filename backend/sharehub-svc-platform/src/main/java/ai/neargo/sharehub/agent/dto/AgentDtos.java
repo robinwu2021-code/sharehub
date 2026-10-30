@@ -44,6 +44,31 @@ public final class AgentDtos {
                        String agentType, Double shareRate, Integer cabinetCount, String status,
                        String archivedAt,
                        /* V123：联系方式从自由文本 contact 拆出来。contact 已退役，仅带出待归位的存量 */
-                       String contactName, String phone, String email) {
+                       String contactName, String phone, String email,
+                       /*
+                        * V157：商家核心资料「位置、行业」+ 系统建的默认站点。追加在末尾，理由同 LocDtos.Site。
+                        * 保存时**不传 = 不改**：这几项多由运营后补（需求方案 D4 两阶段），
+                        * 只改联系人的保存请求不该把位置清空。
+                        */
+                       String address, java.math.BigDecimal lng, java.math.BigDecimal lat, String industry,
+                       String defaultSiteNo,
+                       /* V183（C10）：VAT 税号。保存时不传 = 不改；传空串 = 清掉（商家注销了 VAT 登记） */
+                       String vatTrn,
+                       /* V185（MER-01）：营业执照号。不传 = 不改 */
+                       String licenseNo) {
+
+        /** V157 之前的形状：位置与行业一律「不改」。种子与旧用例用它，免得十几个位置参数里塞五个 null。 */
+        public Agent(String agentNo, String name, String contact, String regionScope,
+                     String agentType, Double shareRate, Integer cabinetCount, String status,
+                     String archivedAt, String contactName, String phone, String email) {
+            this(agentNo, name, contact, regionScope, agentType, shareRate, cabinetCount, status, archivedAt,
+                    contactName, phone, email, null, null, null, null, null, null, null);
+        }
+
+        /** 核心资料是否齐全：位置（地址 + 坐标）与行业。店名、联系人建账号时已必填。 */
+        public boolean coreProfileComplete() {
+            return address != null && !address.isBlank() && lng != null && lat != null
+                    && industry != null && !industry.isBlank();
+        }
     }
 }

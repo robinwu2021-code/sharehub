@@ -6,7 +6,8 @@ import { currentAuth } from "../../auth";
 import { useLocaleStore } from "../../stores/locale";
 import { translate, LOCALE_TAG } from "../../i18n";
 import type { FinanceApi } from "../contracts/finance";
-import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ } from "../query";
+import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ, TaxInvoiceQ, SelfBillQ, PayableQ, ApprovalQ, ReportQ } from "../query";
+import { downloadFile } from "../download";
 
 /**
  * 非信封端点（整页 HTML）的取数：带同一套 Authorization / Accept-Language，返回文本。
@@ -23,7 +24,8 @@ const raw = {
     try {
       r = await fetch(`${base}${path}${qs}`, {
         headers: {
-          Accept: "text/html",
+          // 对账单是整页 HTML，付款任务转账文件是 CSV —— 都是非信封响应
+          Accept: "text/html, text/csv",
           "Accept-Language": LOCALE_TAG[useLocaleStore.getState().locale],
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
@@ -32,7 +34,7 @@ const raw = {
       throw new ApiError(-1, translate(useLocaleStore.getState().locale, "error.network"));
     }
     const type = r.headers.get("content-type") ?? "";
-    if (r.ok && type.includes("text/html")) return r.text();
+    if (r.ok && (type.includes("text/html") || type.includes("text/csv"))) return r.text();
     const body = (await r.json().catch(() => ({}))) as { code?: number; message?: string };
     throw new ApiError(body.code ?? r.status, body.message || translate(useLocaleStore.getState().locale, "error.unknown"));
   },
@@ -92,6 +94,20 @@ export const financeHttp: FinanceApi = {
   listReconciles: (q?: ReconQ) => client.get("/api/trade/reconciles", q),
   listInvoices: (q?: InvoiceQ) => client.get("/api/trade/invoices", q),
   getInvoice: (invoiceNo) => client.get(`/api/trade/invoices/${invoiceNo}`),
+  listTaxInvoices: (q?: TaxInvoiceQ) => client.get("/api/trade/tax-invoices", q),
+  getTaxInvoice: (invoiceNo) => client.get(`/api/trade/tax-invoices/${invoiceNo}`),
+  retryTaxInvoice: (invoiceNo) => client.post(`/api/trade/tax-invoices/${invoiceNo}/retry`, {}),
+  exportTaxInvoices: (q) => downloadFile("/api/trade/tax-invoices/export", q, `tax-invoices.${q.format}`),
+  listSelfBills: (q?: SelfBillQ) => client.get("/api/trade/self-bills", q),
+  listPayables: (q?: PayableQ) => client.get("/api/trade/payables", q),
+  listApprovals: (q?: ApprovalQ) => client.get("/api/trade/approvals", q),
+  approveApproval: (no) => client.post(`/api/trade/approvals/${no}/approve`, {}),
+  rejectApproval: (no, note) => client.post(`/api/trade/approvals/${no}/reject`, { note }),
+  issueSelfBill: (withdrawNo) => client.post("/api/trade/self-bills/issue", { withdrawNo }),
+  downloadSelfBillPdf: (billNo) => downloadFile(`/api/trade/self-bills/${billNo}/pdf`, {}, `${billNo}.pdf`),
+  listMySelfBills: (q?: PageQ) => client.get("/api/agent/me/self-bills", q),
+  downloadMySelfBillPdf: (billNo) => downloadFile(`/api/agent/me/self-bills/${billNo}/pdf`, {}, `${billNo}.pdf`),
+  downloadTaxInvoicePdf: (invoiceNo) => downloadFile(`/api/trade/tax-invoices/${invoiceNo}/pdf`, {}, `${invoiceNo}.pdf`),
   saveShareRule: (x) => client.post(x.ruleNo ? `/api/trade/share-rules/${x.ruleNo}` : "/api/trade/share-rules", x),
   saveInvoice: (x) => client.post(x.invoiceNo ? `/api/trade/invoices/${x.invoiceNo}` : "/api/trade/invoices", x),
 
@@ -114,4 +130,14 @@ export const financeHttp: FinanceApi = {
   // 财务 B5：分润统计（trade 域聚合）/ 充值订单（钱包同主体，归 user 域）
   listShareSummaries: (q?: ShareSummaryQ) => client.get("/api/trade/share-summaries", q),
   listRechargeOrders: (q?: RechargeQ) => client.get("/api/user/recharge-orders", q),
+
+  // 付款任务（V158）
+  previewPayoutTask: (cutoffDate) => client.get("/api/trade/payout-tasks/preview", { cutoffDate }),
+  createPayoutTask: (cutoffDate) => client.post("/api/trade/payout-tasks", { cutoffDate }),
+  listPayoutTasks: (q) => client.get("/api/trade/payout-tasks", q),
+  getPayoutTask: (no) => client.get(`/api/trade/payout-tasks/${no}`),
+  auditPayoutTask: (no, approve, rejectReason) => client.post(`/api/trade/payout-tasks/${no}/audit`, { approve, rejectReason }),
+  // 非信封：直接写的文件流，走 raw 取文本
+  exportPayoutTask: (no) => raw.get(`/api/trade/payout-tasks/${no}/export`, {}),
+  confirmPayoutTask: (no, body) => client.post(`/api/trade/payout-tasks/${no}/confirm`, body),
 };

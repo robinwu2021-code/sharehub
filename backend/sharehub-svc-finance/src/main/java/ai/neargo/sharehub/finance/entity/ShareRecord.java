@@ -56,6 +56,18 @@ public class ShareRecord extends BaseEntity {
     private BigDecimal grossAmount;
 
     /**
+     * 分成基数口径（V155，需求方案 D9）：{@link ai.neargo.sharehub.finance.ShareBaseMode} 的名字。
+     * 空 = V155 之前生成，当时按含税实收。改口径只影响之后的订单，所以每笔都要自带口径。
+     */
+    private String baseMode;
+
+    /** 折算所用税率，百分数口径（5.00 = 5%）。GROSS 口径或价外税时为 0。 */
+    private BigDecimal taxRate;
+
+    /** 分成基数：{@code amount = baseAmount × rate}（向下取整到分）。PRE_TAX 时为实收折回税前。 */
+    private BigDecimal baseAmount;
+
+    /**
      * 分成依据（V53 / ADR-027）：INVEST / DEVELOP / OPERATE / REFER。
      *
      * <p>一个代理在一个站点上可以既出资又运维，两笔钱的比例与去向都不同。
@@ -74,6 +86,14 @@ public class ShareRecord extends BaseEntity {
      * 规则或合同一改，历史分润的依据就永远查不回来了。
      */
     private String sourceNo;
+
+    /** 冲回来源退款单号（V170）；非空 = 本行是退款冲回，金额为负。原行为空。 */
+    private String refundNo;
+
+    /** 生成列 COALESCE(refund_no, '')，进唯一键。只读。 */
+    @com.baomidou.mybatisplus.annotation.TableField(insertStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.NEVER,
+            updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.NEVER)
+    private String reversalKey;
 
     // createdAt / updatedAt / version / deleted 见 BaseEntity，**不重复声明**（[SKELETON_BRIEF §4]）。
     // 统计口径里的 period（YYYY-MM）就是从 created_at 现算的，本表没有也不需要 period 列。

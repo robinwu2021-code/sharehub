@@ -1,7 +1,7 @@
 // Mock 实现（McpApi）。全部走 mock/db 内存数据 + 模拟延迟。后端未就绪即可跑通全部 UI。
 import * as db from "@/mock/db";
 import type { McpApi, LoginParams, RentParams, PayParams, OrderQ, NearbyQ } from "./contract";
-import type { ConsumerOrder, LogoffItem, UserCoupon, RechargeResult, CsTicket, ReportResult, FileRef } from "@/types";
+import type { ConsumerOrder, TaxInvoice, LogoffItem, UserCoupon, RechargeResult, CsTicket, ReportResult, FileRef } from "@/types";
 import { t } from "@/i18n";
 
 /** 注销申请的 mock 状态。模块级而非 db 里：它是会话内的一次性流程，不是种子数据。 */
@@ -120,6 +120,10 @@ export const mockApi: McpApi = {
   },
   ongoingOrder: () =>
     db.delay(withEstimate(db.orders.find((o) => o.status === "IN_USE" || o.status === "DISPENSING") ?? null)),
+  // 运营方缺省不开 C 端税务发票（invoice.b2c.enabled=0），mock 与之一致
+  orderInvoices: (_orderNo: string) => db.delay([] as TaxInvoice[]),
+  // mock 下没有票（开关缺省关），也就没有可下载的 PDF
+  invoicePdf: (_orderNo: string, invoiceNo: string) => Promise.reject(new Error(`no invoice ${invoiceNo} in mock`)),
   buyout: (orderNo: string) => {
     const o = db.orders.find((x) => x.orderNo === orderNo);
     if (o) {

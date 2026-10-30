@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, keepPreviousData, useMutation } from "@tanstack/react-query";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line,
   Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -11,6 +11,7 @@ import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { Pagination, Skeleton, StatCard } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
+import { InventoryReportTab } from "@/components/report/inventory-report";
 import { useNavTabs, usePageTab, keepWithinTab } from "@/lib/hooks/use-page-tab";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,7 @@ import type {
 } from "@/lib/types";
 
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
-const TAB_KEYS = ["device", "location", "finance", "screen", "custom", "consumer"] as const;
+const TAB_KEYS = ["device", "location", "finance", "inventory", "screen", "custom", "consumer"] as const;
 
 /** 三张周期报表 → 趋势口径。tab 与 kind 一一对应，别在多处各写一次映射。 */
 const TREND_KIND: Record<string, ReportTrendKind> = {
@@ -556,39 +557,12 @@ function ReportsInner() {
     })),
   ];
 
-  // 导出：文件名带周期，否则下载一堆同名 CSV 分不清是哪段时间的。
-  const exportCurrent = () => {
-    const suffix = `-${periodLabel(period)}`;
-    if (tab === "device") {
-      exportCsv<ReportDevice>(`设备运营分析${suffix}`, [
-        { header: "站点", value: (r) => r.locationName },
-        { header: "机柜数", value: (r) => Math.round(r.cabinetCount) },
-        { header: "订单数", value: (r) => r.orders },
-        { header: "在线率", value: (r) => r.onlineRate },
-        { header: "翻台率", value: (r) => r.turnover },
-        { header: "故障率", value: (r) => r.faultRate },
-      ], (q.data?.list ?? []) as ReportDevice[]);
-    } else if (tab === "location") {
-      exportCsv<ReportLocation>(`点位坪效${suffix}`, [
-        { header: "站点", value: (r) => r.siteName },
-        { header: "营收", value: (r) => r.revenue },
-        { header: "成本", value: (r) => r.cost },
-        { header: "订单数", value: (r) => r.orders },
-        { header: "币种", value: (r) => r.currency },
-        { header: "回本天数", value: (r) => (r.payback > 0 ? Math.round(r.payback) : "") },
-        { header: "ROI", value: (r) => r.roi },
-      ], (q.data?.list ?? []) as ReportLocation[]);
-    } else {
-      exportCsv<ReportFinance>(`财务报表${suffix}`, [
-        { header: "周期", value: (r) => r.period },
-        { header: "GMV", value: (r) => r.gmv },
-        { header: "分润", value: (r) => r.share },
-        { header: "结算", value: (r) => r.settle },
-        { header: "净收入", value: (r) => r.net },
-        { header: "币种", value: (r) => r.currency },
-      ], (q.data?.list ?? []) as ReportFinance[]);
-    }
-  };
+  // 导出走后端（K8 / AC-09）：全量而不是当前页，Excel 与 PDF 两种；文件名由后端带业务日期。
+  // 用 mutation 只为接上全局错误弹窗（403 / 网络失败）与按钮的处理中态。
+  const exportReport = useMutation({
+    mutationFn: (format: "xlsx" | "pdf") =>
+      api.exportReport(tab as "device" | "location" | "finance", format, { keyword: keyword || undefined, period }),
+  });
 
   return (
     <div>
@@ -600,10 +574,12 @@ function ReportsInner() {
             search={keyword}
             onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder={tab === "finance" ? "搜索周期" : "搜索站点"}
-            // 三张报表共用一条工具条：周期选择在左，导出按当前 tab 出对应的列
-            onExport={exportCurrent}
+            // 三张报表共用一条工具条：周期选择在左，导出按当前 tab 由后端出全量
+            onExport={() => exportReport.mutate("xlsx")}
+            exportLabel={exportReport.isPending ? "导出中…" : "导出 Excel"}
           >
             <PeriodSelect value={period} onChange={(v) => { setPeriod(v as ReportPeriod); paging.reset(); }} />
+            <Button variant="outline" disabled={exportReport.isPending} onClick={() => exportReport.mutate("pdf")}>导出 PDF</Button>
           </Toolbar>
           <Notice>
             统计口径：{periodLabel(period)}（到昨日为止，T+1 跑批）。图表与汇总条与表格同源，切周期三处同时变；
@@ -613,6 +589,8 @@ function ReportsInner() {
           <TrendChart trend={trendQ.data} loading={trendQ.isLoading} />
         </>
       )}
+
+      {tab === "inventory" && <InventoryReportTab />}
 
       {tab === "device" && (
         <DataTable

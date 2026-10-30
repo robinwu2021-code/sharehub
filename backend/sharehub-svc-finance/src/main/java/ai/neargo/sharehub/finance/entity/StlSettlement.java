@@ -38,6 +38,9 @@ public class StlSettlement extends BaseEntity {
     /** GEN / CONFIRMED / PAID。 */
     private String status;
 
+    /** 纳入的提现单（V158）：非空 = 在途或已付，不再被新付款任务纳入；失败或撤回时清空。 */
+    private String withdrawNo;
+
     /** 确认人（V31，CONFIRMED 时回填）。 */
     private String confirmedBy;
 

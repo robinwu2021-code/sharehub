@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.scenario;
 
+import ai.neargo.sharehub.support.MerchantCoreProfile;
 import ai.neargo.sharehub.common.event.entity.SysOutbox;
 import ai.neargo.sharehub.common.event.mapper.SysOutboxMapper;
 import ai.neargo.sharehub.support.ApiTestSupport;
@@ -19,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>这些断言检查的是**机制**而非某个业务结果 —— outbox 的价值全在
  * 「原子」与「不丢」两点上，业务测试碰不到它们。
  */
+@MerchantCoreProfile({"AG002"})
 class OutboxEventTest extends ApiTestSupport {
 
     @Autowired

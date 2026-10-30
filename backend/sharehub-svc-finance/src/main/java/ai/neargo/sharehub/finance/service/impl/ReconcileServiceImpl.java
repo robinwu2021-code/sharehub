@@ -153,10 +153,10 @@ public class ReconcileServiceImpl implements ReconcileService {
         if (period != null && !period.isBlank()) w.eq("period", period);
         long tasks = taskMapper.selectCount(w);
         long diffs = diffMapper.selectCount(null);
-        com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<ReconDiff> rw =
-                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<>();
-        rw.eq("status", "RESOLVED");
-        long resolved = diffMapper.selectCount(rw);
+        // 已处理 = resolved = 1（与 resolve / 待处理列表同一口径）。此前按字符串列名查 status = 'RESOLVED'，
+        // 表里根本没有 status 列 —— 对账页统计每次都 500，编译期无从发现，所以改用 lambda
+        long resolved = diffMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ReconDiff>()
+                .eq(ReconDiff::getResolved, 1));
         // 差异数与已处理数分开给，前端才能算「还有多少没对平」——
         // 只给一个「未处理数」的话，页面无法显示进度分母。
         return java.util.Map.of("tasks", tasks, "diffs", diffs, "resolved", resolved,

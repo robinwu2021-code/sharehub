@@ -158,7 +158,8 @@ public class AuditTrailInterceptor implements HandlerInterceptor {
                     u == null ? systemActor(req) : u.userNo(),
                     u == null ? systemActor(req) : u.username(),
                     u == null ? null : ClientCode.of(u.realm()),
-                    req.getMethod() + " " + uri,
+                    // 列宽 255（V208）；再长的路径截断也比整条审计写失败、没有留痕强
+                    abbreviate(req.getMethod() + " " + uri, 255),
                     AuditOutcome.ofStatus(res.getStatus()),
                     TraceContext.currentTraceId(),
                     // **不包 json**：这两列存的是业务值（资源名 / 业务键），不是 JSON。
@@ -203,6 +204,10 @@ public class AuditTrailInterceptor implements HandlerInterceptor {
      * 从路径推出操作对象：{@code /api/ops/work-orders/WO123/dispatch} → (work-orders, WO123)。
      * 取「最后一个像业务键的段」而非固定位置 —— 动作端点的键在倒数第二段，CRUD 在最后一段。
      */
+    private static String abbreviate(String s, int max) {
+        return s.length() <= max ? s : s.substring(0, max - 1) + "…";
+    }
+
     private static Target targetOf(String uri) {
         String[] seg = uri.split("/");
         String type = seg.length > 3 ? seg[3] : "";

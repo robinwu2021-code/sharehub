@@ -37,11 +37,18 @@ public class AnonymousRateLimitFilter extends OncePerRequestFilter {
 
     private static final Duration WINDOW = Duration.ofMinutes(1);
 
-    private final int maxPerMinute;
-    private final Map<String, Counter> counters = new ConcurrentHashMap<>();
+    private static final String LOGIN = "/api/auth/login";
 
-    public AnonymousRateLimitFilter(@Value("${sharehub.security.apply-rate-per-minute:10}") int maxPerMinute) {
+    private final int maxPerMinute;
+    private final int loginPerMinute;
+    private final Map<String, Counter> counters = new ConcurrentHashMap<>();
+    /** 登录单独计数：与发码共用一个桶的话，正常登录几次就把发码额度吃光（反之亦然）。 */
+    private final Map<String, Counter> loginCounters = new ConcurrentHashMap<>();
+
+    public AnonymousRateLimitFilter(@Value("${sharehub.security.apply-rate-per-minute:10}") int maxPerMinute,
+                                    @Value("${sharehub.security.login-rate-per-minute:30}") int loginPerMinute) {
         this.maxPerMinute = maxPerMinute;
+        this.loginPerMinute = loginPerMinute;
     }
 
     private static final class Counter {
@@ -58,7 +65,10 @@ public class AnonymousRateLimitFilter extends OncePerRequestFilter {
                 || p.equals("/api/agent/apply/otp")
                 // 登录发码：与入驻发码同性质 —— OtpGate 的重发间隔是**按手机号**的，
                 // 换个号就能接着发，只有单 IP 限流拦得住批量刷短信
-                || p.equals("/api/auth/otp"));
+                || p.equals("/api/auth/otp")
+                // 登录（商家一期 B2，需求方案 §四「同一 IP 每分钟上限」）：口令登录有逐账号的失败锁定，
+                // 但换账号撞库只有单 IP 限流拦得住。上限比发码宽 —— 一个办公室共用出口 IP，正常登录要放得过
+                || p.equals(LOGIN));
     }
 
     @Override
@@ -71,7 +81,8 @@ public class AnonymousRateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (!allow(clientIp(req))) {
+        boolean login = LOGIN.equals(req.getRequestURI());
+        if (!allow(login ? loginCounters : counters, clientIp(req), login ? loginPerMinute : maxPerMinute)) {
             resp.setStatus(429);
             resp.setContentType("application/json;charset=UTF-8");
             // message 不是 msg —— 见 SecurityConfig 同处注释
@@ -81,7 +92,7 @@ public class AnonymousRateLimitFilter extends OncePerRequestFilter {
         chain.doFilter(req, resp);
     }
 
-    private boolean allow(String ip) {
+    private static boolean allow(Map<String, Counter> counters, String ip, int maxPerMinute) {
         Counter c = counters.computeIfAbsent(ip, k -> new Counter());
         Instant now = Instant.now();
         synchronized (c) {

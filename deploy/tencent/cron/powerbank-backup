@@ -1,0 +1,20 @@
+# powerbank · 每日库备份（README §8；运营方原始需求 SEC-07 / DLV-12，2026-10-29 补进仓库）
+#
+# 03:30 —— 避开 ai-shop 03:20 的备份抢锁。脚本见 ops/backup-to-cos.sh。
+#
+# 口令与 COS 上传命令从独立的 600 文件读，**不写进 cron 文件、不进仓库**：
+#   /data/app/powerbank/ops/backup.env
+#     PB_DB_USER=… PB_DB_PASS=… PB_DB_NAME=pb_core
+#     PB_BACKUP_UPLOAD='coscli cp {file} cos://hxmall-backup-1301656997/db/powerbank/'
+# 备份账号要有 SELECT、SHOW VIEW、TRIGGER、LOCK TABLES；MySQL 8+ 另需 RELOAD 或 FLUSH_TABLES（MariaDB 不需要）。
+#
+# 失败即非 0 退出 → cron 把输出寄给 MAILTO；日志另落 /data/log/powerbank/backup.log。
+# 每月第一个工作日跑一次恢复演练：ops/restore-drill.sh <最新备份> restore_drill_YYYYMM（见 docs/delivery/备份与恢复演练.md）
+#
+# 安装：sudo cp cron/powerbank-backup /etc/cron.d/powerbank-backup
+#       sudo cp ops/backup-to-cos.sh ops/restore-drill.sh /data/app/powerbank/ops/ && sudo chmod 750 /data/app/powerbank/ops/*.sh
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+30 3 * * * deploy set -a && . /data/app/powerbank/ops/backup.env && set +a && /data/app/powerbank/ops/backup-to-cos.sh >> /data/log/powerbank/backup.log 2>&1

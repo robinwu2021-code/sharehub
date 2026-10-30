@@ -11,6 +11,9 @@ public interface AgentService {
     /** 新增/更新（upsert）：无 agentNo 则生成 AGxxx。 */
     Agent save(String agentNo, Agent in);
 
+    /** 运营为商家新建站点（V162）：建站含默认点位、划给商家、写运维责任，一个事务。 */
+    ai.neargo.sharehub.loc.dto.LocDtos.Site createSite(String agentNo, ai.neargo.sharehub.loc.dto.SiteDtos.SiteReq req);
+
     /** 归档代理商：盖 archivedAt 时间戳。**不是删除**，可 unarchive 恢复。 */
     Agent archive(String no);
 

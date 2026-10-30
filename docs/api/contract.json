@@ -376,6 +376,34 @@
     {
      "name": "email",
      "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "industry",
+     "type": "String"
+    },
+    {
+     "name": "defaultSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "vatTrn",
+     "type": "String"
+    },
+    {
+     "name": "licenseNo",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -449,6 +477,34 @@
     {
      "name": "email",
      "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "industry",
+     "type": "String"
+    },
+    {
+     "name": "defaultSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "vatTrn",
+     "type": "String"
+    },
+    {
+     "name": "licenseNo",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -498,6 +554,34 @@
     },
     {
      "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "industry",
+     "type": "String"
+    },
+    {
+     "name": "defaultSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "vatTrn",
+     "type": "String"
+    },
+    {
+     "name": "licenseNo",
      "type": "String"
     }
    ]
@@ -636,6 +720,30 @@
      "type": "String"
     }
    ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/agent/agents/{agentNo}/invite",
+   "perm": "agent:apply:approve",
+   "perms": [
+    "agent:apply:approve"
+   ],
+   "handler": "AgentApplyController#resendInvite",
+   "summary": "重发开通邀请：作废旧口令、发新的一次性口令（首登强制改）并重寄邀请邮件。",
+   "params": [
+    {
+     "in": "path",
+     "name": "agentNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "java.util.Map<String, Object>",
+   "returnContainer": null,
+   "returnElement": "java.util.Map<String, Object>",
+   "responseShape": null,
+   "requestShape": null
   },
   {
    "verb": "POST",
@@ -924,6 +1032,10 @@
     {
      "name": "operatorNo",
      "type": "String"
+    },
+    {
+     "name": "initialPassword",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -998,6 +1110,10 @@
     {
      "name": "operatorNo",
      "type": "String"
+    },
+    {
+     "name": "initialPassword",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -1034,6 +1150,10 @@
     },
     {
      "name": "operatorNo",
+     "type": "String"
+    },
+    {
+     "name": "initialPassword",
      "type": "String"
     }
    ],
@@ -1079,6 +1199,10 @@
     },
     {
      "name": "operatorNo",
+     "type": "String"
+    },
+    {
+     "name": "initialPassword",
      "type": "String"
     }
    ],
@@ -1184,7 +1308,7 @@
    "perm": null,
    "perms": [],
    "handler": "AgentApplyController#applyOtp",
-   "summary": "提交入驻申请 —— **自助与代建共用同一个端点**。",
+   "summary": "自助入口关闭时三个免鉴权端点一律 404。",
    "params": [],
    "bodyType": "Map<String, String>",
    "returnType": "Map<String, Object>",
@@ -1397,13 +1521,47 @@
   },
   {
    "verb": "POST",
+   "path": "/api/agent/assignments/batch",
+   "perm": "agent:scope:assign",
+   "perms": [
+    "agent:scope:assign"
+   ],
+   "handler": "AgentExtController#assignBatch",
+   "summary": "批量回收到平台直营。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.agent.ext.dto.AgentExtDtos.AssignBatchReq",
+   "returnType": "java.util.List<AssignmentLog>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<AssignmentLog>",
+   "responseShape": null,
+   "requestShape": [
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "siteNos",
+     "type": "java.util.List<String>"
+    },
+    {
+     "name": "action",
+     "type": "String"
+    },
+    {
+     "name": "operator",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
    "path": "/api/agent/assignments/reclaim",
    "perm": "agent:scope:assign",
    "perms": [
     "agent:scope:assign"
    ],
    "handler": "AgentExtController#reclaim",
-   "summary": "批量回收到平台直营。",
+   "summary": "",
    "params": [],
    "bodyType": "ReclaimReq",
    "returnType": "java.util.List<AssignmentLog>",
@@ -1960,6 +2118,258 @@
    "requestShape": null
   },
   {
+   "verb": "POST",
+   "path": "/api/agent/me/contact",
+   "perm": "agent:profile:update",
+   "perms": [
+    "agent:profile:update"
+   ],
+   "handler": "MerchantProfileController#updateContact",
+   "summary": "只改联系人（姓名、电话、邮箱）；名称、位置、行业由运营维护。",
+   "params": [],
+   "bodyType": "ContactReq",
+   "returnType": "MerchantProfile",
+   "returnContainer": null,
+   "returnElement": "MerchantProfile",
+   "responseShape": [
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "industry",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "defaultSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/agent/me/profile",
+   "perm": "agent:profile:read",
+   "perms": [
+    "agent:profile:read"
+   ],
+   "handler": "MerchantProfileController#profile",
+   "summary": "",
+   "params": [],
+   "bodyType": null,
+   "returnType": "MerchantProfile",
+   "returnContainer": null,
+   "returnElement": "MerchantProfile",
+   "responseShape": [
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "industry",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "defaultSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/agent/me/self-bills",
+   "perm": "finance:withdrawal:read",
+   "perms": [
+    "finance:withdrawal:read"
+   ],
+   "handler": "MerchantSelfBillController#mine",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<SelfBillView>",
+   "returnContainer": "PageResult",
+   "returnElement": "SelfBillView",
+   "responseShape": [
+    {
+     "name": "billNo",
+     "type": "String"
+    },
+    {
+     "name": "withdrawNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierName",
+     "type": "String"
+    },
+    {
+     "name": "supplierAddress",
+     "type": "String"
+    },
+    {
+     "name": "supplierTrn",
+     "type": "String"
+    },
+    {
+     "name": "recipientName",
+     "type": "String"
+    },
+    {
+     "name": "recipientTrn",
+     "type": "String"
+    },
+    {
+     "name": "taxRatePercent",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "netAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "grossAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "payRef",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/agent/me/self-bills/{billNo}/pdf",
+   "perm": "finance:withdrawal:read",
+   "perms": [
+    "finance:withdrawal:read"
+   ],
+   "handler": "MerchantSelfBillController#pdf",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "billNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
    "verb": "GET",
    "path": "/api/agent/performance",
    "perm": "agent:performance:read",
@@ -2135,6 +2545,14 @@
     },
     {
      "name": "otp",
+     "type": "String"
+    },
+    {
+     "name": "identifier",
+     "type": "String"
+    },
+    {
+     "name": "realm",
      "type": "String"
     }
    ]
@@ -5195,9 +5613,9 @@
   {
    "verb": "POST",
    "path": "/api/ops/asset-diffs/{diffNo}/resolve",
-   "perm": "device:inventory:transfer",
+   "perm": "device:inventory:diff",
    "perms": [
-    "device:inventory:transfer"
+    "device:inventory:diff"
    ],
    "handler": "AssetOpsController#resolve",
    "summary": "",
@@ -5392,6 +5810,18 @@
      "name": "status",
      "type": "String",
      "required": false
+    },
+    {
+     "in": "query",
+     "name": "issuedAgentNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "pool",
+     "type": "String",
+     "required": false
     }
    ],
    "bodyType": null,
@@ -5466,6 +5896,26 @@
     {
      "name": "warehouseNo",
      "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -5497,9 +5947,9 @@
   {
    "verb": "POST",
    "path": "/api/ops/cabinets/import",
-   "perm": "device:cabinet:create",
+   "perm": "device:cabinet:import",
    "perms": [
-    "device:cabinet:create"
+    "device:cabinet:import"
    ],
    "handler": "OpsController#importCabinets",
    "summary": "批量导入机柜。",
@@ -5603,6 +6053,26 @@
       },
       {
        "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "issuedAgentNo",
+       "type": "String"
+      },
+      {
+       "name": "issuedAt",
+       "type": "String"
+      },
+      {
+       "name": "issuedSiteNo",
+       "type": "String"
+      },
+      {
+       "name": "issueReceiverNo",
+       "type": "String"
+      },
+      {
+       "name": "issueClaimedAt",
        "type": "String"
       }
      ]
@@ -11174,6 +11644,79 @@
   },
   {
    "verb": "GET",
+   "path": "/api/ops/device-movements",
+   "perm": "device:cabinet:read",
+   "perms": [
+    "device:cabinet:read"
+   ],
+   "handler": "AssetOpsController#movements",
+   "summary": "设备履历（V196，仓外段）：位置与归属的每一次变化，新的在前。",
+   "params": [
+    {
+     "in": "query",
+     "name": "itemNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "List<ai.neargo.sharehub.dev.dto.DeviceOpsDtos.DeviceMovement>",
+   "returnContainer": "List",
+   "returnElement": "ai.neargo.sharehub.dev.dto.DeviceOpsDtos.DeviceMovement",
+   "responseShape": [
+    {
+     "name": "id",
+     "type": "Long"
+    },
+    {
+     "name": "itemType",
+     "type": "String"
+    },
+    {
+     "name": "itemNo",
+     "type": "String"
+    },
+    {
+     "name": "event",
+     "type": "String"
+    },
+    {
+     "name": "fromRef",
+     "type": "String"
+    },
+    {
+     "name": "toRef",
+     "type": "String"
+    },
+    {
+     "name": "agentBefore",
+     "type": "String"
+    },
+    {
+     "name": "agentAfter",
+     "type": "String"
+    },
+    {
+     "name": "reason",
+     "type": "String"
+    },
+    {
+     "name": "sourceRef",
+     "type": "String"
+    },
+    {
+     "name": "operatorNo",
+     "type": "String"
+    },
+    {
+     "name": "occurredAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/ops/device-signals",
    "perm": "device:cabinet:read",
    "perms": [
@@ -11221,6 +11764,631 @@
     }
    ],
    "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/devices/bind-batch",
+   "perm": "device:cabinet:update",
+   "perms": [
+    "device:cabinet:update"
+   ],
+   "handler": "DevicePoolController#bindBatch",
+   "summary": "批量绑定：同一商家的一批出库池设备，一个事务（任一台不满足整批不动）。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.dev.dto.BindDtos.BindBatchReq",
+   "returnType": "List<ai.neargo.sharehub.dev.dto.BindDtos.BindResult>",
+   "returnContainer": "List",
+   "returnElement": "ai.neargo.sharehub.dev.dto.BindDtos.BindResult",
+   "responseShape": [
+    {
+     "name": "cabinet",
+     "type": "Cabinet",
+     "fields": [
+      {
+       "name": "cabinetNo",
+       "type": "String"
+      },
+      {
+       "name": "sn",
+       "type": "String"
+      },
+      {
+       "name": "vendorCode",
+       "type": "String"
+      },
+      {
+       "name": "model",
+       "type": "String"
+      },
+      {
+       "name": "locationNo",
+       "type": "String"
+      },
+      {
+       "name": "locationName",
+       "type": "String"
+      },
+      {
+       "name": "slotTotal",
+       "type": "int"
+      },
+      {
+       "name": "availableCount",
+       "type": "int"
+      },
+      {
+       "name": "onlineStatus",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "fwVersion",
+       "type": "String"
+      },
+      {
+       "name": "lastHeartbeatAt",
+       "type": "String"
+      },
+      {
+       "name": "siteNo",
+       "type": "String"
+      },
+      {
+       "name": "agentNo",
+       "type": "String"
+      },
+      {
+       "name": "archivedAt",
+       "type": "String"
+      },
+      {
+       "name": "qcStatus",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "issuedAgentNo",
+       "type": "String"
+      },
+      {
+       "name": "issuedAt",
+       "type": "String"
+      },
+      {
+       "name": "issuedSiteNo",
+       "type": "String"
+      },
+      {
+       "name": "issueReceiverNo",
+       "type": "String"
+      },
+      {
+       "name": "issueClaimedAt",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "woNo",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "locationNo",
+     "type": "String"
+    },
+    {
+     "name": "deviceNos",
+     "type": "List<String>"
+    },
+    {
+     "name": "openInstallWo",
+     "type": "Boolean"
+    },
+    {
+     "name": "expectedAt",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/devices/claim",
+   "perm": "device:cabinet:update",
+   "perms": [
+    "device:cabinet:update"
+   ],
+   "handler": "DevicePoolController#claim",
+   "summary": "接收人签收（V195）：只能签给自己的 —— 权限码只是门槛，「本人 = 接收人」在服务里校验。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.dev.dto.PoolDtos.ClaimReq",
+   "returnType": "List<Cabinet>",
+   "returnContainer": "List",
+   "returnElement": "Cabinet",
+   "responseShape": [
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "sn",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "model",
+     "type": "String"
+    },
+    {
+     "name": "locationNo",
+     "type": "String"
+    },
+    {
+     "name": "locationName",
+     "type": "String"
+    },
+    {
+     "name": "slotTotal",
+     "type": "int"
+    },
+    {
+     "name": "availableCount",
+     "type": "int"
+    },
+    {
+     "name": "onlineStatus",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "fwVersion",
+     "type": "String"
+    },
+    {
+     "name": "lastHeartbeatAt",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "cabinetNos",
+     "type": "List<String>"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/devices/issue",
+   "perm": "device:inventory:transfer",
+   "perms": [
+    "device:inventory:transfer"
+   ],
+   "handler": "DevicePoolController#issue",
+   "summary": "",
+   "params": [],
+   "bodyType": "IssueReq",
+   "returnType": "List<Cabinet>",
+   "returnContainer": "List",
+   "returnElement": "Cabinet",
+   "responseShape": [
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "sn",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "model",
+     "type": "String"
+    },
+    {
+     "name": "locationNo",
+     "type": "String"
+    },
+    {
+     "name": "locationName",
+     "type": "String"
+    },
+    {
+     "name": "slotTotal",
+     "type": "int"
+    },
+    {
+     "name": "availableCount",
+     "type": "int"
+    },
+    {
+     "name": "onlineStatus",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "fwVersion",
+     "type": "String"
+    },
+    {
+     "name": "lastHeartbeatAt",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "receiverNo",
+     "type": "String"
+    },
+    {
+     "name": "cabinetNos",
+     "type": "List<String>"
+    },
+    {
+     "name": "carrier",
+     "type": "String"
+    },
+    {
+     "name": "trackingNo",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/devices/issue-redirect",
+   "perm": "device:inventory:transfer",
+   "perms": [
+    "device:inventory:transfer"
+   ],
+   "handler": "DevicePoolController#redirect",
+   "summary": "出库调整（V195）：改商家 / 站点 / 接收人，只收未绑定的。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.dev.dto.PoolDtos.RedirectReq",
+   "returnType": "List<Cabinet>",
+   "returnContainer": "List",
+   "returnElement": "Cabinet",
+   "responseShape": [
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "sn",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "model",
+     "type": "String"
+    },
+    {
+     "name": "locationNo",
+     "type": "String"
+    },
+    {
+     "name": "locationName",
+     "type": "String"
+    },
+    {
+     "name": "slotTotal",
+     "type": "int"
+    },
+    {
+     "name": "availableCount",
+     "type": "int"
+    },
+    {
+     "name": "onlineStatus",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "fwVersion",
+     "type": "String"
+    },
+    {
+     "name": "lastHeartbeatAt",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "cabinetNos",
+     "type": "List<String>"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "receiverNo",
+     "type": "String"
+    },
+    {
+     "name": "reason",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/devices/pool-return",
+   "perm": "device:inventory:transfer",
+   "perms": [
+    "device:inventory:transfer"
+   ],
+   "handler": "DevicePoolController#poolReturn",
+   "summary": "",
+   "params": [],
+   "bodyType": "PoolReturnReq",
+   "returnType": "List<Cabinet>",
+   "returnContainer": "List",
+   "returnElement": "Cabinet",
+   "responseShape": [
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "sn",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "model",
+     "type": "String"
+    },
+    {
+     "name": "locationNo",
+     "type": "String"
+    },
+    {
+     "name": "locationName",
+     "type": "String"
+    },
+    {
+     "name": "slotTotal",
+     "type": "int"
+    },
+    {
+     "name": "availableCount",
+     "type": "int"
+    },
+    {
+     "name": "onlineStatus",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "fwVersion",
+     "type": "String"
+    },
+    {
+     "name": "lastHeartbeatAt",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "cabinetNos",
+     "type": "List<String>"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "reason",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -11299,9 +12467,9 @@
   {
    "verb": "POST",
    "path": "/api/ops/devices/{cabinetNo}/qc",
-   "perm": "device:cabinet:update",
+   "perm": "device:qc:inspect",
    "perms": [
-    "device:cabinet:update"
+    "device:qc:inspect"
    ],
    "handler": "AssetOpsController#inspectCabinet",
    "summary": "",
@@ -11361,6 +12529,18 @@
     {
      "name": "inspectedAt",
      "type": "LocalDateTime"
+    },
+    {
+     "name": "ruleSnapshot",
+     "type": "String"
+    },
+    {
+     "name": "intakeNo",
+     "type": "String"
+    },
+    {
+     "name": "consumedBy",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -11386,6 +12566,135 @@
     },
     {
      "name": "note",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/devices/{deviceNo}/bind",
+   "perm": "device:cabinet:update",
+   "perms": [
+    "device:cabinet:update"
+   ],
+   "handler": "DevicePoolController#bind",
+   "summary": "绑定（V164）：出库池设备绑到点位；不给点位 = 出库池商家默认站点的默认点位。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.dev.dto.BindDtos.BindReq",
+   "returnType": "ai.neargo.sharehub.dev.dto.BindDtos.BindResult",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.dev.dto.BindDtos.BindResult",
+   "responseShape": [
+    {
+     "name": "cabinet",
+     "type": "Cabinet",
+     "fields": [
+      {
+       "name": "cabinetNo",
+       "type": "String"
+      },
+      {
+       "name": "sn",
+       "type": "String"
+      },
+      {
+       "name": "vendorCode",
+       "type": "String"
+      },
+      {
+       "name": "model",
+       "type": "String"
+      },
+      {
+       "name": "locationNo",
+       "type": "String"
+      },
+      {
+       "name": "locationName",
+       "type": "String"
+      },
+      {
+       "name": "slotTotal",
+       "type": "int"
+      },
+      {
+       "name": "availableCount",
+       "type": "int"
+      },
+      {
+       "name": "onlineStatus",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "fwVersion",
+       "type": "String"
+      },
+      {
+       "name": "lastHeartbeatAt",
+       "type": "String"
+      },
+      {
+       "name": "siteNo",
+       "type": "String"
+      },
+      {
+       "name": "agentNo",
+       "type": "String"
+      },
+      {
+       "name": "archivedAt",
+       "type": "String"
+      },
+      {
+       "name": "qcStatus",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "issuedAgentNo",
+       "type": "String"
+      },
+      {
+       "name": "issuedAt",
+       "type": "String"
+      },
+      {
+       "name": "issuedSiteNo",
+       "type": "String"
+      },
+      {
+       "name": "issueReceiverNo",
+       "type": "String"
+      },
+      {
+       "name": "issueClaimedAt",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "woNo",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "locationNo",
+     "type": "String"
+    },
+    {
+     "name": "openInstallWo",
+     "type": "Boolean"
+    },
+    {
+     "name": "expectedAt",
      "type": "String"
     }
    ]
@@ -11478,6 +12787,26 @@
     },
     {
      "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
      "type": "String"
     }
    ],
@@ -11626,6 +12955,26 @@
     },
     {
      "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
      "type": "String"
     }
    ],
@@ -11882,6 +13231,26 @@
     {
      "name": "warehouseNo",
      "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -11974,6 +13343,26 @@
     },
     {
      "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
      "type": "String"
     }
    ],
@@ -12116,6 +13505,117 @@
   },
   {
    "verb": "POST",
+   "path": "/api/ops/devices/{deviceNo}/unbind",
+   "perm": "device:cabinet:update",
+   "perms": [
+    "device:cabinet:update"
+   ],
+   "handler": "DevicePoolController#unbind",
+   "summary": "解绑：仅已绑定未上线；回同一商家的出库池。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.dev.dto.BindDtos.UnbindReq",
+   "returnType": "Cabinet",
+   "returnContainer": null,
+   "returnElement": "Cabinet",
+   "responseShape": [
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "sn",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "model",
+     "type": "String"
+    },
+    {
+     "name": "locationNo",
+     "type": "String"
+    },
+    {
+     "name": "locationName",
+     "type": "String"
+    },
+    {
+     "name": "slotTotal",
+     "type": "int"
+    },
+    {
+     "name": "availableCount",
+     "type": "int"
+    },
+    {
+     "name": "onlineStatus",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "fwVersion",
+     "type": "String"
+    },
+    {
+     "name": "lastHeartbeatAt",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "reason",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
    "path": "/api/ops/devices/{deviceNo}/undeploy",
    "perm": "device:cabinet:update",
    "perms": [
@@ -12202,6 +13702,26 @@
     },
     {
      "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
      "type": "String"
     }
    ],
@@ -13211,7 +14731,7 @@
      "required": true
     }
    ],
-   "bodyType": null,
+   "bodyType": "ai.neargo.sharehub.inv.dto.ShipmentDtos.ShipInfo",
    "returnType": "InventoryTransferDetail",
    "returnContainer": null,
    "returnElement": "InventoryTransferDetail",
@@ -13287,6 +14807,4248 @@
        "type": "boolean"
       }
      ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "carrier",
+     "type": "String"
+    },
+    {
+     "name": "trackingNo",
+     "type": "String"
+    },
+    {
+     "name": "shippedAt",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/counts",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#counts",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockCount>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockCount>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/counts",
+   "perm": "device:inventory:stocktake",
+   "perms": [
+    "device:inventory:stocktake"
+   ],
+   "handler": "InventoryController#openCount",
+   "summary": "",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.StockDtos.OpenCountReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "responseShape": [
+    {
+     "name": "count",
+     "type": "StockCount",
+     "fields": [
+      {
+       "name": "countNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "openedAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "List<StockCountLine>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "bookQty",
+       "type": "int"
+      },
+      {
+       "name": "countedQty",
+       "type": "Integer"
+      },
+      {
+       "name": "diffQty",
+       "type": "Integer"
+      }
+     ]
+    },
+    {
+     "name": "exceptions",
+     "type": "List<StockCountScan>",
+     "fields": [
+      {
+       "name": "serialNo",
+       "type": "String"
+      },
+      {
+       "name": "verdict",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "missingSerials",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/counts/{countNo}",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#count",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "countNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "responseShape": [
+    {
+     "name": "count",
+     "type": "StockCount",
+     "fields": [
+      {
+       "name": "countNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "openedAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "List<StockCountLine>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "bookQty",
+       "type": "int"
+      },
+      {
+       "name": "countedQty",
+       "type": "Integer"
+      },
+      {
+       "name": "diffQty",
+       "type": "Integer"
+      }
+     ]
+    },
+    {
+     "name": "exceptions",
+     "type": "List<StockCountScan>",
+     "fields": [
+      {
+       "name": "serialNo",
+       "type": "String"
+      },
+      {
+       "name": "verdict",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "missingSerials",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/counts/{countNo}/approve",
+   "perm": "device:inventory:stocktake",
+   "perms": [
+    "device:inventory:stocktake"
+   ],
+   "handler": "InventoryController#approveCount",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "countNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.inv.dto.StockDtos.CountNoteReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "responseShape": [
+    {
+     "name": "count",
+     "type": "StockCount",
+     "fields": [
+      {
+       "name": "countNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "openedAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "List<StockCountLine>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "bookQty",
+       "type": "int"
+      },
+      {
+       "name": "countedQty",
+       "type": "Integer"
+      },
+      {
+       "name": "diffQty",
+       "type": "Integer"
+      }
+     ]
+    },
+    {
+     "name": "exceptions",
+     "type": "List<StockCountScan>",
+     "fields": [
+      {
+       "name": "serialNo",
+       "type": "String"
+      },
+      {
+       "name": "verdict",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "missingSerials",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "note",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/counts/{countNo}/cancel",
+   "perm": "device:inventory:stocktake",
+   "perms": [
+    "device:inventory:stocktake"
+   ],
+   "handler": "InventoryController#cancelCount",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "countNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "responseShape": [
+    {
+     "name": "count",
+     "type": "StockCount",
+     "fields": [
+      {
+       "name": "countNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "openedAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "List<StockCountLine>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "bookQty",
+       "type": "int"
+      },
+      {
+       "name": "countedQty",
+       "type": "Integer"
+      },
+      {
+       "name": "diffQty",
+       "type": "Integer"
+      }
+     ]
+    },
+    {
+     "name": "exceptions",
+     "type": "List<StockCountScan>",
+     "fields": [
+      {
+       "name": "serialNo",
+       "type": "String"
+      },
+      {
+       "name": "verdict",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "missingSerials",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/counts/{countNo}/post",
+   "perm": "device:inventory:stocktake",
+   "perms": [
+    "device:inventory:stocktake"
+   ],
+   "handler": "InventoryController#postCount",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "countNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "responseShape": [
+    {
+     "name": "count",
+     "type": "StockCount",
+     "fields": [
+      {
+       "name": "countNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "openedAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "List<StockCountLine>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "bookQty",
+       "type": "int"
+      },
+      {
+       "name": "countedQty",
+       "type": "Integer"
+      },
+      {
+       "name": "diffQty",
+       "type": "Integer"
+      }
+     ]
+    },
+    {
+     "name": "exceptions",
+     "type": "List<StockCountScan>",
+     "fields": [
+      {
+       "name": "serialNo",
+       "type": "String"
+      },
+      {
+       "name": "verdict",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "missingSerials",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/counts/{countNo}/reject",
+   "perm": "device:inventory:stocktake",
+   "perms": [
+    "device:inventory:stocktake"
+   ],
+   "handler": "InventoryController#rejectCount",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "countNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.inv.dto.StockDtos.CountNoteReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "responseShape": [
+    {
+     "name": "count",
+     "type": "StockCount",
+     "fields": [
+      {
+       "name": "countNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "openedAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "List<StockCountLine>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "bookQty",
+       "type": "int"
+      },
+      {
+       "name": "countedQty",
+       "type": "Integer"
+      },
+      {
+       "name": "diffQty",
+       "type": "Integer"
+      }
+     ]
+    },
+    {
+     "name": "exceptions",
+     "type": "List<StockCountScan>",
+     "fields": [
+      {
+       "name": "serialNo",
+       "type": "String"
+      },
+      {
+       "name": "verdict",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "missingSerials",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "note",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/counts/{countNo}/scans",
+   "perm": "device:inventory:stocktake",
+   "perms": [
+    "device:inventory:stocktake"
+   ],
+   "handler": "InventoryController#scanCount",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "countNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.inv.dto.StockDtos.CountScanReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "responseShape": [
+    {
+     "name": "count",
+     "type": "StockCount",
+     "fields": [
+      {
+       "name": "countNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "openedAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "List<StockCountLine>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "bookQty",
+       "type": "int"
+      },
+      {
+       "name": "countedQty",
+       "type": "Integer"
+      },
+      {
+       "name": "diffQty",
+       "type": "Integer"
+      }
+     ]
+    },
+    {
+     "name": "exceptions",
+     "type": "List<StockCountScan>",
+     "fields": [
+      {
+       "name": "serialNo",
+       "type": "String"
+      },
+      {
+       "name": "verdict",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "missingSerials",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "serialNos",
+     "type": "List<String>"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/counts/{countNo}/submit",
+   "perm": "device:inventory:stocktake",
+   "perms": [
+    "device:inventory:stocktake"
+   ],
+   "handler": "InventoryController#submitCount",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "countNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "responseShape": [
+    {
+     "name": "count",
+     "type": "StockCount",
+     "fields": [
+      {
+       "name": "countNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "openedAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "List<StockCountLine>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "bookQty",
+       "type": "int"
+      },
+      {
+       "name": "countedQty",
+       "type": "Integer"
+      },
+      {
+       "name": "diffQty",
+       "type": "Integer"
+      }
+     ]
+    },
+    {
+     "name": "exceptions",
+     "type": "List<StockCountScan>",
+     "fields": [
+      {
+       "name": "serialNo",
+       "type": "String"
+      },
+      {
+       "name": "verdict",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "missingSerials",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/disposals",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#disposals",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "kind",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "supplierNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<ai.neargo.sharehub.inv.dto.DisposalDtos.Disposal>",
+   "returnContainer": "PageResult",
+   "returnElement": "ai.neargo.sharehub.inv.dto.DisposalDtos.Disposal",
+   "responseShape": [
+    {
+     "name": "disposalNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "warehouseName",
+     "type": "String"
+    },
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierName",
+     "type": "String"
+    },
+    {
+     "name": "reasonCode",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "itemCount",
+     "type": "int"
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/disposals",
+   "perm": "device:inventory:transfer",
+   "perms": [
+    "device:inventory:transfer"
+   ],
+   "handler": "InventoryController#createDisposal",
+   "summary": "建单即过账：报废须原因码，退供应商须供应商。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalDetail",
+   "responseShape": [
+    {
+     "name": "disposal",
+     "type": "Disposal",
+     "fields": [
+      {
+       "name": "disposalNo",
+       "type": "String"
+      },
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseName",
+       "type": "String"
+      },
+      {
+       "name": "supplierNo",
+       "type": "String"
+      },
+      {
+       "name": "supplierName",
+       "type": "String"
+      },
+      {
+       "name": "reasonCode",
+       "type": "String"
+      },
+      {
+       "name": "note",
+       "type": "String"
+      },
+      {
+       "name": "itemCount",
+       "type": "int"
+      },
+      {
+       "name": "createdBy",
+       "type": "String"
+      },
+      {
+       "name": "createdAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "items",
+     "type": "List<DisposalItem>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "reasonCode",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "cabinetNos",
+     "type": "List<String>"
+    },
+    {
+     "name": "powerbankNos",
+     "type": "List<String>"
+    },
+    {
+     "name": "carrier",
+     "type": "String"
+    },
+    {
+     "name": "trackingNo",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/disposals/{disposalNo}",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#disposal",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "disposalNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalDetail",
+   "responseShape": [
+    {
+     "name": "disposal",
+     "type": "Disposal",
+     "fields": [
+      {
+       "name": "disposalNo",
+       "type": "String"
+      },
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseName",
+       "type": "String"
+      },
+      {
+       "name": "supplierNo",
+       "type": "String"
+      },
+      {
+       "name": "supplierName",
+       "type": "String"
+      },
+      {
+       "name": "reasonCode",
+       "type": "String"
+      },
+      {
+       "name": "note",
+       "type": "String"
+      },
+      {
+       "name": "itemCount",
+       "type": "int"
+      },
+      {
+       "name": "createdBy",
+       "type": "String"
+      },
+      {
+       "name": "createdAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "items",
+     "type": "List<DisposalItem>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/engine",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#engine",
+   "summary": "当前库存引擎：盘点只在 SERVICE 下可用，页面据此提示。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.InventoryEngine",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.InventoryEngine",
+   "responseShape": [
+    {
+     "name": "engine",
+     "type": "String"
+    },
+    {
+     "name": "configured",
+     "type": "boolean"
+    },
+    {
+     "name": "endpointMode",
+     "type": "String"
+    },
+    {
+     "name": "reachable",
+     "type": "Boolean"
+    },
+    {
+     "name": "failure",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/intakes",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#intakes",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<ai.neargo.sharehub.inv.dto.IntakeDtos.Intake>",
+   "returnContainer": "PageResult",
+   "returnElement": "ai.neargo.sharehub.inv.dto.IntakeDtos.Intake",
+   "responseShape": [
+    {
+     "name": "intakeNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "warehouseName",
+     "type": "String"
+    },
+    {
+     "name": "sourceRef",
+     "type": "String"
+    },
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierName",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "totalCost",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "arrivedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "total",
+     "type": "int"
+    },
+    {
+     "name": "pending",
+     "type": "int"
+    },
+    {
+     "name": "passed",
+     "type": "int"
+    },
+    {
+     "name": "failed",
+     "type": "int"
+    },
+    {
+     "name": "inbound",
+     "type": "int"
+    },
+    {
+     "name": "disposed",
+     "type": "int"
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/intakes",
+   "perm": "device:inventory:inbound",
+   "perms": [
+    "device:inventory:inbound"
+   ],
+   "handler": "InventoryController#createIntake",
+   "summary": "",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.IntakeDtos.CreateReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "responseShape": [
+    {
+     "name": "intake",
+     "type": "Intake",
+     "fields": [
+      {
+       "name": "intakeNo",
+       "type": "String"
+      },
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseName",
+       "type": "String"
+      },
+      {
+       "name": "sourceRef",
+       "type": "String"
+      },
+      {
+       "name": "supplierNo",
+       "type": "String"
+      },
+      {
+       "name": "supplierName",
+       "type": "String"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "totalCost",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "arrivedAt",
+       "type": "LocalDateTime"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "note",
+       "type": "String"
+      },
+      {
+       "name": "total",
+       "type": "int"
+      },
+      {
+       "name": "pending",
+       "type": "int"
+      },
+      {
+       "name": "passed",
+       "type": "int"
+      },
+      {
+       "name": "failed",
+       "type": "int"
+      },
+      {
+       "name": "inbound",
+       "type": "int"
+      },
+      {
+       "name": "disposed",
+       "type": "int"
+      },
+      {
+       "name": "createdBy",
+       "type": "String"
+      },
+      {
+       "name": "createdAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "items",
+     "type": "List<IntakeItem>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      },
+      {
+       "name": "unitCost",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "sn",
+       "type": "String"
+      },
+      {
+       "name": "model",
+       "type": "String"
+      },
+      {
+       "name": "qcNo",
+       "type": "String"
+      },
+      {
+       "name": "qcResult",
+       "type": "String"
+      },
+      {
+       "name": "disposition",
+       "type": "String"
+      },
+      {
+       "name": "dispositionNote",
+       "type": "String"
+      },
+      {
+       "name": "handledBy",
+       "type": "String"
+      },
+      {
+       "name": "handledAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "sourceRef",
+     "type": "String"
+    },
+    {
+     "name": "arrivedAt",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "unitCosts",
+     "type": "java.util.Map<String, java.math.BigDecimal>"
+    },
+    {
+     "name": "cabinetNos",
+     "type": "List<String>"
+    },
+    {
+     "name": "powerbankNos",
+     "type": "List<String>"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/intakes/{intakeNo}",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#intake",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "intakeNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "responseShape": [
+    {
+     "name": "intake",
+     "type": "Intake",
+     "fields": [
+      {
+       "name": "intakeNo",
+       "type": "String"
+      },
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseName",
+       "type": "String"
+      },
+      {
+       "name": "sourceRef",
+       "type": "String"
+      },
+      {
+       "name": "supplierNo",
+       "type": "String"
+      },
+      {
+       "name": "supplierName",
+       "type": "String"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "totalCost",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "arrivedAt",
+       "type": "LocalDateTime"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "note",
+       "type": "String"
+      },
+      {
+       "name": "total",
+       "type": "int"
+      },
+      {
+       "name": "pending",
+       "type": "int"
+      },
+      {
+       "name": "passed",
+       "type": "int"
+      },
+      {
+       "name": "failed",
+       "type": "int"
+      },
+      {
+       "name": "inbound",
+       "type": "int"
+      },
+      {
+       "name": "disposed",
+       "type": "int"
+      },
+      {
+       "name": "createdBy",
+       "type": "String"
+      },
+      {
+       "name": "createdAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "items",
+     "type": "List<IntakeItem>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      },
+      {
+       "name": "unitCost",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "sn",
+       "type": "String"
+      },
+      {
+       "name": "model",
+       "type": "String"
+      },
+      {
+       "name": "qcNo",
+       "type": "String"
+      },
+      {
+       "name": "qcResult",
+       "type": "String"
+      },
+      {
+       "name": "disposition",
+       "type": "String"
+      },
+      {
+       "name": "dispositionNote",
+       "type": "String"
+      },
+      {
+       "name": "handledBy",
+       "type": "String"
+      },
+      {
+       "name": "handledAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/intakes/{intakeNo}/dispose",
+   "perm": "device:inventory:inbound",
+   "perms": [
+    "device:inventory:inbound"
+   ],
+   "handler": "InventoryController#disposeIntake",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "intakeNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.inv.dto.IntakeDtos.DisposeReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "responseShape": [
+    {
+     "name": "intake",
+     "type": "Intake",
+     "fields": [
+      {
+       "name": "intakeNo",
+       "type": "String"
+      },
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseName",
+       "type": "String"
+      },
+      {
+       "name": "sourceRef",
+       "type": "String"
+      },
+      {
+       "name": "supplierNo",
+       "type": "String"
+      },
+      {
+       "name": "supplierName",
+       "type": "String"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "totalCost",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "arrivedAt",
+       "type": "LocalDateTime"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "note",
+       "type": "String"
+      },
+      {
+       "name": "total",
+       "type": "int"
+      },
+      {
+       "name": "pending",
+       "type": "int"
+      },
+      {
+       "name": "passed",
+       "type": "int"
+      },
+      {
+       "name": "failed",
+       "type": "int"
+      },
+      {
+       "name": "inbound",
+       "type": "int"
+      },
+      {
+       "name": "disposed",
+       "type": "int"
+      },
+      {
+       "name": "createdBy",
+       "type": "String"
+      },
+      {
+       "name": "createdAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "items",
+     "type": "List<IntakeItem>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      },
+      {
+       "name": "unitCost",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "sn",
+       "type": "String"
+      },
+      {
+       "name": "model",
+       "type": "String"
+      },
+      {
+       "name": "qcNo",
+       "type": "String"
+      },
+      {
+       "name": "qcResult",
+       "type": "String"
+      },
+      {
+       "name": "disposition",
+       "type": "String"
+      },
+      {
+       "name": "dispositionNote",
+       "type": "String"
+      },
+      {
+       "name": "handledBy",
+       "type": "String"
+      },
+      {
+       "name": "handledAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "items",
+     "type": "List<ItemRef>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "disposition",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/intakes/{intakeNo}/inbound",
+   "perm": "device:inventory:inbound",
+   "perms": [
+    "device:inventory:inbound"
+   ],
+   "handler": "InventoryController#inboundIntake",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "intakeNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.inv.dto.IntakeDtos.ItemsReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "responseShape": [
+    {
+     "name": "intake",
+     "type": "Intake",
+     "fields": [
+      {
+       "name": "intakeNo",
+       "type": "String"
+      },
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseName",
+       "type": "String"
+      },
+      {
+       "name": "sourceRef",
+       "type": "String"
+      },
+      {
+       "name": "supplierNo",
+       "type": "String"
+      },
+      {
+       "name": "supplierName",
+       "type": "String"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "totalCost",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "arrivedAt",
+       "type": "LocalDateTime"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "note",
+       "type": "String"
+      },
+      {
+       "name": "total",
+       "type": "int"
+      },
+      {
+       "name": "pending",
+       "type": "int"
+      },
+      {
+       "name": "passed",
+       "type": "int"
+      },
+      {
+       "name": "failed",
+       "type": "int"
+      },
+      {
+       "name": "inbound",
+       "type": "int"
+      },
+      {
+       "name": "disposed",
+       "type": "int"
+      },
+      {
+       "name": "createdBy",
+       "type": "String"
+      },
+      {
+       "name": "createdAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "items",
+     "type": "List<IntakeItem>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      },
+      {
+       "name": "unitCost",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "sn",
+       "type": "String"
+      },
+      {
+       "name": "model",
+       "type": "String"
+      },
+      {
+       "name": "qcNo",
+       "type": "String"
+      },
+      {
+       "name": "qcResult",
+       "type": "String"
+      },
+      {
+       "name": "disposition",
+       "type": "String"
+      },
+      {
+       "name": "dispositionNote",
+       "type": "String"
+      },
+      {
+       "name": "handledBy",
+       "type": "String"
+      },
+      {
+       "name": "handledAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "itemNos",
+     "type": "List<String>"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/intakes/{intakeNo}/items/{itemType}/{itemNo}/qc",
+   "perm": "device:qc:inspect",
+   "perms": [
+    "device:qc:inspect"
+   ],
+   "handler": "InventoryController#inspectIntakeItem",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "intakeNo",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "path",
+     "name": "itemType",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "path",
+     "name": "itemNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.dev.dto.DeviceOpsDtos.QcReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "responseShape": [
+    {
+     "name": "intake",
+     "type": "Intake",
+     "fields": [
+      {
+       "name": "intakeNo",
+       "type": "String"
+      },
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseName",
+       "type": "String"
+      },
+      {
+       "name": "sourceRef",
+       "type": "String"
+      },
+      {
+       "name": "supplierNo",
+       "type": "String"
+      },
+      {
+       "name": "supplierName",
+       "type": "String"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "totalCost",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "arrivedAt",
+       "type": "LocalDateTime"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "note",
+       "type": "String"
+      },
+      {
+       "name": "total",
+       "type": "int"
+      },
+      {
+       "name": "pending",
+       "type": "int"
+      },
+      {
+       "name": "passed",
+       "type": "int"
+      },
+      {
+       "name": "failed",
+       "type": "int"
+      },
+      {
+       "name": "inbound",
+       "type": "int"
+      },
+      {
+       "name": "disposed",
+       "type": "int"
+      },
+      {
+       "name": "createdBy",
+       "type": "String"
+      },
+      {
+       "name": "createdAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "items",
+     "type": "List<IntakeItem>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      },
+      {
+       "name": "unitCost",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "sn",
+       "type": "String"
+      },
+      {
+       "name": "model",
+       "type": "String"
+      },
+      {
+       "name": "qcNo",
+       "type": "String"
+      },
+      {
+       "name": "qcResult",
+       "type": "String"
+      },
+      {
+       "name": "disposition",
+       "type": "String"
+      },
+      {
+       "name": "dispositionNote",
+       "type": "String"
+      },
+      {
+       "name": "handledBy",
+       "type": "String"
+      },
+      {
+       "name": "handledAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "powerOn",
+     "type": "Boolean"
+    },
+    {
+     "name": "slotsOk",
+     "type": "Boolean"
+    },
+    {
+     "name": "battery",
+     "type": "Integer"
+    },
+    {
+     "name": "cycles",
+     "type": "Integer"
+    },
+    {
+     "name": "result",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/issued-summary",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "DevicePoolController#summary",
+   "summary": "出库池页左侧的商家汇总。",
+   "params": [
+    {
+     "in": "query",
+     "name": "agentNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "List<IssuedSummary>",
+   "returnContainer": "List",
+   "returnElement": "IssuedSummary",
+   "responseShape": [
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "agentName",
+     "type": "String"
+    },
+    {
+     "name": "unbound",
+     "type": "int"
+    },
+    {
+     "name": "bound",
+     "type": "int"
+    },
+    {
+     "name": "live",
+     "type": "int"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/ledger",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#ledger",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "itemType",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<ai.neargo.sharehub.inv.dto.StockDtos.StockLedgerRow>",
+   "returnContainer": "PageResult",
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockLedgerRow",
+   "responseShape": [
+    {
+     "name": "id",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "itemType",
+     "type": "String"
+    },
+    {
+     "name": "itemNo",
+     "type": "String"
+    },
+    {
+     "name": "docKind",
+     "type": "String"
+    },
+    {
+     "name": "docNo",
+     "type": "String"
+    },
+    {
+     "name": "qtyDelta",
+     "type": "int"
+    },
+    {
+     "name": "occurredAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "operator",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/material-balances",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#materialBalances",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "materialNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "category",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "lowOnly",
+     "type": "Boolean",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialBalance>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialBalance>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/material-docs",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#materialDocs",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "kind",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "purpose",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "materialNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDoc>",
+   "returnContainer": "PageResult",
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDoc",
+   "responseShape": [
+    {
+     "name": "docNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "purpose",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "warehouseName",
+     "type": "String"
+    },
+    {
+     "name": "toWarehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "toWarehouseName",
+     "type": "String"
+    },
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierName",
+     "type": "String"
+    },
+    {
+     "name": "reasonCode",
+     "type": "String"
+    },
+    {
+     "name": "receiverNo",
+     "type": "String"
+    },
+    {
+     "name": "woNo",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "totalQty",
+     "type": "int"
+    },
+    {
+     "name": "lines",
+     "type": "List<MaterialDocLine>",
+     "fields": [
+      {
+       "name": "materialNo",
+       "type": "String"
+      },
+      {
+       "name": "materialName",
+       "type": "String"
+      },
+      {
+       "name": "qty",
+       "type": "Integer"
+      },
+      {
+       "name": "serialNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "unitCost",
+       "type": "BigDecimal"
+      }
+     ]
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/material-docs",
+   "perm": "device:inventory:inbound",
+   "perms": [
+    "device:inventory:inbound",
+    "device:inventory:transfer"
+   ],
+   "handler": "InventoryController#createMaterialDoc",
+   "summary": "入库类用途判 :inbound，出库与调拨判 :transfer（与设备单据同口径）。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDocReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDoc",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDoc",
+   "responseShape": [
+    {
+     "name": "docNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "purpose",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "warehouseName",
+     "type": "String"
+    },
+    {
+     "name": "toWarehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "toWarehouseName",
+     "type": "String"
+    },
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierName",
+     "type": "String"
+    },
+    {
+     "name": "reasonCode",
+     "type": "String"
+    },
+    {
+     "name": "receiverNo",
+     "type": "String"
+    },
+    {
+     "name": "woNo",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "totalQty",
+     "type": "int"
+    },
+    {
+     "name": "lines",
+     "type": "List<MaterialDocLine>",
+     "fields": [
+      {
+       "name": "materialNo",
+       "type": "String"
+      },
+      {
+       "name": "materialName",
+       "type": "String"
+      },
+      {
+       "name": "qty",
+       "type": "Integer"
+      },
+      {
+       "name": "serialNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "unitCost",
+       "type": "BigDecimal"
+      }
+     ]
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "purpose",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "toWarehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "reasonCode",
+     "type": "String"
+    },
+    {
+     "name": "receiverNo",
+     "type": "String"
+    },
+    {
+     "name": "woNo",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "lines",
+     "type": "List<MaterialDocLine>",
+     "fields": [
+      {
+       "name": "materialNo",
+       "type": "String"
+      },
+      {
+       "name": "materialName",
+       "type": "String"
+      },
+      {
+       "name": "qty",
+       "type": "Integer"
+      },
+      {
+       "name": "serialNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "unitCost",
+       "type": "BigDecimal"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/material-docs/{docNo}",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#materialDoc",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "docNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDoc",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDoc",
+   "responseShape": [
+    {
+     "name": "docNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "purpose",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "warehouseName",
+     "type": "String"
+    },
+    {
+     "name": "toWarehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "toWarehouseName",
+     "type": "String"
+    },
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierName",
+     "type": "String"
+    },
+    {
+     "name": "reasonCode",
+     "type": "String"
+    },
+    {
+     "name": "receiverNo",
+     "type": "String"
+    },
+    {
+     "name": "woNo",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "totalQty",
+     "type": "int"
+    },
+    {
+     "name": "lines",
+     "type": "List<MaterialDocLine>",
+     "fields": [
+      {
+       "name": "materialNo",
+       "type": "String"
+      },
+      {
+       "name": "materialName",
+       "type": "String"
+      },
+      {
+       "name": "qty",
+       "type": "Integer"
+      },
+      {
+       "name": "serialNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "unitCost",
+       "type": "BigDecimal"
+      }
+     ]
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/material-thresholds",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#saveMaterialMinQty",
+   "summary": "",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialMinQtyReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialBalance",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialBalance",
+   "responseShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "warehouseName",
+     "type": "String"
+    },
+    {
+     "name": "materialNo",
+     "type": "String"
+    },
+    {
+     "name": "materialName",
+     "type": "String"
+    },
+    {
+     "name": "category",
+     "type": "String"
+    },
+    {
+     "name": "trackingMode",
+     "type": "String"
+    },
+    {
+     "name": "uom",
+     "type": "String"
+    },
+    {
+     "name": "onHand",
+     "type": "int"
+    },
+    {
+     "name": "minQty",
+     "type": "int"
+    },
+    {
+     "name": "low",
+     "type": "boolean"
+    },
+    {
+     "name": "serialNos",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "materialNo",
+     "type": "String"
+    },
+    {
+     "name": "minQty",
+     "type": "Integer"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/materials",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#materials",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "category",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "showArchived",
+     "type": "Boolean",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<ai.neargo.sharehub.inv.dto.MaterialDtos.Material>",
+   "returnContainer": "PageResult",
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "responseShape": [
+    {
+     "name": "materialNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "category",
+     "type": "String"
+    },
+    {
+     "name": "trackingMode",
+     "type": "String"
+    },
+    {
+     "name": "uom",
+     "type": "String"
+    },
+    {
+     "name": "spec",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "defaultSupplierNo",
+     "type": "String"
+    },
+    {
+     "name": "builtin",
+     "type": "boolean"
+    },
+    {
+     "name": "hasMovements",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/materials",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#createMaterial",
+   "summary": "",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "responseShape": [
+    {
+     "name": "materialNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "category",
+     "type": "String"
+    },
+    {
+     "name": "trackingMode",
+     "type": "String"
+    },
+    {
+     "name": "uom",
+     "type": "String"
+    },
+    {
+     "name": "spec",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "defaultSupplierNo",
+     "type": "String"
+    },
+    {
+     "name": "builtin",
+     "type": "boolean"
+    },
+    {
+     "name": "hasMovements",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "category",
+     "type": "String"
+    },
+    {
+     "name": "trackingMode",
+     "type": "String"
+    },
+    {
+     "name": "uom",
+     "type": "String"
+    },
+    {
+     "name": "spec",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "defaultSupplierNo",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/materials/{materialNo}",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#updateMaterial",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "materialNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "responseShape": [
+    {
+     "name": "materialNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "category",
+     "type": "String"
+    },
+    {
+     "name": "trackingMode",
+     "type": "String"
+    },
+    {
+     "name": "uom",
+     "type": "String"
+    },
+    {
+     "name": "spec",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "defaultSupplierNo",
+     "type": "String"
+    },
+    {
+     "name": "builtin",
+     "type": "boolean"
+    },
+    {
+     "name": "hasMovements",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "category",
+     "type": "String"
+    },
+    {
+     "name": "trackingMode",
+     "type": "String"
+    },
+    {
+     "name": "uom",
+     "type": "String"
+    },
+    {
+     "name": "spec",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "defaultSupplierNo",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/materials/{materialNo}/archive",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#archiveMaterial",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "materialNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "responseShape": [
+    {
+     "name": "materialNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "category",
+     "type": "String"
+    },
+    {
+     "name": "trackingMode",
+     "type": "String"
+    },
+    {
+     "name": "uom",
+     "type": "String"
+    },
+    {
+     "name": "spec",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "defaultSupplierNo",
+     "type": "String"
+    },
+    {
+     "name": "builtin",
+     "type": "boolean"
+    },
+    {
+     "name": "hasMovements",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/materials/{materialNo}/unarchive",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#unarchiveMaterial",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "materialNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "responseShape": [
+    {
+     "name": "materialNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "category",
+     "type": "String"
+    },
+    {
+     "name": "trackingMode",
+     "type": "String"
+    },
+    {
+     "name": "uom",
+     "type": "String"
+    },
+    {
+     "name": "spec",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "defaultSupplierNo",
+     "type": "String"
+    },
+    {
+     "name": "builtin",
+     "type": "boolean"
+    },
+    {
+     "name": "hasMovements",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/migration",
+   "perm": "system:param:read",
+   "perms": [
+    "system:param:read"
+   ],
+   "handler": "InventoryController#migrationPlan",
+   "summary": "存量迁移试跑（S7）：要入库的、要出库的、跳过的（附原因）、已完成的。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.remote.InventoryMigration.InventoryMigrationPlan",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.remote.InventoryMigration.InventoryMigrationPlan",
+   "responseShape": [
+    {
+     "name": "configured",
+     "type": "boolean"
+    },
+    {
+     "name": "toInbound",
+     "type": "int"
+    },
+    {
+     "name": "toIssue",
+     "type": "int"
+    },
+    {
+     "name": "skipped",
+     "type": "int"
+    },
+    {
+     "name": "done",
+     "type": "int"
+    },
+    {
+     "name": "skippedItems",
+     "type": "List<MigrationCandidate>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      },
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "agentNo",
+       "type": "String"
+      },
+      {
+       "name": "siteNo",
+       "type": "String"
+      },
+      {
+       "name": "claimed",
+       "type": "boolean"
+      },
+      {
+       "name": "reason",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/migration",
+   "perm": "system:param:update",
+   "perms": [
+    "system:param:update"
+   ],
+   "handler": "InventoryController#runMigration",
+   "summary": "存量迁移执行一批（S7）：每台独立、可重跑；失败逐台列出。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.StockDtos.MigrationRunReq",
+   "returnType": "ai.neargo.sharehub.inv.remote.InventoryMigration.InventoryMigrationResult",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.remote.InventoryMigration.InventoryMigrationResult",
+   "responseShape": [
+    {
+     "name": "processed",
+     "type": "int"
+    },
+    {
+     "name": "failed",
+     "type": "int"
+    },
+    {
+     "name": "remaining",
+     "type": "int"
+    },
+    {
+     "name": "failures",
+     "type": "List<MigrationFailure>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      },
+      {
+       "name": "code",
+       "type": "String"
+      },
+      {
+       "name": "detail",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "limit",
+     "type": "Integer"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/period-summary",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#periodSummary",
+   "summary": "期间报表（S6）：期初 / 入 / 出 / 期末，按仓与设备类型。",
+   "params": [
+    {
+     "in": "query",
+     "name": "from",
+     "type": "java.time.LocalDate",
+     "required": true
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "java.time.LocalDate",
+     "required": true
+    },
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockPeriodRow>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockPeriodRow>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/shipments",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#shipments",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "docType",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "docRef",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "itemNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.ShipmentDtos.Shipment>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.ShipmentDtos.Shipment>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/stage-items",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#stageItems",
+   "summary": "阶段下钻（P2 #6）：某阶段 × 类型的设备清单，口径同 stages。",
+   "params": [
+    {
+     "in": "query",
+     "name": "stage",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "query",
+     "name": "itemType",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StageItems",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StageItems",
+   "responseShape": [
+    {
+     "name": "stage",
+     "type": "String"
+    },
+    {
+     "name": "itemType",
+     "type": "String"
+    },
+    {
+     "name": "total",
+     "type": "long"
+    },
+    {
+     "name": "items",
+     "type": "java.util.List<StageItem>"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/stages",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#stages",
+   "summary": "统一库存视图（S6）：按生命周期阶段的台数。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockStage>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockStage>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/stock-thresholds",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#stockThresholds",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.ThresholdDtos.StockThreshold>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.ThresholdDtos.StockThreshold>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/stock-thresholds",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#saveStockThreshold",
+   "summary": "",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.ThresholdDtos.StockThresholdReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.ThresholdDtos.StockThreshold",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.ThresholdDtos.StockThreshold",
+   "responseShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "warehouseName",
+     "type": "String"
+    },
+    {
+     "name": "itemType",
+     "type": "String"
+    },
+    {
+     "name": "minQty",
+     "type": "int"
+    },
+    {
+     "name": "available",
+     "type": "int"
+    },
+    {
+     "name": "low",
+     "type": "boolean"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "itemType",
+     "type": "String"
+    },
+    {
+     "name": "minQty",
+     "type": "Integer"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/suppliers",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#suppliers",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "showArchived",
+     "type": "Boolean",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier>",
+   "returnContainer": "PageResult",
+   "returnElement": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "responseShape": [
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/suppliers",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#createSupplier",
+   "summary": "",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.SupplierDtos.SupplierReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "responseShape": [
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/suppliers/stats",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#supplierStats",
+   "summary": "供应商绩效（V207）：到货 / 入库 / 不合格 / 退货台数与合格率。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.SupplierDtos.SupplierStats>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.SupplierDtos.SupplierStats>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/suppliers/{supplierNo}",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#updateSupplier",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "supplierNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.inv.dto.SupplierDtos.SupplierReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "responseShape": [
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/suppliers/{supplierNo}/archive",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#archiveSupplier",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "supplierNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "responseShape": [
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/suppliers/{supplierNo}/unarchive",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#unarchiveSupplier",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "supplierNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "responseShape": [
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/warehouses",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#warehouses",
+   "summary": "",
+   "params": [],
+   "bodyType": null,
+   "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/warehouses",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#createWarehouse",
+   "summary": "",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem",
+   "responseShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/warehouses/{warehouseNo}",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#updateWarehouse",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem",
+   "responseShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/warehouses/{warehouseNo}/archive",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#archiveWarehouse",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem",
+   "responseShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/warehouses/{warehouseNo}/unarchive",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#unarchiveWarehouse",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem",
+   "responseShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -14575,6 +20337,18 @@
      "name": "showArchived",
      "type": "Boolean",
      "required": false
+    },
+    {
+     "in": "query",
+     "name": "siteNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "agentNo",
+     "type": "String",
+     "required": false
     }
    ],
    "bodyType": null,
@@ -14608,6 +20382,14 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "Boolean"
+    },
+    {
+     "name": "agentNo",
      "type": "String"
     }
    ],
@@ -14662,6 +20444,14 @@
     {
      "name": "status",
      "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "Boolean"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -14691,6 +20481,14 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "Boolean"
+    },
+    {
+     "name": "agentNo",
      "type": "String"
     }
    ]
@@ -14744,6 +20542,14 @@
     {
      "name": "status",
      "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "Boolean"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -14773,6 +20579,14 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "Boolean"
+    },
+    {
+     "name": "agentNo",
      "type": "String"
     }
    ]
@@ -15403,6 +21217,223 @@
    "returnContainer": null,
    "returnElement": "Object",
    "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/merchant-revenue/alerts",
+   "perm": "dashboard:overview:read",
+   "perms": [
+    "dashboard:overview:read"
+   ],
+   "handler": "MerchantRevenueController#alerts",
+   "summary": "设备提醒：在用设备里离线几台、在线但没有可借电池几台，各带最多 20 个柜号供点进去处理。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.dev.service.DeviceAlertQuery.DeviceAlerts",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.dev.service.DeviceAlertQuery.DeviceAlerts",
+   "responseShape": [
+    {
+     "name": "deployed",
+     "type": "long"
+    },
+    {
+     "name": "offline",
+     "type": "long"
+    },
+    {
+     "name": "noBorrowable",
+     "type": "long"
+    },
+    {
+     "name": "offlineSample",
+     "type": "List<String>"
+    },
+    {
+     "name": "noBorrowableSample",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/merchant-revenue/by-device",
+   "perm": "dashboard:overview:read",
+   "perms": [
+    "dashboard:overview:read"
+   ],
+   "handler": "MerchantRevenueController#byDevice",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "from",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "limit",
+     "type": "Integer",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "List<OrderRevenueQuery.RevenueByDevice>",
+   "returnContainer": "List",
+   "returnElement": "OrderRevenueQuery.RevenueByDevice",
+   "responseShape": [
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "orderCount",
+     "type": "int"
+    },
+    {
+     "name": "gross",
+     "type": "BigDecimal"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/merchant-revenue/summary",
+   "perm": "dashboard:overview:read",
+   "perms": [
+    "dashboard:overview:read"
+   ],
+   "handler": "MerchantRevenueController#summary",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "from",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "RevenueSummary",
+   "returnContainer": null,
+   "returnElement": "RevenueSummary",
+   "responseShape": [
+    {
+     "name": "from",
+     "type": "String"
+    },
+    {
+     "name": "to",
+     "type": "String"
+    },
+    {
+     "name": "orderCount",
+     "type": "int"
+    },
+    {
+     "name": "gross",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "refund",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "net",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "preTax",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "myShare",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "pending",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "settledUnpaid",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "paid",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "prevOrderCount",
+     "type": "int"
+    },
+    {
+     "name": "prevGross",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "prevMyShare",
+     "type": "BigDecimal"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/merchant-revenue/trend",
+   "perm": "dashboard:overview:read",
+   "perms": [
+    "dashboard:overview:read"
+   ],
+   "handler": "MerchantRevenueController#trend",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "from",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "List<OrderRevenueQuery.RevenueDay>",
+   "returnContainer": "List",
+   "returnElement": "OrderRevenueQuery.RevenueDay",
+   "responseShape": [
+    {
+     "name": "date",
+     "type": "String"
+    },
+    {
+     "name": "orderCount",
+     "type": "int"
+    },
+    {
+     "name": "gross",
+     "type": "BigDecimal"
+    }
+   ],
    "requestShape": null
   },
   {
@@ -16891,9 +22922,9 @@
   {
    "verb": "POST",
    "path": "/api/ops/powerbanks/{powerbankNo}/qc",
-   "perm": "device:powerbank:update",
+   "perm": "device:qc:inspect",
    "perms": [
-    "device:powerbank:update"
+    "device:qc:inspect"
    ],
    "handler": "AssetOpsController#inspectPowerbank",
    "summary": "",
@@ -16953,6 +22984,18 @@
     {
      "name": "inspectedAt",
      "type": "LocalDateTime"
+    },
+    {
+     "name": "ruleSnapshot",
+     "type": "String"
+    },
+    {
+     "name": "intakeNo",
+     "type": "String"
+    },
+    {
+     "name": "consumedBy",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -17047,6 +23090,18 @@
     {
      "name": "inspectedAt",
      "type": "LocalDateTime"
+    },
+    {
+     "name": "ruleSnapshot",
+     "type": "String"
+    },
+    {
+     "name": "intakeNo",
+     "type": "String"
+    },
+    {
+     "name": "consumedBy",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -17379,6 +23434,137 @@
     {
      "name": "currency",
      "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/reports/inventory",
+   "perm": "report:inventory:read",
+   "perms": [
+    "report:inventory:read"
+   ],
+   "handler": "ReportController#inventory",
+   "summary": "库存报表（V206）：现算，不走 T+1 快照；期间默认本月。",
+   "params": [
+    {
+     "in": "query",
+     "name": "from",
+     "type": "java.time.LocalDate",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "java.time.LocalDate",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.InventoryReportDtos.InventoryReport",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.InventoryReportDtos.InventoryReport",
+   "responseShape": [
+    {
+     "name": "from",
+     "type": "String"
+    },
+    {
+     "name": "to",
+     "type": "String"
+    },
+    {
+     "name": "stages",
+     "type": "List<StockDtos.StockStage>",
+     "fields": [
+      {
+       "name": "stage",
+       "type": "String"
+      },
+      {
+       "name": "cabinets",
+       "type": "long"
+      },
+      {
+       "name": "powerbanks",
+       "type": "long"
+      }
+     ]
+    },
+    {
+     "name": "rows",
+     "type": "List<WarehouseRow>",
+     "fields": [
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseName",
+       "type": "String"
+      },
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "opening",
+       "type": "long"
+      },
+      {
+       "name": "inQty",
+       "type": "long"
+      },
+      {
+       "name": "outQty",
+       "type": "long"
+      },
+      {
+       "name": "closing",
+       "type": "long"
+      },
+      {
+       "name": "available",
+       "type": "int"
+      },
+      {
+       "name": "minQty",
+       "type": "int"
+      },
+      {
+       "name": "low",
+       "type": "boolean"
+      }
+     ]
+    },
+    {
+     "name": "disposals",
+     "type": "Map<String, Long>"
+    },
+    {
+     "name": "purchases",
+     "type": "List<PurchaseRow>",
+     "fields": [
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "qty",
+       "type": "long"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      }
+     ]
     }
    ],
    "requestShape": null
@@ -17746,6 +23932,50 @@
      "type": "String"
     }
    ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/reports/{kind}/export",
+   "perm": "report:device:read",
+   "perms": [
+    "report:device:read",
+    "report:location:read",
+    "report:finance:read"
+   ],
+   "handler": "ReportController#export",
+   "summary": "三张周期报表的后端导出（K8 / RQ-RPT-03 / AC-09）：同列表的筛选、全量（到 `ExportSupport#MAX_ROWS`）， `format=xlsx|pdf`。",
+   "params": [
+    {
+     "in": "path",
+     "name": "kind",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "query",
+     "name": "format",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "period",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
    "requestShape": null
   },
   {
@@ -18289,7 +24519,7 @@
     "location:poi:read"
    ],
    "handler": "SiteController#page",
-   "summary": "站点（2026-09-25 定：站点状态与门店生命周期合并为一套状态机；TDD-运营核心流程/03）。",
+   "summary": "",
    "params": [
     {
      "in": "query",
@@ -18331,6 +24561,12 @@
      "in": "query",
      "name": "missingOpenHours",
      "type": "Boolean",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "agentNo",
+     "type": "String",
      "required": false
     }
    ],
@@ -18455,6 +24691,10 @@
     },
     {
      "name": "opsEmployeeNo",
+     "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
      "type": "String"
     }
    ],
@@ -18592,6 +24832,10 @@
     {
      "name": "opsEmployeeNo",
      "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -18637,6 +24881,10 @@
     },
     {
      "name": "opsEmployeeNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
      "type": "String"
     }
    ]
@@ -18826,6 +25074,10 @@
     {
      "name": "opsEmployeeNo",
      "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -18969,6 +25221,10 @@
     {
      "name": "opsEmployeeNo",
      "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -19014,6 +25270,10 @@
     },
     {
      "name": "opsEmployeeNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
      "type": "String"
     }
    ]
@@ -19375,6 +25635,10 @@
     {
      "name": "opsEmployeeNo",
      "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -19517,6 +25781,10 @@
     },
     {
      "name": "opsEmployeeNo",
+     "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
      "type": "String"
     }
    ],
@@ -19776,6 +26044,10 @@
     {
      "name": "opsEmployeeNo",
      "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -19927,6 +26199,10 @@
     },
     {
      "name": "opsEmployeeNo",
+     "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
      "type": "String"
     }
    ],
@@ -20408,6 +26684,10 @@
     {
      "name": "opsEmployeeNo",
      "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -20550,6 +26830,10 @@
     },
     {
      "name": "opsEmployeeNo",
+     "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
      "type": "String"
     }
    ],
@@ -22102,6 +28386,10 @@
     },
     {
      "name": "expectedAt",
+     "type": "String"
+    },
+    {
+     "name": "disposition",
      "type": "String"
     }
    ]
@@ -31307,6 +37595,12 @@
      "name": "groupName",
      "type": "String",
      "required": false
+    },
+    {
+     "in": "query",
+     "name": "pendingDecision",
+     "type": "String",
+     "required": false
     }
    ],
    "bodyType": null,
@@ -31333,6 +37627,48 @@
     {
      "name": "updatedAt",
      "type": "String"
+    },
+    {
+     "name": "valueType",
+     "type": "String"
+    },
+    {
+     "name": "options",
+     "type": "List<ParamOption>",
+     "fields": [
+      {
+       "name": "value",
+       "type": "String"
+      },
+      {
+       "name": "label",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "minValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "maxValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "pattern",
+     "type": "String"
+    },
+    {
+     "name": "nullable",
+     "type": "Boolean"
+    },
+    {
+     "name": "hint",
+     "type": "String"
+    },
+    {
+     "name": "pendingDecision",
+     "type": "Boolean"
     }
    ],
    "requestShape": null
@@ -31371,6 +37707,48 @@
     {
      "name": "updatedAt",
      "type": "String"
+    },
+    {
+     "name": "valueType",
+     "type": "String"
+    },
+    {
+     "name": "options",
+     "type": "List<ParamOption>",
+     "fields": [
+      {
+       "name": "value",
+       "type": "String"
+      },
+      {
+       "name": "label",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "minValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "maxValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "pattern",
+     "type": "String"
+    },
+    {
+     "name": "nullable",
+     "type": "Boolean"
+    },
+    {
+     "name": "hint",
+     "type": "String"
+    },
+    {
+     "name": "pendingDecision",
+     "type": "Boolean"
     }
    ],
    "requestShape": [
@@ -31389,6 +37767,38 @@
     {
      "name": "groupName",
      "type": "String"
+    },
+    {
+     "name": "valueType",
+     "type": "String"
+    },
+    {
+     "name": "valueOptions",
+     "type": "String"
+    },
+    {
+     "name": "minValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "maxValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "pattern",
+     "type": "String"
+    },
+    {
+     "name": "nullable",
+     "type": "Integer"
+    },
+    {
+     "name": "hint",
+     "type": "String"
+    },
+    {
+     "name": "pendingDecision",
+     "type": "Integer"
     },
     {
      "name": "id",
@@ -31482,6 +37892,48 @@
     {
      "name": "updatedAt",
      "type": "String"
+    },
+    {
+     "name": "valueType",
+     "type": "String"
+    },
+    {
+     "name": "options",
+     "type": "List<ParamOption>",
+     "fields": [
+      {
+       "name": "value",
+       "type": "String"
+      },
+      {
+       "name": "label",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "minValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "maxValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "pattern",
+     "type": "String"
+    },
+    {
+     "name": "nullable",
+     "type": "Boolean"
+    },
+    {
+     "name": "hint",
+     "type": "String"
+    },
+    {
+     "name": "pendingDecision",
+     "type": "Boolean"
     }
    ],
    "requestShape": [
@@ -31500,6 +37952,38 @@
     {
      "name": "groupName",
      "type": "String"
+    },
+    {
+     "name": "valueType",
+     "type": "String"
+    },
+    {
+     "name": "valueOptions",
+     "type": "String"
+    },
+    {
+     "name": "minValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "maxValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "pattern",
+     "type": "String"
+    },
+    {
+     "name": "nullable",
+     "type": "Integer"
+    },
+    {
+     "name": "hint",
+     "type": "String"
+    },
+    {
+     "name": "pendingDecision",
+     "type": "Integer"
     },
     {
      "name": "id",
@@ -31606,6 +38090,14 @@
     {
      "name": "effectiveFrom",
      "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -31656,6 +38148,14 @@
     {
      "name": "effectiveFrom",
      "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -31681,6 +38181,14 @@
     },
     {
      "name": "invoiceTitle",
+     "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
      "type": "String"
     },
     {
@@ -31778,6 +38286,14 @@
     {
      "name": "effectiveFrom",
      "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -31803,6 +38319,14 @@
     },
     {
      "name": "invoiceTitle",
+     "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
      "type": "String"
     },
     {
@@ -31844,6 +38368,263 @@
     {
      "name": "deleted",
      "type": "?"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/approvals",
+   "perm": "order:refund:audit",
+   "perms": [
+    "order:refund:audit",
+    "finance:ledger:create"
+   ],
+   "handler": "ApprovalController#list",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "kind",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<ApprovalRequest>",
+   "returnContainer": "PageResult",
+   "returnElement": "ApprovalRequest",
+   "responseShape": [
+    {
+     "name": "requestNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "refNo",
+     "type": "String"
+    },
+    {
+     "name": "amount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "reason",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "applicantName",
+     "type": "String"
+    },
+    {
+     "name": "approverName",
+     "type": "String"
+    },
+    {
+     "name": "decidedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "decideNote",
+     "type": "String"
+    },
+    {
+     "name": "resultRef",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/approvals/{requestNo}/approve",
+   "perm": "order:refund:audit",
+   "perms": [
+    "order:refund:audit",
+    "finance:ledger:create"
+   ],
+   "handler": "ApprovalController#approve",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "requestNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ApprovalRequest",
+   "returnContainer": null,
+   "returnElement": "ApprovalRequest",
+   "responseShape": [
+    {
+     "name": "requestNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "refNo",
+     "type": "String"
+    },
+    {
+     "name": "amount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "reason",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "applicantName",
+     "type": "String"
+    },
+    {
+     "name": "approverName",
+     "type": "String"
+    },
+    {
+     "name": "decidedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "decideNote",
+     "type": "String"
+    },
+    {
+     "name": "resultRef",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/approvals/{requestNo}/reject",
+   "perm": "order:refund:audit",
+   "perms": [
+    "order:refund:audit",
+    "finance:ledger:create"
+   ],
+   "handler": "ApprovalController#reject",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "requestNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "RejectReq",
+   "returnType": "ApprovalRequest",
+   "returnContainer": null,
+   "returnElement": "ApprovalRequest",
+   "responseShape": [
+    {
+     "name": "requestNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "refNo",
+     "type": "String"
+    },
+    {
+     "name": "amount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "reason",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "applicantName",
+     "type": "String"
+    },
+    {
+     "name": "approverName",
+     "type": "String"
+    },
+    {
+     "name": "decidedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "decideNote",
+     "type": "String"
+    },
+    {
+     "name": "resultRef",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "reason",
+     "type": "String"
     }
    ]
   },
@@ -33588,6 +40369,36 @@
      "name": "payStatus",
      "type": "String",
      "required": false
+    },
+    {
+     "in": "query",
+     "name": "from",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "agentNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "siteNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "cabinetNo",
+     "type": "String",
+     "required": false
     }
    ],
    "bodyType": null,
@@ -33674,8 +40485,112 @@
     {
      "name": "payStatus",
      "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "agentName",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "maxCharge",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "liveDurationMin",
+     "type": "Integer"
+    },
+    {
+     "name": "accruedFee",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "payNo",
+     "type": "String"
+    },
+    {
+     "name": "payChannel",
+     "type": "String"
     }
    ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/orders/export",
+   "perm": "order:order:export",
+   "perms": [
+    "order:order:export"
+   ],
+   "handler": "TradeController#exportOrders",
+   "summary": "订单导出（RNT-03 / AC-09）：同列表筛选、全量（上限 `ai.neargo.sharehub.portal.shared.ExportSupport#MAX_ROWS`）， `format=xlsx|pdf`。",
+   "params": [
+    {
+     "in": "query",
+     "name": "format",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "payStatus",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "from",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "agentNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "siteNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "cabinetNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
    "requestShape": null
   },
   {
@@ -33779,6 +40694,38 @@
     {
      "name": "payStatus",
      "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "agentName",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "maxCharge",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "liveDurationMin",
+     "type": "Integer"
+    },
+    {
+     "name": "accruedFee",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "payNo",
+     "type": "String"
+    },
+    {
+     "name": "payChannel",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -33801,143 +40748,10 @@
     }
    ],
    "bodyType": "InterventionDtos.InterveneReq",
-   "returnType": "InterventionDtos.OrderInterveneResult",
+   "returnType": "Object",
    "returnContainer": null,
-   "returnElement": "InterventionDtos.OrderInterveneResult",
-   "responseShape": [
-    {
-     "name": "order",
-     "type": "RentOrder",
-     "fields": [
-      {
-       "name": "orderNo",
-       "type": "String"
-      },
-      {
-       "name": "cUserNo",
-       "type": "String"
-      },
-      {
-       "name": "cabinetNo",
-       "type": "String"
-      },
-      {
-       "name": "returnCabinetNo",
-       "type": "String"
-      },
-      {
-       "name": "powerbankNo",
-       "type": "String"
-      },
-      {
-       "name": "locationName",
-       "type": "String"
-      },
-      {
-       "name": "status",
-       "type": "String"
-      },
-      {
-       "name": "rentStartAt",
-       "type": "String"
-      },
-      {
-       "name": "rentEndAt",
-       "type": "String"
-      },
-      {
-       "name": "durationMin",
-       "type": "Integer"
-      },
-      {
-       "name": "feeAmount",
-       "type": "double"
-      },
-      {
-       "name": "depositAmount",
-       "type": "double"
-      },
-      {
-       "name": "currency",
-       "type": "String"
-      },
-      {
-       "name": "waivedAmount",
-       "type": "java.math.BigDecimal"
-      },
-      {
-       "name": "compensateAmount",
-       "type": "java.math.BigDecimal"
-      },
-      {
-       "name": "ejectCount",
-       "type": "Integer"
-      },
-      {
-       "name": "lastEjectAt",
-       "type": "String"
-      },
-      {
-       "name": "couponAmount",
-       "type": "java.math.BigDecimal"
-      },
-      {
-       "name": "memberDiscountAmount",
-       "type": "java.math.BigDecimal"
-      },
-      {
-       "name": "payStatus",
-       "type": "String"
-      }
-     ]
-    },
-    {
-     "name": "intervention",
-     "type": "OrderIntervention",
-     "fields": [
-      {
-       "name": "interventionNo",
-       "type": "String"
-      },
-      {
-       "name": "orderNo",
-       "type": "String"
-      },
-      {
-       "name": "action",
-       "type": "String"
-      },
-      {
-       "name": "operatorName",
-       "type": "String"
-      },
-      {
-       "name": "reason",
-       "type": "String"
-      },
-      {
-       "name": "amount",
-       "type": "BigDecimal"
-      },
-      {
-       "name": "currency",
-       "type": "String"
-      },
-      {
-       "name": "beforeStatus",
-       "type": "String"
-      },
-      {
-       "name": "afterStatus",
-       "type": "String"
-      },
-      {
-       "name": "createdAt",
-       "type": "String"
-      }
-     ]
-    }
-   ],
+   "returnElement": "Object",
+   "responseShape": null,
    "requestShape": [
     {
      "name": "action",
@@ -33956,6 +40770,103 @@
      "type": "String"
     }
    ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/payables",
+   "perm": "finance:share_record:read",
+   "perms": [
+    "finance:share_record:read"
+   ],
+   "handler": "FinanceController#payables",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "payeeType",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "payeeNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "fromPeriod",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "toPeriod",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "onlyOutstanding",
+     "type": "Boolean",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<ai.neargo.sharehub.finance.service.PayableReportService.PayableRow>",
+   "returnContainer": "PageResult",
+   "returnElement": "ai.neargo.sharehub.finance.service.PayableReportService.PayableRow",
+   "responseShape": [
+    {
+     "name": "payeeType",
+     "type": "String"
+    },
+    {
+     "name": "payeeNo",
+     "type": "String"
+    },
+    {
+     "name": "payeeName",
+     "type": "String"
+    },
+    {
+     "name": "period",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "earned",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "settled",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "paid",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "outstanding",
+     "type": "BigDecimal"
+    }
+   ],
+   "requestShape": null
   },
   {
    "verb": "GET",
@@ -34281,6 +41192,894 @@
   },
   {
    "verb": "GET",
+   "path": "/api/trade/payout-tasks",
+   "perm": "finance:withdrawal:read",
+   "perms": [
+    "finance:withdrawal:read"
+   ],
+   "handler": "PayoutTaskController#page",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<PayoutTask>",
+   "returnContainer": "PageResult",
+   "returnElement": "PayoutTask",
+   "responseShape": [
+    {
+     "name": "taskNo",
+     "type": "String"
+    },
+    {
+     "name": "cutoffDate",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "itemCount",
+     "type": "int"
+    },
+    {
+     "name": "totalAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdName",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "String"
+    },
+    {
+     "name": "reviewedName",
+     "type": "String"
+    },
+    {
+     "name": "reviewedAt",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "bankBatchRef",
+     "type": "String"
+    },
+    {
+     "name": "transferDate",
+     "type": "String"
+    },
+    {
+     "name": "confirmedAt",
+     "type": "String"
+    },
+    {
+     "name": "exportCount",
+     "type": "int"
+    },
+    {
+     "name": "items",
+     "type": "List<PayoutTaskItem>",
+     "fields": [
+      {
+       "name": "seq",
+       "type": "int"
+      },
+      {
+       "name": "withdrawNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeName",
+       "type": "String"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "accountName",
+       "type": "String"
+      },
+      {
+       "name": "accountMasked",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "settleNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "payRef",
+       "type": "String"
+      },
+      {
+       "name": "paidAt",
+       "type": "String"
+      },
+      {
+       "name": "failReason",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/payout-tasks",
+   "perm": "finance:withdrawal:create",
+   "perms": [
+    "finance:withdrawal:create"
+   ],
+   "handler": "PayoutTaskController#create",
+   "summary": "",
+   "params": [],
+   "bodyType": "PayoutTaskCreateReq",
+   "returnType": "PayoutTask",
+   "returnContainer": null,
+   "returnElement": "PayoutTask",
+   "responseShape": [
+    {
+     "name": "taskNo",
+     "type": "String"
+    },
+    {
+     "name": "cutoffDate",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "itemCount",
+     "type": "int"
+    },
+    {
+     "name": "totalAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdName",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "String"
+    },
+    {
+     "name": "reviewedName",
+     "type": "String"
+    },
+    {
+     "name": "reviewedAt",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "bankBatchRef",
+     "type": "String"
+    },
+    {
+     "name": "transferDate",
+     "type": "String"
+    },
+    {
+     "name": "confirmedAt",
+     "type": "String"
+    },
+    {
+     "name": "exportCount",
+     "type": "int"
+    },
+    {
+     "name": "items",
+     "type": "List<PayoutTaskItem>",
+     "fields": [
+      {
+       "name": "seq",
+       "type": "int"
+      },
+      {
+       "name": "withdrawNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeName",
+       "type": "String"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "accountName",
+       "type": "String"
+      },
+      {
+       "name": "accountMasked",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "settleNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "payRef",
+       "type": "String"
+      },
+      {
+       "name": "paidAt",
+       "type": "String"
+      },
+      {
+       "name": "failReason",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "cutoffDate",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/payout-tasks/preview",
+   "perm": "finance:withdrawal:read",
+   "perms": [
+    "finance:withdrawal:read"
+   ],
+   "handler": "PayoutTaskController#preview",
+   "summary": "付款任务（商家一期 B4，需求方案 §八）：平台向商家付款，财务在运营端手动执行。",
+   "params": [
+    {
+     "in": "query",
+     "name": "cutoffDate",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PayoutPreview",
+   "returnContainer": null,
+   "returnElement": "PayoutPreview",
+   "responseShape": [
+    {
+     "name": "cutoffDate",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "payableCount",
+     "type": "int"
+    },
+    {
+     "name": "payableTotal",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "items",
+     "type": "List<PayoutPreviewItem>",
+     "fields": [
+      {
+       "name": "payeeNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeName",
+       "type": "String"
+      },
+      {
+       "name": "settleNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "periods",
+       "type": "List<String>"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "accountMasked",
+       "type": "String"
+      },
+      {
+       "name": "blockedReason",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/payout-tasks/{taskNo}",
+   "perm": "finance:withdrawal:read",
+   "perms": [
+    "finance:withdrawal:read"
+   ],
+   "handler": "PayoutTaskController#detail",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "taskNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PayoutTask",
+   "returnContainer": null,
+   "returnElement": "PayoutTask",
+   "responseShape": [
+    {
+     "name": "taskNo",
+     "type": "String"
+    },
+    {
+     "name": "cutoffDate",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "itemCount",
+     "type": "int"
+    },
+    {
+     "name": "totalAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdName",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "String"
+    },
+    {
+     "name": "reviewedName",
+     "type": "String"
+    },
+    {
+     "name": "reviewedAt",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "bankBatchRef",
+     "type": "String"
+    },
+    {
+     "name": "transferDate",
+     "type": "String"
+    },
+    {
+     "name": "confirmedAt",
+     "type": "String"
+    },
+    {
+     "name": "exportCount",
+     "type": "int"
+    },
+    {
+     "name": "items",
+     "type": "List<PayoutTaskItem>",
+     "fields": [
+      {
+       "name": "seq",
+       "type": "int"
+      },
+      {
+       "name": "withdrawNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeName",
+       "type": "String"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "accountName",
+       "type": "String"
+      },
+      {
+       "name": "accountMasked",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "settleNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "payRef",
+       "type": "String"
+      },
+      {
+       "name": "paidAt",
+       "type": "String"
+      },
+      {
+       "name": "failReason",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/payout-tasks/{taskNo}/audit",
+   "perm": "finance:withdrawal:audit",
+   "perms": [
+    "finance:withdrawal:audit"
+   ],
+   "handler": "PayoutTaskController#audit",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "taskNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "PayoutTaskAuditReq",
+   "returnType": "PayoutTask",
+   "returnContainer": null,
+   "returnElement": "PayoutTask",
+   "responseShape": [
+    {
+     "name": "taskNo",
+     "type": "String"
+    },
+    {
+     "name": "cutoffDate",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "itemCount",
+     "type": "int"
+    },
+    {
+     "name": "totalAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdName",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "String"
+    },
+    {
+     "name": "reviewedName",
+     "type": "String"
+    },
+    {
+     "name": "reviewedAt",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "bankBatchRef",
+     "type": "String"
+    },
+    {
+     "name": "transferDate",
+     "type": "String"
+    },
+    {
+     "name": "confirmedAt",
+     "type": "String"
+    },
+    {
+     "name": "exportCount",
+     "type": "int"
+    },
+    {
+     "name": "items",
+     "type": "List<PayoutTaskItem>",
+     "fields": [
+      {
+       "name": "seq",
+       "type": "int"
+      },
+      {
+       "name": "withdrawNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeName",
+       "type": "String"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "accountName",
+       "type": "String"
+      },
+      {
+       "name": "accountMasked",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "settleNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "payRef",
+       "type": "String"
+      },
+      {
+       "name": "paidAt",
+       "type": "String"
+      },
+      {
+       "name": "failReason",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "approve",
+     "type": "Boolean"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/payout-tasks/{taskNo}/confirm",
+   "perm": "finance:withdrawal:pay",
+   "perms": [
+    "finance:withdrawal:pay"
+   ],
+   "handler": "PayoutTaskController#confirm",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "taskNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "PayoutConfirmReq",
+   "returnType": "PayoutTask",
+   "returnContainer": null,
+   "returnElement": "PayoutTask",
+   "responseShape": [
+    {
+     "name": "taskNo",
+     "type": "String"
+    },
+    {
+     "name": "cutoffDate",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "itemCount",
+     "type": "int"
+    },
+    {
+     "name": "totalAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdName",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "String"
+    },
+    {
+     "name": "reviewedName",
+     "type": "String"
+    },
+    {
+     "name": "reviewedAt",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "bankBatchRef",
+     "type": "String"
+    },
+    {
+     "name": "transferDate",
+     "type": "String"
+    },
+    {
+     "name": "confirmedAt",
+     "type": "String"
+    },
+    {
+     "name": "exportCount",
+     "type": "int"
+    },
+    {
+     "name": "items",
+     "type": "List<PayoutTaskItem>",
+     "fields": [
+      {
+       "name": "seq",
+       "type": "int"
+      },
+      {
+       "name": "withdrawNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeName",
+       "type": "String"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "accountName",
+       "type": "String"
+      },
+      {
+       "name": "accountMasked",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "settleNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "payRef",
+       "type": "String"
+      },
+      {
+       "name": "paidAt",
+       "type": "String"
+      },
+      {
+       "name": "failReason",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "bankBatchRef",
+     "type": "String"
+    },
+    {
+     "name": "transferDate",
+     "type": "String"
+    },
+    {
+     "name": "results",
+     "type": "List<PayoutConfirmItem>",
+     "fields": [
+      {
+       "name": "withdrawNo",
+       "type": "String"
+      },
+      {
+       "name": "success",
+       "type": "Boolean"
+      },
+      {
+       "name": "payRef",
+       "type": "String"
+      },
+      {
+       "name": "failReason",
+       "type": "String"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/payout-tasks/{taskNo}/export",
+   "perm": "finance:withdrawal:export",
+   "perms": [
+    "finance:withdrawal:export"
+   ],
+   "handler": "PayoutTaskController#export",
+   "summary": "转账文件下载。",
+   "params": [
+    {
+     "in": "path",
+     "name": "taskNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/trade/price-adjustments",
    "perm": "pricing:adjustment:read",
    "perms": [
@@ -34530,6 +42329,14 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "lostFee",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "unitRounding",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -34592,6 +42399,14 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "lostFee",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "unitRounding",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -34633,6 +42448,14 @@
     },
     {
      "name": "deviceType",
+     "type": "String"
+    },
+    {
+     "name": "lostFee",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "unitRounding",
      "type": "String"
     }
    ]
@@ -34750,6 +42573,14 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "lostFee",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "unitRounding",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -34791,6 +42622,14 @@
     },
     {
      "name": "deviceType",
+     "type": "String"
+    },
+    {
+     "name": "lostFee",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "unitRounding",
      "type": "String"
     }
    ]
@@ -36001,6 +43840,216 @@
   },
   {
    "verb": "GET",
+   "path": "/api/trade/self-bills",
+   "perm": "finance:invoice:read",
+   "perms": [
+    "finance:invoice:read"
+   ],
+   "handler": "FinanceController#selfBills",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "agentNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<SelfBillView>",
+   "returnContainer": "PageResult",
+   "returnElement": "SelfBillView",
+   "responseShape": [
+    {
+     "name": "billNo",
+     "type": "String"
+    },
+    {
+     "name": "withdrawNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierName",
+     "type": "String"
+    },
+    {
+     "name": "supplierAddress",
+     "type": "String"
+    },
+    {
+     "name": "supplierTrn",
+     "type": "String"
+    },
+    {
+     "name": "recipientName",
+     "type": "String"
+    },
+    {
+     "name": "recipientTrn",
+     "type": "String"
+    },
+    {
+     "name": "taxRatePercent",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "netAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "grossAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "payRef",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/self-bills/issue",
+   "perm": "finance:invoice:issue",
+   "perms": [
+    "finance:invoice:issue"
+   ],
+   "handler": "FinanceController#issueSelfBill",
+   "summary": "补出：开关当时关着、商家后补了税号、或自动出单失败时，对一笔已到账的提现补一张。",
+   "params": [],
+   "bodyType": "SelfBillIssueReq",
+   "returnType": "SelfBillView",
+   "returnContainer": null,
+   "returnElement": "SelfBillView",
+   "responseShape": [
+    {
+     "name": "billNo",
+     "type": "String"
+    },
+    {
+     "name": "withdrawNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierName",
+     "type": "String"
+    },
+    {
+     "name": "supplierAddress",
+     "type": "String"
+    },
+    {
+     "name": "supplierTrn",
+     "type": "String"
+    },
+    {
+     "name": "recipientName",
+     "type": "String"
+    },
+    {
+     "name": "recipientTrn",
+     "type": "String"
+    },
+    {
+     "name": "taxRatePercent",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "netAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "grossAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "payRef",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "withdrawNo",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/self-bills/{billNo}/pdf",
+   "perm": "finance:invoice:read",
+   "perms": [
+    "finance:invoice:read"
+   ],
+   "handler": "FinanceController#selfBillPdf",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "billNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/trade/settlements",
    "perm": "finance:settlement:read",
    "perms": [
@@ -36358,7 +44407,8 @@
    "path": "/api/trade/settlements/{settleNo}/statement",
    "perm": "finance:settlement:read",
    "perms": [
-    "finance:settlement:read"
+    "finance:settlement:read",
+    "agent:settlement:read"
    ],
    "handler": "StatementController#statement",
    "summary": "场地方对账单（运营核心流程 G3，裁决 #2）：结算单导出对账单线下发给场地方，首版不做场地方门户。",
@@ -36491,7 +44541,8 @@
    "path": "/api/trade/settlements/{settleNo}/statement.html",
    "perm": "finance:settlement:read",
    "perms": [
-    "finance:settlement:read"
+    "finance:settlement:read",
+    "agent:settlement:read"
    ],
    "handler": "StatementController#printable",
    "summary": "可打印对账单：浏览器打开后「打印 → 存为 PDF」。",
@@ -36621,6 +44672,22 @@
     {
      "name": "grossAmount",
      "type": "BigDecimal"
+    },
+    {
+     "name": "baseMode",
+     "type": "String"
+    },
+    {
+     "name": "taxRate",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "baseAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "refundNo",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -37141,6 +45208,459 @@
     {
      "name": "invalid",
      "type": "int"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/tax-invoices",
+   "perm": "finance:invoice:read",
+   "perms": [
+    "finance:invoice:read"
+   ],
+   "handler": "FinanceController#taxInvoices",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "orderNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "kind",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<TaxInvoiceView>",
+   "returnContainer": "PageResult",
+   "returnElement": "TaxInvoiceView",
+   "responseShape": [
+    {
+     "name": "invoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "refInvoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "orderNo",
+     "type": "String"
+    },
+    {
+     "name": "cUserNo",
+     "type": "String"
+    },
+    {
+     "name": "payNo",
+     "type": "String"
+    },
+    {
+     "name": "refundNo",
+     "type": "String"
+    },
+    {
+     "name": "issuerCountry",
+     "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
+     "type": "String"
+    },
+    {
+     "name": "issuerTrn",
+     "type": "String"
+    },
+    {
+     "name": "issuerTitle",
+     "type": "String"
+    },
+    {
+     "name": "taxRatePercent",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxIncluded",
+     "type": "boolean"
+    },
+    {
+     "name": "netAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "grossAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "lineDesc",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "failReason",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/tax-invoices/export",
+   "perm": "finance:invoice:read",
+   "perms": [
+    "finance:invoice:read"
+   ],
+   "handler": "FinanceController#exportTaxInvoices",
+   "summary": "导出（K8 / RQ-INV-07~08）：`format=xlsx|pdf` 出登记表，`format=zip` 把区间内已开出的票逐张出 PDF 打包。",
+   "params": [
+    {
+     "in": "query",
+     "name": "format",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "orderNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "kind",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "from",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/tax-invoices/{invoiceNo}",
+   "perm": "finance:invoice:read",
+   "perms": [
+    "finance:invoice:read"
+   ],
+   "handler": "FinanceController#taxInvoice",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "invoiceNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "TaxInvoiceView",
+   "returnContainer": null,
+   "returnElement": "TaxInvoiceView",
+   "responseShape": [
+    {
+     "name": "invoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "refInvoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "orderNo",
+     "type": "String"
+    },
+    {
+     "name": "cUserNo",
+     "type": "String"
+    },
+    {
+     "name": "payNo",
+     "type": "String"
+    },
+    {
+     "name": "refundNo",
+     "type": "String"
+    },
+    {
+     "name": "issuerCountry",
+     "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
+     "type": "String"
+    },
+    {
+     "name": "issuerTrn",
+     "type": "String"
+    },
+    {
+     "name": "issuerTitle",
+     "type": "String"
+    },
+    {
+     "name": "taxRatePercent",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxIncluded",
+     "type": "boolean"
+    },
+    {
+     "name": "netAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "grossAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "lineDesc",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "failReason",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/tax-invoices/{invoiceNo}/pdf",
+   "perm": "finance:invoice:read",
+   "perms": [
+    "finance:invoice:read"
+   ],
+   "handler": "FinanceController#taxInvoicePdf",
+   "summary": "单张票 PDF（RQ-INV-06）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "invoiceNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/tax-invoices/{invoiceNo}/retry",
+   "perm": "finance:invoice:issue",
+   "perms": [
+    "finance:invoice:issue"
+   ],
+   "handler": "FinanceController#retryTaxInvoice",
+   "summary": "BLOCKED（开票主体不全）的票在补齐主体后重开；ISSUED 的不可动。",
+   "params": [
+    {
+     "in": "path",
+     "name": "invoiceNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "TaxInvoiceView",
+   "returnContainer": null,
+   "returnElement": "TaxInvoiceView",
+   "responseShape": [
+    {
+     "name": "invoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "refInvoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "orderNo",
+     "type": "String"
+    },
+    {
+     "name": "cUserNo",
+     "type": "String"
+    },
+    {
+     "name": "payNo",
+     "type": "String"
+    },
+    {
+     "name": "refundNo",
+     "type": "String"
+    },
+    {
+     "name": "issuerCountry",
+     "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
+     "type": "String"
+    },
+    {
+     "name": "issuerTrn",
+     "type": "String"
+    },
+    {
+     "name": "issuerTitle",
+     "type": "String"
+    },
+    {
+     "name": "taxRatePercent",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxIncluded",
+     "type": "boolean"
+    },
+    {
+     "name": "netAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "grossAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "lineDesc",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "failReason",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
     }
    ],
    "requestShape": null
@@ -42468,6 +50988,38 @@
       {
        "name": "payStatus",
        "type": "String"
+      },
+      {
+       "name": "agentNo",
+       "type": "String"
+      },
+      {
+       "name": "agentName",
+       "type": "String"
+      },
+      {
+       "name": "siteNo",
+       "type": "String"
+      },
+      {
+       "name": "maxCharge",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "liveDurationMin",
+       "type": "Integer"
+      },
+      {
+       "name": "accruedFee",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "payNo",
+       "type": "String"
+      },
+      {
+       "name": "payChannel",
+       "type": "String"
       }
      ]
     },
@@ -43305,7 +51857,7 @@
    "perm": null,
    "perms": [],
    "handler": "OpsKitIntrospectController#introspect",
-   "summary": "",
+   "summary": "测试用：不展开通配码",
    "params": [
     {
      "in": "query",
@@ -44677,7 +53229,7 @@
    "perm": null,
    "perms": [],
    "handler": "RentController#buyout",
-   "summary": "买断：不还了，按 `sys_biz_rule` 计费兜底分区的买断价结单（属主鉴权）。",
+   "summary": "",
    "params": [
     {
      "in": "path",
@@ -44796,6 +53348,149 @@
      "type": "String"
     }
    ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/mp/trade/orders/{orderNo}/invoices",
+   "perm": null,
+   "perms": [],
+   "handler": "RentController#invoices",
+   "summary": "买断：不还了，按 `sys_biz_rule` 计费兜底分区的买断价结单（属主鉴权）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "orderNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "List<ai.neargo.sharehub.portal.finance.TaxInvoiceView>",
+   "returnContainer": "List",
+   "returnElement": "ai.neargo.sharehub.portal.finance.TaxInvoiceView",
+   "responseShape": [
+    {
+     "name": "invoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "refInvoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "orderNo",
+     "type": "String"
+    },
+    {
+     "name": "cUserNo",
+     "type": "String"
+    },
+    {
+     "name": "payNo",
+     "type": "String"
+    },
+    {
+     "name": "refundNo",
+     "type": "String"
+    },
+    {
+     "name": "issuerCountry",
+     "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
+     "type": "String"
+    },
+    {
+     "name": "issuerTrn",
+     "type": "String"
+    },
+    {
+     "name": "issuerTitle",
+     "type": "String"
+    },
+    {
+     "name": "taxRatePercent",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxIncluded",
+     "type": "boolean"
+    },
+    {
+     "name": "netAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "grossAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "lineDesc",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "failReason",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/mp/trade/orders/{orderNo}/invoices/{invoiceNo}/pdf",
+   "perm": null,
+   "perms": [],
+   "handler": "RentController#invoicePdf",
+   "summary": "下载本人某张税务票据的 PDF（K8 / RQ-APP-05）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "orderNo",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "path",
+     "name": "invoiceNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
    "requestShape": null
   },
   {
@@ -45128,7 +53823,7 @@
      "required": true
     }
    ],
-   "bodyType": "Map<String, String>",
+   "bodyType": "SendMessageReq",
    "returnType": "CsMessageVO",
    "returnContainer": null,
    "returnElement": "CsMessageVO",
@@ -45162,7 +53857,12 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "content",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -46442,6 +55142,9 @@
    "SCHEDULED",
    "MANUAL"
   ],
+  "ExportFormat": [
+   "XLSX"
+  ],
   "OutboxStatus": [
    "PENDING",
    "SENT",
@@ -46455,24 +55158,70 @@
    "OPEN",
    "RESOLVED"
   ],
+  "IntakeStatus": [
+   "OPEN",
+   "DONE"
+  ],
   "TransferEndpointType": [
    "WAREHOUSE",
    "SITE",
    "LOCATION"
   ],
+  "DisposalReason": [
+   "BROKEN",
+   "OBSOLETE",
+   "OTHER"
+  ],
+  "MaterialDocKind": [
+   "INBOUND",
+   "OUTBOUND",
+   "TRANSFER"
+  ],
+  "MaterialDocPurpose": [
+   "PURCHASE",
+   "OPENING",
+   "RETURN",
+   "REQUISITION",
+   "SCRAP",
+   "RETURN_SUPPLIER",
+   "TRANSFER"
+  ],
+  "MaterialCategory": [
+   "DEVICE",
+   "SPARE_PART",
+   "CONSUMABLE"
+  ],
   "TransferSource": [
    "MANUAL",
    "REMOVAL"
+  ],
+  "DisposalKind": [
+   "SCRAP",
+   "RETURN_SUPPLIER"
+  ],
+  "ShipmentDocType": [
+   "TRANSFER",
+   "ISSUE",
+   "DISPOSAL"
+  ],
+  "MaterialTracking": [
+   "SERIAL",
+   "QUANTITY"
   ],
   "AssetDiffKind": [
    "MISSING",
    "EXTRA",
    "COUNT_MISMATCH"
   ],
+  "InboxStatus": [
+   "DONE",
+   "FAILED"
+  ],
   "OrderStatus": [
    "CREATED",
    "DISPENSING",
    "IN_USE",
+   "OVERDUE_CHARGED",
    "RETURNED",
    "SETTLED",
    "CLOSED"
@@ -46645,12 +55394,40 @@
    "DEVICE",
    "LOCATION"
   ],
+  "MovementEvent": [
+   "ISSUE",
+   "CLAIM",
+   "REDIRECT",
+   "POOL_RETURN",
+   "BIND",
+   "UNBIND",
+   "SHIP",
+   "RECEIVE",
+   "UNDEPLOY",
+   "RETURN_INTAKE",
+   "INBOUND",
+   "REASSIGN",
+   "RETIRE",
+   "LOST"
+  ],
   "ShareRecordStatus": [
    "PENDING"
   ],
   "SettlementStatus": [
    "GEN",
    "CONFIRMED"
+  ],
+  "WithdrawalOrigin": [
+   "APPLY",
+   "PAYOUT_TASK"
+  ],
+  "PayoutTaskStatus": [
+   "PENDING_REVIEW",
+   "PENDING_TRANSFER",
+   "DONE"
+  ],
+  "ShareBaseMode": [
+   "PRE_TAX"
   ],
   "ReconTaskStatus": [
    "MATCHED"
@@ -46708,6 +55485,14 @@
    "OPEN",
    "PROCESSING"
   ],
+  "CsTicketChannel": [
+   "APP",
+   "MP",
+   "H5",
+   "PHONE",
+   "EMAIL",
+   "MANUAL"
+  ],
   "CsSenderType": [
    "USER"
   ],
@@ -46721,7 +55506,9 @@
    "CONTRACT",
    "PAYEE",
    "AGENT",
-   "WORK_ORDER"
+   "WORK_ORDER",
+   "PAYMENT",
+   "INTAKE"
   ],
   "AlarmStatus": [
    "OPEN",
@@ -46841,6 +55628,9 @@
   "WoReviewStatus": [
    "PASSED",
    "FAILED"
+  ],
+  "RemovalDisposition": [
+   "RETURN_TO_POOL"
   ],
   "WoPriority": [
    "LOW",
@@ -47053,10 +55843,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 534,
-  "records": 479,
-  "withPerm": 454,
-  "withBody": 223,
-  "shapedResponses": 415
+  "endpoints": 626,
+  "records": 603,
+  "withPerm": 544,
+  "withBody": 257,
+  "shapedResponses": 488
  }
 }

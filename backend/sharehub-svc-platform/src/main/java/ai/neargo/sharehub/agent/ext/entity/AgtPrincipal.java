@@ -36,18 +36,37 @@ public class AgtPrincipal extends BaseEntity {
 
     private String principalNo;
 
-    /** HMAC(规范化手机号)；登录查找键，全局唯一。 */
+    /** HMAC(规范化手机号)；查找键。V168 起可空（手机号选填），唯一性只对已验证的生效。 */
     private String phoneHash;
 
     /** 138****8000；**仅显示**。 */
     private String phoneMask;
 
+    /**
+     * 手机号已由本人验证（V168）。运营录入的一律先记 0 —— 录错一位就把账号交给陌生人（R3）；
+     * 只有已验证的手机号可以登录（R5）、才占唯一（{@link #phoneUk}）。
+     */
+    private Integer phoneVerified;
 
-    /** HMAC(lower(trim(邮箱)))；登录查找键，全局唯一。 */
+    /** 生成列：已验证取 phoneHash，否则 NULL —— 唯一键挂这里，未验证的不挡号主（R6）。只读。 */
+    @com.baomidou.mybatisplus.annotation.TableField(insertStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.NEVER,
+            updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.NEVER)
+    private String phoneUk;
+
+
+    /** HMAC(lower(trim(邮箱)))；主登录查找键。唯一性只对已验证的生效（V168）。 */
     private String emailHash;
 
     /** a***@example.com；**仅显示**。 */
     private String emailMask;
+
+    /** 邮箱已由本人验证（V168）：邮箱验证码首登成功即置 1（R4）。 */
+    private Integer emailVerified;
+
+    /** 生成列：已验证取 emailHash，否则 NULL。只读。 */
+    @com.baomidou.mybatisplus.annotation.TableField(insertStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.NEVER,
+            updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.NEVER)
+    private String emailUk;
 
 
     /** pepper 版本；轮换时据它判断哪些行还没重算。 */

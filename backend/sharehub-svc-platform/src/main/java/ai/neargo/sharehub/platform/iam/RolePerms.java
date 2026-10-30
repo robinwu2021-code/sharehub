@@ -18,15 +18,20 @@ public final class RolePerms {
     public static final Map<String, List<String>> MAP = Map.of(
             "ADMIN", List.of("*"),
             "OPS", List.of(
+                    // 设备质检（V186，矩阵 Q2）：此前经 device:cabinet:* / device:powerbank:* 隐含；
+                    // 运维的 device:inventory:* 暂留（Q1 过渡，仓管有人后收回到 read + receive）
+                    "device:qc:inspect",
                     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
                     "flow:todo:read", "flow:approval:read", "flow:approval:submit", "flow:approval:decide", "flow:queue:claim", "flow:ticket:read", "flow:ticket:handle", "flow:ticket:dispatch", "flow:config:manage",
                     "dashboard:overview:read", "dashboard:todo:read",
                     "device:cabinet:*", "device:slot:read", "device:powerbank:*",
                     "device:command:*", "device:inventory:*", "device:ota:*", "device:vendor:read",
                     "location:poi:read", "location:venue:read", "location:overview:read",
+                    // 合同只读（运营方原文 MER-08，2026-10-29）：运维上门要知道站点的合同还有多久、谁签的
+                    "location:contract:read",
                     "order:order:read", "order:exception:read", "order:exception:handle",
                     "workorder:*", "agent:scope:assign",
-                    "report:device:read", "report:location:read",
+                    "report:device:read", "report:location:read", "report:inventory:read",
                     "system:notify_template:read", "system:dict:read",
                     // —— D6d 权限对账补配（2026-09-23）——
                     // 判据：功能权限清单（RBAC SSOT）明确给了本角色 + 端点确实存在，
@@ -64,6 +69,8 @@ public final class RolePerms {
                     "system:notify_log:read", "system:notify_blacklist:read", "system:notify_blacklist:update",
                     "system:problem:read", "system:problem:update"),
             "FINANCE", List.of(
+                    // 库存只读（V186，矩阵 Q4）：资产对账
+                    "device:inventory:read",
                     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
                     "flow:todo:read", "flow:approval:read", "flow:approval:submit", "flow:approval:decide",
                     "dashboard:overview:read", "dashboard:todo:read",
@@ -98,6 +105,8 @@ public final class RolePerms {
                     "marketing:*", "agent:*",
                     "finance:share_rule:read", "finance:share_record:read", "report:*"),
             "VIEWER", List.of(
+                    // 库存 / 充电宝 / 台账导出只读（V186）：功能权限清单早已给，此前漏配
+                    "device:inventory:read", "device:powerbank:read", "device:cabinet:export",
                     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
                     "flow:approval:read", "flow:ticket:read",
                     "dashboard:overview:read", "dashboard:todo:read",
@@ -105,6 +114,15 @@ public final class RolePerms {
                     "location:poi:read", "location:venue:read", "location:analysis:read", "location:overview:read",
                     "finance:share_rule:read", "finance:share_record:read", "finance:settlement:read",
                     "finance:withdrawal:read", "agent:agent:read", "report:*"),
+            "WAREHOUSE", List.of(
+                    // 仓管（V186，矩阵 Q3）：到货质检、发货、盘点录入、期初导入。
+                    // 入库 / 签收 / 盘点复核等码随 S4 端点登记后再补
+                    "dashboard:overview:read", "dashboard:todo:read",
+                    "device:cabinet:read", "device:cabinet:import", "device:slot:read", "device:powerbank:read",
+                    "device:qc:inspect",
+                    "device:inventory:read", "device:inventory:inbound", "device:inventory:transfer", "device:inventory:stocktake",
+                    // 库存报表（V206）
+                    "report:inventory:read"),
             "AGENT", List.of(
                     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
                     "flow:todo:read", "flow:ticket:read", "flow:ticket:handle",
@@ -113,8 +131,12 @@ public final class RolePerms {
                     // **保留**的理由：代理门户有「设备报修」（wo:create），能提报却看不到自己提的工单
                     // 说不通。倾向清单漏标，确认后补进清单。
                     "workorder:wo:create", "workorder:wo:read", "order:order:read",
-                    "finance:share_record:read", "finance:withdrawal:apply",
+                    // 一期提现 = 平台按付款任务主动付款（需求方案 D8），商家只看提现记录，不申请（V158 起）
+                    "finance:share_record:read", "finance:withdrawal:read",
                     "agent:settlement:read", "location:poi:read",
+                    // 商家资料（V175）：看自己的档案、改联系人。不给 agent:agent:read —— agt_agent 没有数据范围，
+                    // 给了就能列出所有商家；这两个码只作用于 /api/agent/me/**，商家号取自会话
+                    "agent:profile:read", "agent:profile:update",
                     // 代理门户要显示「你还不能收款」，判据是有没有可用收款账户 ——
                     // 没有这个码的话 can() 判 false、查询被 disable，那条提示**永远不显示**，
                     // 而代理商会一路提交到审批被拒才知道。**只给读，不给 update**：

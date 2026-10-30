@@ -9,6 +9,7 @@ import type { AgentApply, ApplyStatus, OperatorType } from "../../types";
 import { fail, notFound } from "@/lib/biz-error";
 import { paginate, kwHit } from "./helpers";
 import { agents } from "./agent";
+import { paramOf } from "./system";
 
 /** 在途状态。**必须与后端 V48 生成列 `active_key` 的 CASE 分支一致**，改一处要改两处。 */
 const IN_FLIGHT: ApplyStatus[] = ["DRAFT", "SUBMITTED", "REVIEWING"];
@@ -185,7 +186,22 @@ export function auditAgentApply(x: {
   r.rejectReason = null;
   if (x.shareRate !== undefined) r.shareRate = x.shareRate;
   if (x.regionScope !== undefined) r.regionScope = x.regionScope;
-  return strip(r);
+  // 开通即发一次性初始口令（与后端 MerchantInvite 同口径）：同一邮箱此前已开通过 = 同一个人已有口令，不再发
+  const mail = r.contactEmail?.toLowerCase();
+  const samePersonBefore = applies.some((o) => o !== r && o.status === "APPROVED" && o.contactEmail?.toLowerCase() === mail);
+  return { ...strip(r), initialPassword: samePersonBefore ? null : oneTimePassword() };
+}
+
+/** mock 一次性口令：形近字符（0/O、1/l/I）去掉，与后端字母表同口径。 */
+export function oneTimePassword(): string {
+  const abc = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  return Array.from({ length: 12 }, () => abc[Math.floor(Math.random() * abc.length)]).join("");
+}
+
+/** 重发邀请：作废旧口令、发新的（mock 不存口令，只回一个新的）。 */
+export function resendAgentInvite(agentNo: string): { agentNo: string; initialPassword: string } {
+  if (!agents.some((a) => a.agentNo === agentNo)) fail(`商家不存在：${agentNo}`, `Merchant not found: ${agentNo}`);
+  return { agentNo, initialPassword: oneTimePassword() };
 }
 
 /**
@@ -194,7 +210,17 @@ export function auditAgentApply(x: {
  * 真实现有重发间隔与有效期；mock 不模拟那些，因为它们只会让离线调页面变难，
  * 而「码错了会怎样」这条路径在 verify 里照样验得到。
  */
+/**
+ * 自助注册开关（V155 `agent.apply.self_service_enabled`）。一期只走运营代建，关闭时三个公开端点一律 404，
+ * 与后端同语义 —— 关闭期间这是不该被发现的入口，403 等于告诉对方「这里有东西」。
+ */
+export const SELF_SERVICE_KEY = "agent.apply.self_service_enabled";
+function requireSelfServiceOpen() {
+  if (paramOf(SELF_SERVICE_KEY, "0") !== "1") notFound("自助注册入口", "Self-service sign-up", "");
+}
+
 export function sendApplyOtp(phone: string): { sent: boolean; devCode?: string } {
+  requireSelfServiceOpen();
   if (!phone?.trim()) fail("手机号必填", "Phone is required");
   return { sent: true, devCode: "000000" };
 }
@@ -210,6 +236,7 @@ export function selfServiceApply(x: {
   operatorName: string; operatorType: OperatorType; contactName?: string;
   regionScope?: string; payload?: string;
 }): { applyNo: string; status: ApplyStatus } {
+  requireSelfServiceOpen();
   checkOtp(x.otp);
   const row = createAgentApply(x);
   // source 由入口决定 —— 这里是自助那一侧
@@ -221,6 +248,7 @@ export function selfServiceApply(x: {
 
 /** 申请人查进度。只返回掩码与状态 —— 公开页不能多给任何可枚举的信息。 */
 export function myApply(phone: string, otp: string) {
+  requireSelfServiceOpen();
   checkOtp(otp);
   const key = phoneKey(phone);
   const rows = applies.filter((r) => r._phoneKey === key);
@@ -235,36 +263,36 @@ export function myApply(phone: string, otp: string) {
 }
 
 export function createAgentApply(x: {
-  phone: string; email: string; operatorName: string; operatorType: OperatorType;
+  phone?: string; email: string; operatorName: string; operatorType: OperatorType;
   contactName?: string;
   regionScope?: string; shareRate?: number; payload?: string;
 }): AgentApply {
   if (!x.operatorName?.trim()) fail("主体名称必填", "Operator name is required");
-  if (!x.phone?.trim()) fail("手机号必填", "Phone is required");
   if (!x.email?.trim()) fail("邮箱必填", "Email is required");
-
-  const key = phoneKey(x.phone);
-  // 同手机号至多一张在途 —— 服务端靠生成列 active_key 强制，这里给出人话
-  if (applies.some((r) => r._phoneKey === key && IN_FLIGHT.includes(r.status))) {
-    fail("该手机号已有一张在途申请，请先等待审核结果",
-         "This phone already has an application in progress");
+  // 手机号选填（商家一期 B2）；邮箱是主标识，在途唯一与「同一个人」都按邮箱（与后端 V168 同口径）
+  const phone = x.phone?.trim() || null;
+  const key = phone ? phoneKey(phone) : "";
+  const mail = x.email.trim().toLowerCase();
+  if (applies.some((r) => r.contactEmail?.toLowerCase() === mail && IN_FLIGHT.includes(r.status))) {
+    fail("该邮箱已有一张在途申请，请先等待审核结果",
+         "This email already has an application in progress");
   }
-  // 手机号已有主体**不是重复注册**，是多主体申请：带出已知信息给审核人，不拦
-  const known = applies.find((r) => r._phoneKey === key && r.status === "APPROVED");
+  // 邮箱已有主体**不是重复注册**，是多主体申请：带出已知信息给审核人，不拦
+  const known = applies.find((r) => r.contactEmail?.toLowerCase() === mail && r.status === "APPROVED");
 
   const row: ApplyRow = {
     applyNo: `AP${String(applies.length + 1).padStart(3, "0")}`,
     source: "OPS_CREATED",              // 本入口只给运营；自助入口在公开页（D5）
     status: "SUBMITTED",
     operatorName: x.operatorName.trim(), operatorType: x.operatorType,
-    phoneMask: maskPhone(x.phone), emailMask: maskEmail(x.email),
+    phoneMask: phone ? maskPhone(phone) : "", emailMask: maskEmail(x.email),
     /*
      * 业务联系方式是**明文**，与上面的掩码语义不同：掩码只用于显示，
      * 这三列是运营要拨打、要发件的东西，审核通过时回填到代理商档案。
      * 电话/邮箱默认取提交时填的那个，不让人填两遍。
      */
     contactName: x.contactName?.trim() || null,
-    contactPhone: x.phone.trim(), contactEmail: x.email.trim(),
+    contactPhone: phone, contactEmail: x.email.trim(),
     regionScope: x.regionScope ?? null,
     shareRate: x.shareRate ?? null,
     payload: x.payload ?? null,
@@ -273,7 +301,7 @@ export function createAgentApply(x: {
     submittedBy: "OPS", submittedAt: new Date().toISOString(),
     reviewedBy: null, reviewedAt: null, operatorNo: null,
     phoneAlreadyKnown: !!known,
-    knownEmailMask: known && known.emailMask !== maskEmail(x.email) ? known.emailMask : null,
+    knownEmailMask: null,   // 按邮箱找人，命中的就是同一个邮箱
     _phoneKey: key,
   };
   applies.push(row);

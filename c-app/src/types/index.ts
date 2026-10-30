@@ -65,7 +65,11 @@ export interface CabinetAvailability {
   borrowable: boolean;
   pricePerHour: number;
   dailyCap: number; // 日封顶
-  buyoutPrice: number; // 买断价
+  buyoutPrice: number; // 买断价 = 不还时收多少（方案配了独立遗失费时就是遗失费）
+  /** 最高租赁收费 = 计费方案总封顶（V180，与借出后实扣同一份数）；老后端没有这一项 */
+  maxCharge?: number;
+  /** 方案配了独立遗失费：确认页分开写「最高收费」与「遗失费」 */
+  lostFeeSeparate?: boolean;
   depositAmount: number; // 押金（降级）
   freeQuota: number; // 免押冻结额度
   currency: string;
@@ -492,4 +496,27 @@ export interface StoreDetail {
   currency: string;
   favorite: boolean;
   cabinets: { cabinetNo: string; borrow: number; return: number }[];
+}
+
+/**
+ * 订单的税务票据（V181，{@code GET /mp/trade/orders/{orderNo}/invoices}）：收款时系统自动开出，
+ * 退款批准后有一张负数的贷项通知单（CREDIT_NOTE）。只含已开出的；运营方没开开关时为空列表。
+ */
+export interface TaxInvoice {
+  invoiceNo: string;
+  kind: "INVOICE" | "CREDIT_NOTE";
+  refInvoiceNo: string | null;
+  orderNo: string;
+  issuerLegalName: string | null;
+  issuerAddress: string | null;
+  issuerTrn: string | null;
+  taxRatePercent: number;
+  taxIncluded: boolean;
+  netAmount: number;
+  taxAmount: number;
+  grossAmount: number;
+  currency: string;
+  lineDesc: string | null;
+  status: "ISSUED" | "BLOCKED";
+  issuedAt: string | null;
 }

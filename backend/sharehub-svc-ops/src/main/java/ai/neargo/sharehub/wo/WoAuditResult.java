@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.wo;
 
+import ai.neargo.sharehub.common.BizException;
+
 /**
  * 工单验收结论（{@code wo_order.audit_result}，与前端 {@code WoAuditResult} 同值域）。
  *
@@ -23,13 +25,13 @@ public enum WoAuditResult {
     /** 验收不合格 —— **不允许直接关单**，须走 /rework 退回返工。 */
     FAIL;
 
-    /** 宽松解析：非法值抛 {@link IllegalArgumentException}（全局映射 400）。 */
+    /** 宽松解析：非法值抛 {@link BizException}（400，文案走 i18n key —— 中文字面量会原样送到英文 / 阿语界面）。 */
     public static WoAuditResult of(String v) {
-        if (v == null || v.isBlank()) throw new IllegalArgumentException("验收结论必填");
+        if (v == null || v.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "result");
         try {
             return valueOf(v.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("验收结论非法: " + v + "（仅 PASS/PASS_WITH_ISSUE/FAIL）");
+            throw BizException.badRequest("error.common.invalid_value", v + " (PASS/PASS_WITH_ISSUE/FAIL)");
         }
     }
 

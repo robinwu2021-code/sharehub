@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.api.common;
 
+import ai.neargo.sharehub.common.BizException;
+
 /**
  * 分润执行方式（{@code share_rule.mode}）。
  *
@@ -26,11 +28,11 @@ public enum ShareMode {
 
     /** 宽松解析：非法值抛 {@link IllegalArgumentException}（全局映射 400）。 */
     public static ShareMode of(String v) {
-        if (v == null || v.isBlank()) throw new IllegalArgumentException("分润方式必填");
+        if (v == null || v.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "mode");
         try {
             return valueOf(v.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("分润方式非法: " + v + "（仅 CHANNEL_SPLIT/LEDGER）");
+            throw BizException.badRequest("error.common.invalid_value", v + " (CHANNEL_SPLIT/LEDGER)");
         }
     }
     /**

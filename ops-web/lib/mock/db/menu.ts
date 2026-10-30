@@ -13,14 +13,14 @@ import { fail } from "../../biz-error";
  *
  * <h3>两道闸在 mock 层也要强制</h3>
  * 与后端 `IamAdminController.updateMenu` 同规则：
- * perm 必须在目录里 · 不能把「员工与权限」藏掉。
+ * perm 必须在目录里 · 不能把「系统管理」（菜单管理所在的那一支）藏掉。
  * mock 放行而后端拒绝的话，离线调一路顺、切后端当场吃 500 ——
  * 这条坑本仓库已经踩过四次（saveShareRule / saveVenueOnboarding /
  * reviewVenueOnboarding / 两个详情端点）。
  */
 
-/** 回得来的那扇门：菜单管理自己就在这一支下面。与后端的 ADMIN_SECTION 同值。 */
-const ADMIN_SECTION = "M_org";
+/** 回得来的那扇门：菜单管理自己就在这一支下面。与后端的 ADMIN_SECTION 同值（V172 起是系统管理）。 */
+const ADMIN_SECTION = "M_system";
 
 /** menuNo → 改过的字段。只存差异，底稿永远是 nav.ts。 */
 const overrides = new Map<string, MenuPatch>();
@@ -118,7 +118,7 @@ export async function updateMenu(
   if (patch.visible === 0 && menuNo === ADMIN_SECTION) {
     if (before === undefined) overrides.delete(menuNo); else overrides.set(menuNo, before);
     fail(
-      "这一改之后「员工与权限」对谁都不可见了——菜单是运营端唯一的入口，改成这样之后谁都进不来把它改回去",
+      "这一改之后「系统管理」对谁都不可见了——菜单是运营端唯一的入口，改成这样之后谁都进不来把它改回去",
       "That would hide the only way back in",
       "هذا سيخفي المدخل الوحيد للعودة",
     );

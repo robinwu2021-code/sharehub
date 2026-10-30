@@ -1,10 +1,11 @@
 // 覆盖范围：机柜与仓位、下发指令、充电宝、实时监控、指令记录、调拨、OTA、设备日志、设备编码批次。
-import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ } from "../query";
+import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ, StockLedgerQ, StockCountQ, StockPeriodQ } from "../query";
 import type {
   PageResult, Cabinet, Slot, Powerbank, CabinetMonitor, CommandRecord,
   InventoryTransfer, InventoryTransferDetail, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
   Checklist, TrialRent, Protection, ProtectionReq, SignalCode,
   InvTransferReq, QcReq, QcRecord, ReceiveResult, AssetDiff, AssetDiffStatus, PowerbankAction,
+  DeviceMovement, InventoryEngine, StockStage, StockPeriodRow, InventoryMigrationPlan, InventoryMigrationResult, StockLedgerRow, StockCount, StockCountDetail, IssueDevicesReq, ClaimDevicesReq, IssueRedirectReq, PoolReturnReq, IssuedSummary, Warehouse, WarehouseReq, Supplier, SupplierReq, SupplierStats, Disposal, DisposalDetail, DisposalReq, DisposalKind, StockThreshold, StockThresholdReq, StageItems, Shipment, ShipInfo, ShipmentDocType, Intake, IntakeDetail, IntakeCreateReq, IntakeItemRef, IntakeDisposeReq, IntakeItemType, IntakeStatus, BindReq, BindBatchReq, BindResult,
 } from "../../types";
 
 export interface DeviceApi {
@@ -115,11 +116,37 @@ export interface DeviceApi {
   dismissPowerbankLost(powerbankNo: string, note: string): Promise<Powerbank>;
   /** 某台设备（机柜号或充电宝号）的质检记录，新的在前。 */
   listQcRecords(itemNo: string): Promise<QcRecord[]>;
+  /** 设备履历（V196）：位置与归属的每一次变化，新的在前。 */
+  listDeviceMovements(itemNo: string): Promise<DeviceMovement[]>;
+
+  // === 库存流水与盘点（S4）：盘点只在独立进销存引擎下可用（本地 409）===
+  getInventoryEngine(): Promise<InventoryEngine>;
+  /** 统一库存视图（S6）：按生命周期阶段的台数。 */
+  getStockStages(): Promise<StockStage[]>;
+  /** 阶段下钻（P2 #6）：口径同 getStockStages。 */
+  getStageItems(stage: string, itemType?: IntakeItemType): Promise<StageItems>;
+  /** 期间报表（S6）：from / to 为日期（含）。 */
+  getStockPeriodSummary(q: StockPeriodQ): Promise<StockPeriodRow[]>;
+  /** 存量迁移试跑（S7，system:param:read）。 */
+  getInventoryMigrationPlan(): Promise<InventoryMigrationPlan>;
+  /** 存量迁移执行一批（S7，system:param:update）：每台独立、可重跑。 */
+  runInventoryMigration(limit?: number): Promise<InventoryMigrationResult>;
+  listStockLedger(q?: StockLedgerQ): Promise<PageResult<StockLedgerRow>>;
+  listStockCounts(q?: StockCountQ): Promise<StockCount[]>;
+  getStockCount(countNo: string): Promise<StockCountDetail>;
+  openStockCount(warehouseNo: string): Promise<StockCountDetail>;
+  scanStockCount(countNo: string, serialNos: string[]): Promise<StockCountDetail>;
+  submitStockCount(countNo: string): Promise<StockCountDetail>;
+  approveStockCount(countNo: string, note?: string): Promise<StockCountDetail>;
+  rejectStockCount(countNo: string, note: string): Promise<StockCountDetail>;
+  postStockCount(countNo: string): Promise<StockCountDetail>;
+  cancelStockCount(countNo: string): Promise<StockCountDetail>;
 
   /** 草稿期设定调拨明细（整体替换）。每件都要在库且质检已过。 */
   setTransferItems(transferNo: string, itemNos: string[]): Promise<InventoryTransferDetail>;
   /** 发货：DRAFT → IN_TRANSIT；机柜类随之 IN_STOCK → IN_TRANSIT。发货这一刻再核一遍在库与质检。 */
-  shipTransfer(transferNo: string): Promise<InventoryTransferDetail>;
+  /** 发出：可带物流（V205）。 */
+  shipTransfer(transferNo: string, ship?: ShipInfo): Promise<InventoryTransferDetail>;
   /**
    * 逐件签收：传现场实收的件号。**签收不因差异而卡住** ——
    * 少的记缺件、多的记多件，都落资产差异，返回里当场告诉你是哪几件。
@@ -130,4 +157,53 @@ export interface DeviceApi {
   listAssetDiffs(q?: PageQ & { status?: AssetDiffStatus; sourceType?: string; sourceRef?: string }): Promise<PageResult<AssetDiff>>;
   /** 处理一条差异：写明去向结论。**结论必填** —— 没有结论的「已处理」等于把差异藏起来。 */
   resolveAssetDiff(diffNo: string, note: string): Promise<AssetDiff>;
+
+  // === 出库单与绑定（docs/technical/设备出库与绑定-技术设计.md §3.2 ~ 3.4）===
+  /** 出库给商家：一个事务，全成或全不成。商家须已补齐资料（有默认站点）。 */
+  issueDevices(x: IssueDevicesReq): Promise<Cabinet[]>;
+  /** 出库退回仓库：只收未绑定的设备；原因必填。 */
+  returnPoolDevices(x: PoolReturnReq): Promise<Cabinet[]>;
+  /** 接收人签收（V195）：只能签给自己的、未签收的。 */
+  claimDevices(x: ClaimDevicesReq): Promise<Cabinet[]>;
+  /** 出库调整（V195）：改商家 / 站点 / 接收人。 */
+  redirectIssue(x: IssueRedirectReq): Promise<Cabinet[]>;
+  /** 出库单按商家汇总：未绑定 / 已绑定 / 已上线。 */
+  issuedSummary(agentNo?: string): Promise<IssuedSummary[]>;
+  /** 仓库列表（含已归档；选仓下拉用 activeWarehouses 过滤）。 */
+  listWarehouses(): Promise<Warehouse[]>;
+  /** 仓库管理（V201）：归档前须不是默认回仓仓、仓里无设备、无未结待检单。 */
+  createWarehouse(x: WarehouseReq): Promise<Warehouse>;
+  updateWarehouse(warehouseNo: string, x: WarehouseReq): Promise<Warehouse>;
+  archiveWarehouse(warehouseNo: string): Promise<Warehouse>;
+  unarchiveWarehouse(warehouseNo: string): Promise<Warehouse>;
+  /** 发货物流（V205）：按单据或设备号查。 */
+  listShipments(q: { docType?: ShipmentDocType; docRef?: string; itemNo?: string }): Promise<Shipment[]>;
+  /** 安全库存（V204）：下限 0 = 不预警。 */
+  listStockThresholds(warehouseNo?: string): Promise<StockThreshold[]>;
+  saveStockThreshold(x: StockThresholdReq): Promise<StockThreshold>;
+  /** 处置出库（V203）：报废 / 退供应商，建单即过账。 */
+  listDisposals(q?: PageQ & { kind?: DisposalKind; warehouseNo?: string; supplierNo?: string }): Promise<PageResult<Disposal>>;
+  getDisposal(disposalNo: string): Promise<DisposalDetail>;
+  createDisposal(x: DisposalReq): Promise<DisposalDetail>;
+  /** 供应商绩效（V207）。 */
+  listSupplierStats(): Promise<SupplierStats[]>;
+  /** 供应商（V201）。 */
+  listSuppliers(q?: ArchiveQ): Promise<PageResult<Supplier>>;
+  createSupplier(x: SupplierReq): Promise<Supplier>;
+  updateSupplier(supplierNo: string, x: SupplierReq): Promise<Supplier>;
+  archiveSupplier(supplierNo: string): Promise<Supplier>;
+  unarchiveSupplier(supplierNo: string): Promise<Supplier>;
+  /** 到仓待检（V192）：列表 / 详情 / 到货登记 / 逐台质检 / 合格入库 / 不合格处置。 */
+  listIntakes(q?: PageQ & { status?: IntakeStatus; warehouseNo?: string }): Promise<PageResult<Intake>>;
+  getIntake(intakeNo: string): Promise<IntakeDetail>;
+  createIntake(x: IntakeCreateReq): Promise<IntakeDetail>;
+  inspectIntakeItem(intakeNo: string, itemType: IntakeItemType, itemNo: string, req: QcReq): Promise<IntakeDetail>;
+  inboundIntake(intakeNo: string, items: IntakeItemRef[]): Promise<IntakeDetail>;
+  disposeIntake(intakeNo: string, x: IntakeDisposeReq): Promise<IntakeDetail>;
+  /** 绑定：不给点位 = 出库单商家的默认站点默认点位；点位商家 ≠ 出库单商家 409。 */
+  bindDevice(deviceNo: string, x?: BindReq): Promise<BindResult>;
+  /** 批量绑定：一个事务。 */
+  bindDevices(x: BindBatchReq): Promise<BindResult[]>;
+  /** 解绑：只限已绑定未上线，回到同一商家名下（已出库待绑定）。 */
+  unbindDevice(deviceNo: string, reason: string): Promise<Cabinet>;
 }

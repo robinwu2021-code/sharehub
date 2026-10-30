@@ -5,11 +5,17 @@
 //  ② 「同手机号至多一张在途」漏掉 —— 一个人刷十张申请，审核队列被淹掉；
 //  ③ 多主体申请被当成重复注册拒掉 —— 用户卡死在注册页，而他只是想开第二个主体；
 //  ④ 审核通过了但主体没建出来 —— 列表里查无此人，要到联调或上线才发现。
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   applies, listAgentApplies, acceptAgentApply, auditAgentApply,
-  createAgentApply, selfServiceApply, myApply,
+  createAgentApply, selfServiceApply, myApply, sendApplyOtp, SELF_SERVICE_KEY,
 } from "./apply";
+import { sysParams } from "./system";
+
+/** 自助入口一期默认关闭（V155）。下面验自助流程的用例显式打开，跑完还原，不影响别的文件。 */
+function setSelfService(v: "0" | "1") {
+  sysParams.find((p) => p.paramKey === SELF_SERVICE_KEY)!.value = v;
+}
 import { agents } from "./agent";
 
 const OTP = "000000";
@@ -80,43 +86,63 @@ describe("审核通过 = 激活派生", () => {
   });
 });
 
-describe("同手机号至多一张在途", () => {
+describe("同邮箱至多一张在途（商家一期 B2：V168 起在途唯一按邮箱）", () => {
   it("★ 第二张在途被拒（服务端靠生成列 active_key 强制，这里给的是人话）", () => {
-    const phone = freshPhone();
-    newApply({ phone });
-    expect(() => newApply({ phone })).toThrow(/在途/);
+    const email = `inflight${seq}@example.com`;
+    newApply({ email });
+    expect(() => newApply({ email })).toThrow(/在途/);
   });
 
   it("★ 推到终态之后可以再提——驳回重提是正常路径，不能被这条约束卡死", () => {
-    const phone = freshPhone();
-    const a = newApply({ phone });
+    const email = `retry${seq}@example.com`;
+    const a = newApply({ email });
     auditAgentApply({ applyNo: a.applyNo, approve: false, rejectReason: "补材料" });
-    expect(() => newApply({ phone })).not.toThrow();
+    expect(() => newApply({ email })).not.toThrow();
+  });
+
+  it("★ 手机号选填：只填邮箱也能代建", () => {
+    expect(() => newApply({ phone: undefined, email: `nophone${seq}@example.com` })).not.toThrow();
   });
 });
 
-describe("多主体：手机号已存在不是重复注册", () => {
-  it("★ 同一手机号在已有主体后仍可再申请，并带出已知信息给审核台", () => {
-    const phone = freshPhone();
-    const first = newApply({ phone, email: "boss@first.com" });
+describe("多主体：邮箱已存在不是重复注册（R7）", () => {
+  it("★ 同一邮箱在已有主体后仍可再申请，并带出已知信息给审核台", () => {
+    const first = newApply({ email: "boss@first.com" });
     auditAgentApply({ applyNo: first.applyNo, approve: true });
 
-    // 关键断言：不抛错。把这条写反（当成重复注册拒掉）用户会卡死在注册页
-    const second = newApply({ phone, email: "boss@first.com", operatorName: "第二个主体" });
+    // 关键断言：不抛错。把这条写反（当成重复注册拒掉）同一个老板就开不了第二家
+    const second = newApply({ email: "Boss@First.com ", operatorName: "第二个主体" });
     expect(second.phoneAlreadyKnown).toBe(true);
   });
 
-  it("★ 邮箱与已有记录不一致时给出旧掩码——由审核人裁决，不静默覆盖", () => {
+  it("★ 同一手机号、不同邮箱：按邮箱找人，是另一个人——手机号未验证前不能拿来认人（R3 / R6）", () => {
     const phone = freshPhone();
     const first = newApply({ phone, email: "old@mail.com" });
     auditAgentApply({ applyNo: first.applyNo, approve: true });
 
     const second = newApply({ phone, email: "new@mail.com" });
-    expect(second.knownEmailMask).toBe("o***@mail.com");
+    expect(second.phoneAlreadyKnown).toBe(false);
+  });
+});
+
+describe("自助入口开关（一期只走运营代建）", () => {
+  it("★ 关闭时发码、提交、查进度一律 404，代建不受影响", () => {
+    setSelfService("0");
+    const phone = freshPhone();
+    for (const call of [
+      () => sendApplyOtp(phone),
+      () => selfServiceApply({ phone, otp: OTP, email: "x@example.com", operatorName: "关闭期间", operatorType: "AGENT" }),
+      () => myApply(phone, OTP),
+    ]) {
+      expect(call).toThrow(expect.objectContaining({ code: 404 }));
+    }
+    expect(newApply().status).toBe("SUBMITTED");
   });
 });
 
 describe("自助与代建：同一张表、同一个状态机，只有来源不同", () => {
+  beforeAll(() => setSelfService("1"));
+  afterAll(() => setSelfService("0"));
   it("★ 自助提交落 SELF_SERVICE，代建落 OPS_CREATED，两者进同一个队列", () => {
     const selfPhone = freshPhone();
     const s = selfServiceApply({
@@ -151,6 +177,8 @@ describe("自助与代建：同一张表、同一个状态机，只有来源不�
 });
 
 describe("申请人查进度", () => {
+  beforeAll(() => setSelfService("1"));
+  afterAll(() => setSelfService("0"));
   it("★ 只返回掩码与状态——公开页不能多给任何可枚举的信息", () => {
     const phone = freshPhone();
     const a = newApply({ phone, email: "who@example.com" });

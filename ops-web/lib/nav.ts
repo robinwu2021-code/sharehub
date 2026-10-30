@@ -166,18 +166,26 @@ export const NAV: NavSection[] = [
     portalFor: ["AGENT"],
     children: [
       { href: "/", label: "我的看板", perm: "dashboard:overview:read", group: "经营概览" },
-      { href: "/finance?tab=records", label: "我的收益", perm: "finance:share_record:read", group: "经营概览" },
-      { href: "/finance?tab=settlements", label: "我的结算", perm: "agent:settlement:read", group: "经营概览" },
+      // 2026-10-28 三项随结算页签搬到 /settlement（OM08）；/finance 上的旧链接会被转过去
+      { href: "/settlement?tab=records", label: "我的收益", perm: "finance:share_record:read", group: "经营概览" },
+      { href: "/settlement?tab=settlements", label: "我的结算", perm: "agent:settlement:read", group: "经营概览" },
       // 2026-09-23 分级矩阵 AGT-06：代理自助提现是 L0（⑦ 分钱的最后一步），权限码 finance:withdrawal:apply
-      // 前后端与 POST /api/trade/withdrawals 三处一致。soon = 申请侧页面未建（/finance?tab=withdrawals
-      // 是运营方的审核页，要 finance:withdrawal:read，AGENT 不持有）——先登记入口，页建好再去掉 soon。
-      { href: "/finance?tab=withdrawals", label: "申请提现", perm: "finance:withdrawal:apply", group: "经营概览" },
+      // 前后端与 POST /api/trade/withdrawals 三处一致。申请侧在结算页按 AGENT 角色分流
+      // （components/finance/finance-workspace.tsx 的申请流），不再是 soon。
+      // 2026-10-28 商家一期 D8：提现在运营端按付款任务进行，商家只看记录（V166）
+      { href: "/settlement?tab=withdrawals", label: "提现记录", perm: "finance:withdrawal:read", group: "经营概览" },
+      // 2026-10-28 商家资料（V175，G23）：只看自己的档案、改联系人。码是 agent:profile:*，不是 agent:agent:read
+      { href: "/profile", label: "商家资料", perm: "agent:profile:read", group: "我的商家" },
     ],
   },
   {
     key: "my-asset", label: "我的资产", icon: "Server", module: "device", href: "/devices",
     portalFor: ["AGENT"],
+    // 2026-10-28「我的站点」（用户裁决：站点就是门店，商家端叫「我的站点」；一期运营代建，商家只读）。
+    // 复用运营端站点页，按数据范围只看自己的；match 认领三条路径，门户里点进去面包屑才不丢。
+    match: ["/devices", "/operation/sites", "/orders"],
     children: [
+      { href: "/operation/sites", label: "我的站点", perm: "location:poi:read", group: "设备与订单" },
       { href: "/devices", label: "我的设备", perm: "device:cabinet:read", group: "设备与订单" },
       { href: "/orders", label: "我的订单", perm: "order:order:read", group: "设备与订单" },
     ],
@@ -193,87 +201,100 @@ export const NAV: NavSection[] = [
   // ── 运营端 16 项 ────────────────────────────────────────────────────
   // 它没有叶子，可见性只能看自己这一个码（别的 section 看「有没有可见叶子」）
   { key: "dashboard", label: "经营看板", icon: "LayoutDashboard", module: "dashboard", href: "/", perm: "dashboard:overview:read" },
-  {
-    // 2026-09-22 新菜单：对标简电云「运营管理」三个分组（场站管理 / 基础管理 / 公告管理），
-    // 不在旧菜单上叠加，将来替换站点/计费/系统设置/营销里的对应项。
-    // 需求：docs/requirements/features/运营管理-功能清单.md；方案：TDD-运营管理菜单-前端.md
-    // 与其它 section 不同：一个 section 下是**多个独立页面**（/operation/<page>），不是同页 tab。
-    // soon 由 backend-ready.ts 决定：真实后端模式下接口未就绪的页面灰显，mock 模式恒可点。
-    key: "operation", label: "运营管理", icon: "Store", module: "location",
-    modules: ["location", "pricing", "finance", "system", "marketing"],
-    href: "/operation/overview", match: ["/operation", "/locations"],
-    // 2026-09-23 菜单收敛（docs/technical/菜单重合梳理与优化方案.md）：
-    //
-    // 第一步（A 类重合）：站点管理、收费方案、时段倍率、应用版本、银行、问题、公告
-    // 此前**每一项都有第二个入口**且调同一组 API。一律并到本 section，旧入口连页面代码一起撤。
-    //
-    // 第二步：撤销「站点与点位」L1，点位与坪效并进来（URL 仍是 /locations，故 match 带它）。
-    //
-    // 第三步（续）：「计费定价」L1 整体撤销 —— 它的计费模板/时段价早已并入本 section 的
-    // 「收费方案」，最后剩的「差异化定价」在 ADR-028 落地后并入方案的「适用范围」，
-    // 取价从此只有一处答案（V49）。那个 L1 已无内容，留着只是一个空壳。
-    //
-    // 第三步：场地方 / 合同 / BD CRM / 进件 / 生命周期 **移出本 section**，
-    // 独立成「场地方与拓展」L1 —— 拓展是签约前的获客，不是经营已有站点；
-    // 而分成是分账动作、不是报表，故原「场站报表」组改名「分成」，坪效归回场站管理。
-    //
-    // ⚠️ 顺序即分组：groupedLeaves 只合并**相邻**的同名 group，插叶子时别打断连续段。
-    children: [
-      ...opLeaves([
-        ["overview", "站点概览", "location:overview:read", "场站管理"],
-        ["sites", "站点管理", "location:poi:read", "场站管理"],
-      ]),
-      { href: "/locations?tab=points", label: "点位管理", perm: "location:poi:read", group: "场站管理" },
-      { href: "/locations?tab=analysis", label: "站点坪效", perm: "location:analysis:read", phase: 3, group: "场站管理" },
-      ...opLeaves([
-        ["fee-plans", "收费方案", "pricing:plan:read", "计费与调价"],
-        ["fee-adjustments", "预约调价", "pricing:adjustment:read", "计费与调价"],
-        // 公告并进「基础管理」：原先它自成一组，而组名与唯一那条叶子完全同名 ——
-        // 一个只为一条叶子存在的分组标题只是多一行噪音。四项都是运营日常要维护的基础内容。
-        ["app-versions", "应用版本", "system:app_version:read", "基础管理"],
-        ["banks", "银行管理", "system:bank:read", "基础管理"],
-        ["brands", "品牌管理", "system:brand:read", "基础管理"],
-        ["problems", "问题管理", "system:problem:read", "基础管理"],
-        ["notices", "公告管理", "marketing:notice:read", "基础管理"],
-        // 「分成」不是报表：这两页展示的是钱**实际分给了谁、各多少**，是分账口径本身，
-        // 不是给人分析用的统计。组名叫报表会让人以为它可改可不看。
-        ["site-sharing", "站点分成", "finance:share_rule:read", "分成"],
-        ["payee-sharing", "分成方分成", "finance:share_rule:read", "分成"],
-      ]),
-    ],
-  },
+  // 「运营管理」L1 2026-10-28 撤销（OM11）：站点四项归网点管理、计费两项归销售管理、分成两项归结算，
+  // 最后的基础管理五项（应用版本 / 银行 / 品牌 / 问题 / 公告）归系统管理 › 基础资料。
+  // /operation/* 页面路径不动，由各新 L1 的 match 认领（最长前缀胜出）。
   {
     key: "device", label: "设备管理", icon: "Server", module: "device", href: "/devices",
+    // 2026-10-28 按设备生命周期重排（docs/requirements/设备生命周期管理-运营端设计.md §五）：
+    //   设备档案 → 仓储与出库 → 部署与安装 → 绑定上线 → 运行监控 → 维护与退出
+    //   （采购入库等后端；V165 补上装机、待上线、故障与维修、撤机与回仓、报废与遗失五个设备视图）。
+    // 「出库单」（设备出库与绑定 · 开发计划 F3）：绑定商家先出库，出库必须选商家；绑定只从出库单里选，
+    // 默认绑到商家的默认站点、默认点位。
+    // 「供应商接入」更名「厂商接入」：它是硬件厂商的协议接入，「供应商」留给采购。
+    // ⚠️ 菜单真源在库里：本段的行由 V150 重编号、V163 / V165 再重排，改这里要同步新开迁移（见 nav-seed.test.ts）。
     children: [
-      // 按「资产台账 / 在线运行 / 资产流转」分组
-      { href: "/devices", label: "设备台账", perm: "device:cabinet:read", group: "资产台账" },
-      { href: "/devices?tab=powerbanks", label: "充电宝管理", perm: "device:powerbank:read", group: "资产台账" },
-      { href: "/devices?tab=monitor", label: "实时监控", perm: "device:cabinet:read", group: "在线运行" },
-      { href: "/devices?tab=commands", label: "远程控制·指令记录", perm: "device:command:send", group: "在线运行" },
-      { href: "/devices?tab=logs", label: "设备日志", perm: "device:cabinet:read", phase: 1, group: "在线运行" },
-      { href: "/devices?tab=inventory", label: "库存调拨", perm: "device:inventory:read", phase: 2, group: "资产流转" },
-      { href: "/devices?tab=ota", label: "固件 OTA", perm: "device:ota:read", phase: 2, group: "资产流转" },
-      { href: "/devices?tab=codes", label: "设备编码", perm: "device:cabinet:read", phase: 1, group: "资产流转" },
+      { href: "/devices", label: "设备台账", perm: "device:cabinet:read", group: "设备档案" },
+      { href: "/devices?tab=powerbanks", label: "充电宝管理", perm: "device:powerbank:read", group: "设备档案" },
+      // 五个生命周期视图（V165）：都是既有数据的设备视角，不新增后端端点；装机 / 撤机单仍在运维管理 › 工单里办理
+      { href: "/devices?tab=installs", label: "部署与装机", perm: "workorder:wo:read", group: "部署与安装" },
+      { href: "/devices?tab=pending-live", label: "待上线", perm: "device:cabinet:read", group: "绑定上线" },
+      // 设备码是绑定的第一层（码 ↔ 设备）；厂商接入是第二层（网关 ↔ 设备）
+      { href: "/devices?tab=codes", label: "设备编码", perm: "device:cabinet:read", phase: 1, ready: true, group: "绑定上线" },
+      { href: "/devices?tab=vendors", label: "厂商接入", perm: "device:vendor:read", group: "绑定上线" },
+      { href: "/devices?tab=monitor", label: "实时监控", perm: "device:cabinet:read", group: "运行监控" },
+      { href: "/devices?tab=commands", label: "远程控制与指令记录", perm: "device:command:send", group: "运行监控" },
+      { href: "/devices?tab=logs", label: "设备日志", perm: "device:cabinet:read", phase: 1, ready: true, group: "运行监控" },
+      { href: "/devices?tab=ota", label: "固件 OTA", perm: "device:ota:read", phase: 1, ready: true, group: "运行监控" },
+      { href: "/devices?tab=repairs", label: "故障与维修", perm: "device:cabinet:read", group: "维护与退出" },
+      { href: "/devices?tab=removals", label: "撤机与回仓", perm: "workorder:wo:read", group: "维护与退出" },
+      { href: "/devices?tab=retired", label: "报废与遗失", perm: "device:cabinet:read", group: "维护与退出" },
     ],
   },
   {
-    // 对标简电云「告警管理」（补齐清单 A）：告警码字典 → 通知规则 → 记录 → 触达。
-    // 我们比它多一环：记录带「关联工单号」，规则带「静默窗口/升级策略」，字典带「建议处置/自动开工单」。
-    key: "alarm", label: "告警管理", icon: "BellRing", module: "workorder", href: "/alarms",
+    // 2026-10-29 从设备管理拆出「库存管理」（V209；规范见 docs/technical/设计规范-库存管理菜单.md）：
+    //   主数据 → 出入库 → 库内作业 → 库存账 → 设置。管的是「东西在不在库、在哪个仓、有多少」——
+    //   设备（柜 / 宝 / 其他整机，逐件）与物料（备件、耗材，按数量）同一套账；设备上线后的生命周期留在设备管理。
+    // 将来的独立系统以 ai-shop 库存服务为准（docs/technical/独立进销存/），这里是运营端的统一入口。
+    // 权限码沿用 device:inventory:*。物料三项（V210）的账在 ai-shop 库存服务：物料单据与物料库存只在独立进销存引擎下可用。
+    // ⚠️ 菜单真源在库里：本段的行由 V209 建立，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    key: "inventory", label: "库存管理", icon: "Warehouse", module: "device", href: "/inventory?tab=stock",
+    match: ["/inventory"],
     children: [
-      { href: "/alarms", label: "告警记录", perm: "workorder:alarm:read", group: "告警处置" },
-      { href: "/alarms?tab=notices", label: "告警通知", perm: "workorder:alarm:read", group: "告警处置" },
-      { href: "/alarms?tab=codes", label: "告警代码", perm: "workorder:alarm:read", group: "规则配置" },
-      { href: "/alarms?tab=rules", label: "通知规则", perm: "workorder:alarm:read", group: "规则配置" },
+      { href: "/inventory?tab=materials", label: "物料档案", perm: "device:inventory:read", phase: 1, ready: true, group: "主数据" },
+      // 仓库（V190 只读 → V201 可维护，写码 device:inventory:warehouse）；供应商（V201）为到货来源与退供应商去向
+      { href: "/inventory?tab=warehouses", label: "仓库", perm: "device:inventory:read", phase: 1, ready: true, group: "主数据" },
+      { href: "/inventory?tab=suppliers", label: "供应商", perm: "device:inventory:read", phase: 1, ready: true, group: "主数据" },
+      // 入库单（原「到仓待检」V193；V202 起承载采购到货 / 期初建账 / 撤机回仓）
+      { href: "/inventory?tab=intakes", label: "入库单", perm: "device:inventory:read", phase: 1, ready: true, group: "出入库" },
+      // 物料单据：数量物料（备件、耗材）与其他整机的入库 / 领用 / 报废 / 退供应商 / 调拨
+      { href: "/inventory?tab=material-docs", label: "物料单据", perm: "device:inventory:read", phase: 1, ready: true, group: "出入库" },
+      { href: "/inventory?tab=issued", label: "出库单", perm: "device:inventory:read", group: "出入库" },
+      // 处置出库（V203）：在库设备报废 / 退供应商，写码 device:inventory:transfer
+      { href: "/inventory?tab=disposals", label: "处置出库", perm: "device:inventory:read", phase: 1, ready: true, group: "出入库" },
+      { href: "/inventory?tab=transfers", label: "库存调拨", perm: "device:inventory:read", phase: 1, ready: true, group: "库内作业" },
+      // 盘点（V199，S4）：只在独立进销存引擎下可用
+      { href: "/inventory?tab=counts", label: "盘点", perm: "device:inventory:read", phase: 1, ready: true, group: "库内作业" },
+      { href: "/inventory?tab=asset-diffs", label: "资产差异", perm: "device:inventory:read", phase: 1, ready: true, group: "库内作业" },
+      { href: "/inventory?tab=stock", label: "库存余额", perm: "device:inventory:read", phase: 1, ready: true, group: "库存账" },
+      { href: "/inventory?tab=material-stock", label: "物料库存", perm: "device:inventory:read", phase: 1, ready: true, group: "库存账" },
+      { href: "/inventory?tab=ledger", label: "库存流水", perm: "device:inventory:read", phase: 1, ready: true, group: "库存账" },
+      // 库存设置：系统参数「库存」组（V207），复用 /api/platform/sys-params，写码 system:param:update
+      { href: "/inventory?tab=settings", label: "库存设置", perm: "device:inventory:read", phase: 1, ready: true, group: "设置" },
     ],
   },
   {
-    key: "workorder", label: "工单管理", icon: "Wrench", module: "workorder", href: "/work-orders",
+    // 2026-10-28 按运营顺序合并为「运维管理」（OM06 · docs/requirements/运营端菜单清单-按运营顺序.md）：
+    // 告警管理 + 客服管理 + 工单管理三个 L1 合一。三组是同一条处置链：
+    //   告警（机器发现问题）→ 客服（用户报来问题）→ 工单（派人去现场解决）。
+    // 前两组是问题的两个入口，工单是两者共同的出口（告警「转工单」、报障「转工单」都落到这里）。
+    // 告警组仍对标简电云「告警管理」：码字典 → 通知规则 → 记录 → 触达；我们多一环关联工单号与处置路由。
+    // 客服原先的「退款/补偿」「黑名单处理」两个快捷入口撤销：它们指向 /orders、/users，
+    // 一个 URL 只属于一个 L1，在这里点进去面包屑与 Rail 高亮跳到别的菜单，运营反而找不到回来的路；
+    // 退款直达销售管理 › 售后，黑名单直达用户管理 › 风险。
+    // 三个页面 URL 不动（/alarms、/cs、/work-orders），靠 match 认领；落地页是告警记录（href）。
+    // ⚠️ 菜单真源在库里：本段的行由 V153 重编号（M_alarm / M_cs 两个 L1 删除），改这里要同步新开迁移（见 nav-seed.test.ts）。
+    key: "workorder", label: "运维管理", icon: "Wrench", module: "workorder", href: "/alarms",
+    match: ["/alarms", "/cs", "/work-orders"],
     children: [
-      { href: "/work-orders?view=list", label: "工单列表", perm: "workorder:wo:read" },
-      { href: "/work-orders?view=board", label: "工单看板", perm: "workorder:wo:read" },
-      { href: "/work-orders?view=sla", label: "SLA 管理", phase: 2, perm: "workorder:wo:read" },
-      { href: "/work-orders?view=inspection", label: "巡检计划", phase: 2, perm: "workorder:wo:read" },
+      { href: "/alarms", label: "告警记录", perm: "workorder:alarm:read", group: "告警" },
+      { href: "/alarms?tab=notices", label: "告警通知", perm: "workorder:alarm:read", group: "告警" },
+      { href: "/alarms?tab=codes", label: "告警代码", perm: "workorder:alarm:read", group: "告警" },
+      { href: "/alarms?tab=rules", label: "通知规则", perm: "workorder:alarm:read", group: "告警" },
+      /*
+       * 2026-09-28 解锁客服两叶（徽章仍是 L1/L2，ready 只放宽分期）。
+       * 在此之前生产跑在 L0，这两页都点不开 —— 而 **C 端的报障全部落在这里**：
+       * 用户提交（连同截图）→ 落 cs_ticket / 转人工会话 → 运营端没有任何界面能打开它，
+       * 而 C 端还写着「正在排队处理」。L0 可达的「待办中心」只接告警，兜不住这条。
+       * 后端就绪：列表 / 详情（含截图）/ 受理 / 转工单 / 转退款 / 会话消息与回复端点齐备。
+       */
+      { href: "/cs", label: "报障受理", phase: 1, ready: true, perm: "cs:ticket:read", group: "客服" },
+      { href: "/cs?tab=sessions", label: "客服会话", phase: 2, ready: true, perm: "cs:session:read", group: "客服" },
+      { href: "/work-orders?view=list", label: "工单列表", perm: "workorder:wo:read", group: "工单" },
+      { href: "/work-orders?view=board", label: "工单看板", perm: "workorder:wo:read", group: "工单" },
+      // 先定巡检、再定时效：巡检计划生成工单，SLA 量的是所有工单
+      { href: "/work-orders?view=inspection", label: "巡检计划", phase: 2, perm: "workorder:wo:read", group: "工单" },
+      { href: "/work-orders?view=sla", label: "SLA 管理", phase: 2, perm: "workorder:wo:read", group: "工单" },
     ],
   },
   {
@@ -283,122 +304,162 @@ export const NAV: NavSection[] = [
     // 与经营已有站点是两件事、两拨人；混在一个菜单里，运营每天要从一堆线索里找自己的站点。
     // 页面在 /venues（从 /locations 拆出）：一个 URL 只能属于一个 L1，
     // 否则面包屑与 Rail 高亮必错一边（findActiveSection 按路径前缀定归属）。
-    key: "venue", label: "场地方与拓展", icon: "Building2", module: "location", href: "/venues?tab=venues",
-    match: ["/venues"],
+    //
+    // 2026-10-28 按运营顺序合并为「网点管理」（OM02 · docs/requirements/运营端菜单清单-按运营顺序.md）：
+    // 场地方这条线与运营管理里的站点四项合成一个 L1，三组跟着 P1 拓场 → P2 签约 → P3 建站走。
+    // 站点页的 URL 不动（/operation/sites、/operation/overview、/locations），靠 match 认领 ——
+    // findActiveSection 取最长前缀，/operation/sites 胜过运营管理的 /operation。
+    // 落地页是站点管理（href），不是第一项 BD CRM：sectionDefaultHref 先认 section.href。
+    // ⚠️ 菜单真源在库里：本段与运营管理段的行由 V149 重编号，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    key: "venue", label: "网点管理", icon: "Building2", module: "location", href: "/operation/sites",
+    match: ["/venues", "/locations", "/operation/sites", "/operation/overview"],
     children: [
-      { href: "/venues?tab=venues", label: "场地方", perm: "location:venue:read", group: "机构档案" },
-      { href: "/venues?tab=contracts", label: "进场合同", perm: "location:contract:read", group: "机构档案" },
       // 必须有显式 perm：无 perm 的叶子跟随 section，客服/运维不该看到 BD 的线索池。
       { href: "/venues?tab=crm", label: "BD 拓展 CRM", perm: "location:lead:read", group: "拓展" },
       { href: "/venues?tab=onboarding", label: "门店 Onboarding", perm: "location:venue:read", phase: 2, group: "拓展" },
-      { href: "/venues?tab=lifecycle", label: "门店生命周期", perm: "location:venue:read", phase: 3, group: "拓展" },
+      { href: "/venues?tab=venues", label: "场地方", perm: "location:venue:read", group: "场地方与合同" },
+      { href: "/venues?tab=contracts", label: "进场合同", perm: "location:contract:read", group: "场地方与合同" },
+      // 「合同提醒设置」（OM02-07）暂不建叶：到期提醒的 60 / 30 / 7 天在后端写死（合同汇总与 V104 告警码），
+      // 前端做配置页没有任何东西读它。已提给服务端评审，后端可配后再加。
+      ...opLeaves([["sites", "站点管理", "location:poi:read", "站点与点位"]]),
+      { href: "/locations?tab=points", label: "点位管理", perm: "location:poi:read", group: "站点与点位" },
+      ...opLeaves([["overview", "站点概览", "location:overview:read", "站点与点位"]]),
+      { href: "/locations?tab=analysis", label: "站点坪效", perm: "location:analysis:read", phase: 3, group: "站点与点位" },
+      // 门店生命周期已并入站点状态（运营核心流程 §10.2），它统计的是站点，从「拓展」挪到这里
+      { href: "/venues?tab=lifecycle", label: "门店生命周期", perm: "location:venue:read", phase: 3, group: "站点与点位" },
     ],
   },
   {
-    key: "agent", label: "代理商管理", icon: "Handshake", module: "agent", href: "/agents",
+    // 2026-10-28 按运营顺序重排（docs/requirements/运营端菜单清单-按运营顺序.md · OM01）：
+    // 「代理商管理」更名「商家管理」—— 商家是第一阶段的结算单元（ADR-032），代理商 / 城市合伙人
+    // 只是它的登记类型。三组顺序跟着商家的一生走：进来 → 定钱与资产 → 经营与退出。
+    // 入驻审核排在档案之前：档案是「已经在的」，入驻是「正在进来的」—— 待办优先于台账。
+    // 代建录入不单开叶子，它是本页的一个按钮（权限码另发，见 ADR-030 §3.3）。
+    // 「代理收益结算」深链撤销：它指向财务的结算单，挂的 agent:settlement:read 没有任何后端端点
+    // 挂载（功能权限清单 §缺口 2），BD 从这里点进去对真后端必 403。结算单归「结算」模块。
+    // ⚠️ 菜单真源在库里：本段的行由 V148 定点更新，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    // 落地页 = 入驻审核（待办优先于台账）。sectionDefaultHref 先认 href，所以 href 必须指向它而不是档案页
+    key: "agent", label: "商家管理", icon: "Handshake", module: "agent", href: "/agents?tab=applies",
     children: [
-      // 按「机构生命周期」分组：先建档授权，再谈钱，最后看经营。
-      // 入驻审核排在档案之前：档案是「已经在的」，入驻是「正在进来的」——
-      // 待办优先于台账。代建录入不单开叶子，它是本页的一个按钮（权限码另发，见 §3.3）
-      { href: "/agents?tab=applies", label: "入驻审核", perm: "agent:apply:read", group: "机构档案" },
-      { href: "/agents", label: "代理商档案", perm: "agent:agent:read", group: "机构档案" },
-      { href: "/agents?tab=accounts", label: "代理账号管理", perm: "agent:agent:update", group: "机构档案" },
-      { href: "/agents?tab=assign", label: "设备/点位划拨", perm: "agent:scope:assign", group: "机构档案" },
-      { href: "/agents?tab=commission", label: "分润配置", perm: "agent:share:config", group: "机构收益" },
-      // 跨 section 深链（D3）：复用财务结算单，面包屑按 URL 归属财务管理
-      { href: "/finance?tab=settlements", label: "代理收益结算", perm: "agent:settlement:read", group: "机构收益" },
-      { href: "/agents?tab=performance", label: "代理绩效", perm: "agent:performance:read", phase: 2, group: "机构经营" },
+      { href: "/agents?tab=applies", label: "入驻审核", perm: "agent:apply:read", group: "入驻与档案" },
+      { href: "/agents", label: "商家档案", perm: "agent:agent:read", group: "入驻与档案" },
+      // 码与后端账号端点一致（/api/agent/accounts 全挂 agent:account:manage），此前挂的 agent:agent:update 对不上
+      { href: "/agents?tab=accounts", label: "商家账号", perm: "agent:account:manage", group: "入驻与档案" },
+      // 先定分润、再划资产：划拨只影响之后的订单归属，规则得先在
+      { href: "/agents?tab=commission", label: "商家分润规则", perm: "agent:share:config", group: "分润与划拨" },
+      // 2026-10-28 更名「整站换商家」（V171）：划拨只剩站点粒度（620656d9），站内柜子与运维责任行一并换；
+      // 单台设备换位置走库存管理 › 出库单的绑定 / 解绑或撤机
+      { href: "/agents?tab=assign", label: "整站换商家", perm: "agent:scope:assign", group: "分润与划拨" },
+      // 经营视图由三个既有读端点在页内拼出（商家 / 绩效 / 分润汇总），不新增后端端点
+      { href: "/agents?tab=business", label: "商家经营视图", perm: "agent:agent:read", phase: 1, ready: true, group: "经营与退出" },
+      { href: "/agents?tab=performance", label: "商家绩效", perm: "agent:performance:read", phase: 2, group: "经营与退出" },
+      // 清退流程早已在档案详情里跑通（四步门禁），这里补的是「所有在途清退」的列表入口
+      { href: "/agents?tab=exits", label: "退出与清算", perm: "agent:agent:update", phase: 2, ready: true, group: "经营与退出" },
     ],
   },
   {
-    key: "order", label: "订单管理", icon: "ReceiptText", module: "order", href: "/orders",
+    // 2026-10-28 按运营顺序合并为「销售管理」（OM04 · docs/requirements/运营端菜单清单-按运营顺序.md）：
+    // 订单管理 + 营销管理（整段并入）+ 运营管理的计费两项 + 用户管理的会员两项 + 系统设置的支付渠道。
+    // 收入线：先有价格，再有订单，订单产生支付，异常走售后；营销、会员、广告是增长手段，排在主线之后。
+    // 跨三条路径：/orders（订单、支付渠道、会员 tab）、/marketing、/operation/fee-*（match 最长前缀认领）。
+    // 落地页是订单列表（href），不是第一项收费方案。
+    // ⚠️ 菜单真源在库里：本段及其它四段的行由 V151 重编号，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    key: "order", label: "销售管理", icon: "ReceiptText", module: "order", modules: ["order", "marketing", "pricing"], href: "/orders",
+    match: ["/orders", "/marketing", "/operation/fee-plans", "/operation/fee-adjustments"],
     children: [
-      // 按「交易流水 / 售后处置 / 特殊单据」分组（补齐清单 B）
-      { href: "/orders", label: "订单列表", perm: "order:order:read", group: "交易流水" },
-      { href: "/orders?tab=reservations", label: "预约订单", perm: "order:order:read", phase: 2, group: "交易流水" },
-      { href: "/orders?tab=exceptions", label: "异常订单", perm: "order:exception:read", group: "售后处置" },
-      { href: "/orders?tab=complaints", label: "投诉订单", perm: "order:exception:read", group: "售后处置" },
-      { href: "/orders?tab=refunds", label: "退款记录", perm: "order:refund:audit", group: "售后处置" },
-      { href: "/orders?tab=deposit", label: "押金与欠费", perm: "order:order:read", phase: 1, ready: true, group: "特殊单据" },
-      { href: "/orders?tab=free", label: "免费订单", perm: "order:order:read", phase: 2, group: "特殊单据" },
+      ...opLeaves([
+        ["fee-plans", "收费方案", "pricing:plan:read", "计费"],
+        ["fee-adjustments", "预约调价", "pricing:adjustment:read", "计费"],
+      ]),
+      { href: "/orders", label: "订单列表", perm: "order:order:read", group: "订单" },
+      { href: "/orders?tab=reservations", label: "预约订单", perm: "order:order:read", phase: 2, group: "订单" },
+      { href: "/orders?tab=deposit", label: "押金与欠费", perm: "order:order:read", phase: 1, ready: true, group: "订单" },
+      { href: "/orders?tab=free", label: "免费订单", perm: "order:order:read", phase: 2, group: "订单" },
+      // 支付流水 / 扣款失败与重试（OM04-12 / 04）待后端补实体后加在这一组
+      { href: "/orders?tab=payment-channels", label: "支付渠道", perm: "system:payment_channel:read", group: "支付" },
+      { href: "/orders?tab=exceptions", label: "异常订单", perm: "order:exception:read", group: "售后" },
+      { href: "/orders?tab=complaints", label: "投诉订单", perm: "order:exception:read", group: "售后" },
+      { href: "/orders?tab=refunds", label: "退款记录", perm: "order:refund:audit", group: "售后" },
+      { href: "/marketing", label: "优惠券", perm: "marketing:coupon:read", phase: 2, ready: true, group: "营销" },
+      { href: "/marketing?tab=campaigns", label: "活动", phase: 2, group: "营销", perm: "marketing:campaign:read" },
+      { href: "/marketing?tab=push", label: "推送触达", perm: "marketing:push:send", phase: 3, ready: true, group: "营销" },
+      { href: "/marketing?tab=referral", label: "邀请裂变", phase: 3, group: "营销", perm: "marketing:campaign:read" },
+      { href: "/orders?tab=plans", label: "会员套餐", perm: "user:member:read", phase: 2, group: "会员" },
+      { href: "/orders?tab=members", label: "会员/次卡", perm: "user:member:read", phase: 2, group: "会员" },
+      { href: "/marketing?tab=ad-slots", label: "广告位管理", phase: 3, group: "广告", perm: "marketing:ad:read" },
+      { href: "/marketing?tab=ad-campaigns", label: "广告活动", phase: 3, group: "广告", perm: "marketing:ad:read" },
+      { href: "/marketing?tab=ad-delivery", label: "投放与曝光", phase: 3, group: "广告", perm: "marketing:ad:read" },
     ],
   },
   {
-    key: "finance", label: "财务管理", icon: "Wallet", module: "finance", href: "/finance",
+    // 2026-10-28 按运营顺序从财务管理拆出「结算」（OM08 · docs/requirements/运营端菜单清单-按运营顺序.md）：
+    // 分润 → 结算单 → 付款，回答「该分给商家多少、付了没有」。排在财务管理之前：
+    // 应付台账与调整单都消费本模块的产出。
+    // 页签从 /finance 搬到 /settlement（一个 URL 只属于一个 L1）；站点分成 / 分成方分成两页
+    // 仍在 /operation/*-sharing，靠 match 认领（最长前缀胜过运营管理的 /operation）。
+    // 「代理分润配置」深链撤销：它指向商家管理 › 商家分润规则，跨 L1 深链点进去面包屑与高亮跳走。
+    // 「付款登记」（OM08-06）暂不建叶：结算单维度的付款没有后端实体与端点（契约草案在服务端评审 S11 §四）。
+    // 落地页是结算单（href），不是第一项分润规则。
+    // ⚠️ 菜单真源在库里：本段与财务管理、运营管理段的行由 V154 重编号、V160 改名，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    key: "settlement", label: "结算", icon: "HandCoins", module: "finance", href: "/settlement?tab=settlements",
+    match: ["/settlement", "/operation/site-sharing", "/operation/payee-sharing"],
     children: [
-      // 按「资金主体」分组（对标简电云 平台/运营商/商户/会员 四套财务视图）：
-      // 分润与结算 = 跨主体的规则与产出；平台账 = 自家的账；伙伴账 = 代理商/场地方的钱；用户账 = C 端的钱。
-      { href: "/finance?tab=rules", label: "分润规则", perm: "finance:share_rule:read", group: "分润与结算" },
-      { href: "/finance?tab=records", label: "分润明细", perm: "finance:share_record:read", group: "分润与结算" },
-      { href: "/finance?tab=summary", label: "分润统计", perm: "finance:share_record:read", phase: 1, group: "分润与结算" },
-      { href: "/finance?tab=settlements", label: "结算单", perm: "finance:settlement:read", group: "分润与结算" },
-      { href: "/finance?tab=ledger", label: "账务分录", perm: "finance:ledger:read", phase: 2, group: "平台账" },
-      { href: "/finance?tab=reconcile", label: "对账", perm: "finance:recon:read", phase: 1, ready: true, group: "平台账" },
-      { href: "/finance?tab=invoices", label: "发票", perm: "finance:invoice:read", phase: 2, ready: true, group: "平台账" },
-      // 跨 section 深链（导航审查 #4）：FINANCE 岗管场地方分润在本页、代理分润在 /agents，
-      // 此处回链避免找不到入口；面包屑按 URL 归属「代理商管理」。
-      { href: "/agents?tab=commission", label: "代理分润配置", perm: "agent:share:config", group: "伙伴账" },
-      { href: "/finance?tab=withdrawals", label: "提现审核", perm: "finance:withdrawal:read", group: "伙伴账" },
-      // 排在提现审核之后：没有收款账户，提现审批根本放行不了（B3）
-      { href: "/finance?tab=payout-accounts", label: "收款账户", perm: "finance:payout_account:read", group: "伙伴账" },
-      { href: "/users?tab=wallets", label: "用户钱包", perm: "user:wallet:read", phase: 2, group: "用户账" },
-      { href: "/finance?tab=recharges", label: "充值订单", perm: "user:wallet:read", phase: 2, group: "用户账" },
+      { href: "/settlement?tab=rules", label: "分润规则", perm: "finance:share_rule:read", group: "分润" },
+      { href: "/settlement?tab=records", label: "分润明细", perm: "finance:share_record:read", group: "分润" },
+      { href: "/settlement?tab=summary", label: "分润统计", perm: "finance:share_record:read", phase: 1, group: "分润" },
+      // 「分成」不是报表：这两页展示的是钱**实际分给了谁、各多少**，是分账口径本身
+      ...opLeaves([
+        ["site-sharing", "站点分成", "finance:share_rule:read", "分润"],
+        ["payee-sharing", "分成方分成", "finance:share_rule:read", "分润"],
+      ]),
+      { href: "/settlement?tab=settlements", label: "结算单", perm: "finance:settlement:read", group: "结算" },
+      // 2026-10-28 「提现审核」更名「付款任务」（V160）：一期提现就是平台主动付款（商家一期方案 D8 / D12），
+      // 商家不申请；页签顶部是付款任务区块（5c33ee42），下面仍是提现单列表。tab key 不变，旧链接照常。
+      { href: "/settlement?tab=withdrawals", label: "付款任务", perm: "finance:withdrawal:read", group: "付款" },
+      // 排在付款任务之后：没有收款账户，付款根本放行不了（B3）
+      { href: "/settlement?tab=payout-accounts", label: "收款账户", perm: "finance:payout_account:read", group: "付款" },
     ],
   },
   {
-    key: "user", label: "用户管理", icon: "UserCircle", module: "user", href: "/users",
+    // 2026-10-28 按运营顺序调整（OM07 · docs/requirements/运营端菜单清单-按运营顺序.md）：
+    // 回答「钱对不对得上、欠谁多少」。先核对（对账）、再记账与更正（账务分录 · 调整单）、最后看应付。
+    // 结算六项已拆到「结算」L1（OM08）；「用户账」组归「用户管理 › 资产」（OM05）。
+    // 调整单从「结算单」页签里的一个视图升为本段的页签（/finance?tab=adjustments）：
+    // 它更正的是应付与账务，不是结算单列表的另一种看法；后端端点一直独立（/api/ops/settlement-adjustments）。
+    // 暂不建叶（都没有后端实体与端点，契约草案在服务端评审 S11 §四、S12 §四）：
+    //   网关手续费与到账（OM07-05，还取决于网关给不给清算数据）、应付台账（OM07-03）；
+    //   Zoho 连接与映射（OM07-06）是架构预留，不编码。
+    // 发票待发票模块（OM09）调整时迁走，暂自成一组放在末尾。
+    // 落地页是对账（href）。⚠️ 菜单真源在库里：本段的行由 V156 重编号，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    key: "finance", label: "财务管理", icon: "Wallet", module: "finance", href: "/finance?tab=reconcile",
     children: [
-      // 按「用户主体 / 风险治理 / 用户资产」分组
-      { href: "/users", label: "用户列表", perm: "user:cuser:read", phase: 1, group: "用户主体" },
-      { href: "/users?tab=logoffs", label: "注销申请", perm: "user:logoff:read", phase: 2, group: "用户主体" },
-      { href: "/users?tab=risk", label: "风控用户", perm: "user:risk:read", phase: 1, ready: true, group: "风险治理" },
-      { href: "/users?tab=blacklist", label: "黑名单", perm: "user:risk:update", phase: 1, group: "风险治理" },
-      { href: "/users?tab=whitelist", label: "免费用户白名单", perm: "user:risk:update", phase: 2, group: "风险治理" },
-      { href: "/users?tab=members", label: "会员/次卡", perm: "user:member:read", phase: 2, group: "用户资产" },
-      { href: "/users?tab=wallets", label: "钱包", perm: "user:wallet:read", phase: 2, group: "用户资产" },
-      { href: "/users?tab=recharge", label: "充值套餐", perm: "user:wallet:read", phase: 2, group: "用户资产" },
-      // 2026-09-25：C 端一直在产生这两类待办，而运营端此前没有入口 ——
-      // 不报错、不红、用户也不会投诉，因为他们不知道本该有。
-      // 同名 group 的叶子必须相邻：「注销申请」在用户主体组里，「开票申请」跟在用户资产组末尾。
-      { href: "/users?tab=invoices", label: "开票申请", perm: "user:invoice:read", phase: 2, group: "用户资产" },
-      // 2026-09-27：mbr_plan 此前没有任何写入方 —— C 端会员页因此永远是空列表。
-      // 放在本菜单**末尾**而不是紧挨「会员/次卡」：菜单真源在库里，往中间插一条
-      // 会让同组后面所有叶子的 sort 都要挪，而那就得整表重灌 ——
-      // 整表重灌会冲掉「菜单管理」里的线上改动（见 nav-seed.test.ts）。
-      { href: "/users?tab=plans", label: "会员套餐", perm: "user:member:read", phase: 2, group: "用户资产" },
+      { href: "/finance?tab=reconcile", label: "对账", perm: "finance:recon:read", phase: 1, ready: true, group: "对账" },
+      { href: "/finance?tab=ledger", label: "账务分录", perm: "finance:ledger:read", phase: 2, group: "账务" },
+      { href: "/finance?tab=adjustments", label: "调整单", perm: "finance:settlement:read", group: "账务" },
+      { href: "/finance?tab=invoices", label: "发票", perm: "finance:invoice:read", phase: 2, ready: true, group: "发票" },
     ],
   },
   {
-    key: "marketing", label: "营销管理", icon: "Ticket", module: "marketing", href: "/marketing",
+    // 2026-10-28 按运营顺序（OM05 · docs/requirements/运营端菜单清单-按运营顺序.md）：用户 → 风险 → 资产。
+    // 会员两项迁到销售管理（OM04）；充值订单自财务管理迁入，与充值套餐合为一项；
+    // 开票申请属发票模块（OM09），该模块调整时迁走，暂留资产组末尾。
+    // ⚠️ 菜单真源在库里：本段与财务管理段的行由 V152 重编号，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    key: "user", label: "用户管理", icon: "UserCircle", module: "user", modules: ["user", "marketing"], href: "/users",
     children: [
-      // 公告管理 2026-09-23 并入 运营管理 › 公告管理（同一组 listNotices/saveNotice/archiveNotice）。
-      // c-app 首页 Hub 的「公告条」发布口仍在，只是换了一个菜单位置。
-      { href: "/marketing", label: "优惠券", perm: "marketing:coupon:read", phase: 2, ready: true, group: "促销玩法" },
-      { href: "/marketing?tab=campaigns", label: "活动", phase: 2, group: "促销玩法", perm: "marketing:campaign:read" },
-      { href: "/marketing?tab=push", label: "推送触达", perm: "marketing:push:send", phase: 3, ready: true, group: "促销玩法" },
-      { href: "/marketing?tab=referral", label: "邀请裂变", phase: 3, group: "促销玩法", perm: "marketing:campaign:read" },
-      { href: "/marketing?tab=ad-slots", label: "广告位管理", phase: 3, group: "广告经营", perm: "marketing:ad:read" },
-      { href: "/marketing?tab=ad-campaigns", label: "广告活动", phase: 3, group: "广告经营", perm: "marketing:ad:read" },
-      { href: "/marketing?tab=ad-delivery", label: "投放与曝光", phase: 3, group: "广告经营", perm: "marketing:ad:read" },
+      { href: "/users", label: "用户列表", perm: "user:cuser:read", phase: 1, group: "用户" },
+      { href: "/users?tab=logoffs", label: "注销申请", perm: "user:logoff:read", phase: 2, group: "用户" },
+      { href: "/users?tab=risk", label: "风控用户", perm: "user:risk:read", phase: 1, ready: true, group: "风险" },
+      { href: "/users?tab=blacklist", label: "黑名单", perm: "user:risk:update", phase: 1, group: "风险" },
+      { href: "/users?tab=whitelist", label: "免押白名单", perm: "user:risk:update", phase: 2, group: "风险" },
+      { href: "/users?tab=wallets", label: "钱包", perm: "user:wallet:read", phase: 2, group: "资产" },
+      { href: "/users?tab=recharge", label: "充值订单与套餐", perm: "user:wallet:read", phase: 2, group: "资产" },
+      { href: "/users?tab=invoices", label: "开票申请", perm: "user:invoice:read", phase: 2, group: "资产" },
     ],
   },
-  {
-    // 复用项为跨 section 深链，可点
-    key: "cs", label: "客服管理", icon: "Headset", module: "cs", href: "/cs",
-    children: [
-      /*
-       * 2026-09-28 解锁这两叶（徽章仍是 L1/L2，ready 只放宽分期）。
-       * 在此之前生产跑在 L0，这两页都点不开 —— 而 **C 端的报障全部落在这里**：
-       * 用户提交（连同截图）→ 落 cs_ticket / 转人工会话 → 运营端没有任何界面能打开它，
-       * 而 C 端还写着「正在排队处理」。L0 可达的「待办中心」只接告警，兜不住这条。
-       * 后端就绪：列表 / 详情（含截图）/ 受理 / 转工单 / 转退款 / 会话消息与回复端点齐备。
-       */
-      { href: "/cs", label: "报障受理", phase: 1, ready: true, perm: "cs:ticket:read" },
-      { href: "/cs?tab=sessions", label: "客服会话", phase: 2, ready: true, perm: "cs:session:read" },
-      { href: "/orders", label: "退款/补偿", perm: "order:refund:apply" },
-      { href: "/users", label: "黑名单处理", perm: "user:risk:update", phase: 1 },
-    ],
-  },
+  // 「营销管理」L1 2026-10-28 整段并入「销售管理」（OM04）：营销与广告是收入线上的增长手段。
+  // /marketing 页面不动，由销售管理的 match 认领。
+  // 「客服管理」L1 2026-10-28 并入「运维管理」（OM06）：报障受理 / 客服会话归「客服」组，
+  // 两个快捷入口（退款/补偿、黑名单处理）撤销。/cs 页面不动，由运维管理的 match 认领。
   {
     // 分期说明（导航审查 #2）：PDF V4 的「基础运营报表 P1」由「经营看板」承载
     // （KPI/趋势/实时告警/待办中心/排名榜单），本 section 全部为 P2/P3 的专题分析报表，
@@ -408,52 +469,59 @@ export const NAV: NavSection[] = [
       { href: "/reports?tab=device", label: "设备运营分析", perm: "report:device:read", phase: 2 },
       { href: "/reports?tab=location", label: "点位坪效", perm: "report:location:read", phase: 2 },
       { href: "/reports?tab=finance", label: "财务报表", phase: 2, perm: "report:finance:read" },
+      // 库存报表（V206）：现算，阶段 / 各仓进出 / 处置 / 采购金额
+      { href: "/reports?tab=inventory", label: "库存报表", perm: "report:inventory:read", phase: 1, ready: true },
       { href: "/reports?tab=screen", label: "实时大屏", phase: 3, perm: "report:screen:read" },
       { href: "/reports?tab=custom", label: "自定义报表", phase: 3, perm: "report:custom:read" },
       { href: "/reports?tab=consumer", label: "消费者分析", phase: 3, perm: "report:consumer:read" },
     ],
   },
+  // 「员工与权限」L1 2026-10-28 并入系统管理（OM11），六项成为「员工与权限」组。/employees 由系统管理 match 认领。
   {
-    key: "org", label: "员工与权限", icon: "Users", module: "org", href: "/employees",
-    children: [
-      // 按「人与组织 / 授权 / 留痕」分组
-      { href: "/employees?tab=employees", label: "员工", perm: "org:employee:read", group: "人与组织" },
-      // 组织架构与绩效展示的都是员工数据，与「员工」同一个码 ——
-      // 此前菜单没写 perm 而页面写了，两边不一致时以更严的那边为准
-      { href: "/employees?tab=org", label: "组织架构", perm: "org:employee:read", phase: 2, group: "人与组织" },
-      { href: "/employees?tab=roles", label: "角色权限", perm: "org:role:read", group: "授权" },
-      // 菜单本身也在库里（V67 起），所以它的维护入口也是一条菜单 ——
-      // 加这一条要写迁移，这就是「菜单真源迁进库」的代价（方案 §8）
-      { href: "/employees?tab=menus", label: "菜单管理", perm: "org:role:read", group: "授权" },
-      { href: "/employees?tab=audit", label: "操作审计", perm: "org:audit:read", phase: 1, group: "留痕与考核" },
-      { href: "/employees?tab=performance", label: "绩效报表", perm: "org:employee:read", phase: 3, group: "留痕与考核" },
-    ],
-  },
-  {
-    // D1：菜单按 system 模块过滤；供应商页按钮级用 device:vendor:*（权限双源，后端 SSOT 不改）
-    key: "system", label: "系统设置", icon: "Settings", module: "system", href: "/system?tab=vendors",
-    match: ["/system"],
+    // 2026-10-28 按运营顺序合并为「系统管理」（OM11 · docs/requirements/运营端菜单清单-按运营顺序.md）：
+    // 回答「谁能做什么、系统按什么规则跑」。员工与权限（原 L1）+ 系统设置 + 运营管理的基础管理五项
+    // + 流程与工单的配置与统计五项，分五组：员工与权限 → 规则与参数 → 基础资料 → 消息触达 → 流程（矩阵叫「流程配置」，与同名叶撞 i18n 键，改「流程」）。
+    // 「流程与工单」只留待办 / 审批 / 审核队列 / 工单工作台四项（归工作台 OM00，届时迁走）。
+    // 「备份与恢复」（OM11-21）没有后端，不建叶。税率与发票待发票模块（OM09）迁走，暂留规则与参数组末尾。
+    // 落地页是员工（href）。页面路径不动：/employees、/system、/operation/*（基础资料五页）、/flow/<配置与统计>，
+    // 靠 match 认领；/flow/todo 等仍归流程与工单（/flow 前缀短，配置五页按完整路径认领）。
+    // D1：菜单按 system 模块过滤（供应商接入已于 2026-10-28 搬到设备管理，其 device:vendor:* 码随之归设备段）
+    // ⚠️ 菜单真源在库里：本段与员工与权限、运营管理、流程与工单三段的行由 V172 重编号，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    key: "system", label: "系统管理", icon: "Settings", module: "system", modules: ["system", "org"], href: "/employees?tab=employees",
+    match: ["/system", "/employees", "/operation", "/flow/processes", "/flow/settings", "/flow/access", "/flow/instances", "/flow/stats"],
     pinBottom: true,
     children: [
-      // 按「接入 / 消息触达 / 业务规则 / 基础字典 / 开放与市场」分组（补齐清单 E）。
-      // 注：对方把 提现设置/预约设置/充电设置 拆三个菜单、7 个支付渠道各占一菜单；
-      //     我们合并为「业务规则」一页与「支付渠道」一页 —— 少菜单噪音即"信息更清晰"。
-      { href: "/system?tab=vendors", label: "供应商接入", perm: "device:vendor:read", group: "接入与支付" },
-      { href: "/system?tab=payment", label: "支付渠道", perm: "system:payment_channel:read", group: "接入与支付" },
+      { href: "/employees?tab=employees", label: "员工", perm: "org:employee:read", group: "员工与权限" },
+      { href: "/employees?tab=org", label: "组织架构", perm: "org:employee:read", phase: 2, group: "员工与权限" },
+      { href: "/employees?tab=roles", label: "角色权限", perm: "org:role:read", group: "员工与权限" },
+      { href: "/employees?tab=menus", label: "菜单管理", perm: "org:role:read", group: "员工与权限" },
+      { href: "/employees?tab=audit", label: "操作审计", perm: "org:audit:read", phase: 1, group: "员工与权限" },
+      { href: "/employees?tab=performance", label: "绩效报表", perm: "org:employee:read", phase: 3, group: "员工与权限" },
+      { href: "/system?tab=rules", label: "业务规则", perm: "system:biz_rule:update", phase: 1, group: "规则与参数" },
+      { href: "/system?tab=login", label: "登录设置", perm: "system:login_setting:update", phase: 1, group: "规则与参数" },
+      { href: "/system?tab=params", label: "系统参数", perm: "system:param:read", group: "规则与参数" },
+      { href: "/system?tab=tax", label: "税率与发票", perm: "system:tax:update", phase: 2, group: "规则与参数" },
+      { href: "/system?tab=markets", label: "多国家市场", perm: "system:market:read", phase: 3, group: "规则与参数" },
+      // OpenAPI 应用：S15 指出重置密钥明文被丢弃、新建不生成密钥、无签名验证 —— 三期前不放开（分期锁住）
+      { href: "/system?tab=openapi", label: "OpenAPI 应用", perm: "system:openapi:read", phase: 3, group: "规则与参数" },
+      { href: "/system?tab=dict", label: "参数字典", perm: "system:dict:read", group: "基础资料" },
+      { href: "/system?tab=region", label: "地区库", perm: "system:dict:read", group: "基础资料" },
+      ...opLeaves([
+        ["banks", "银行管理", "system:bank:read", "基础资料"],
+        ["brands", "品牌管理", "system:brand:read", "基础资料"],
+        ["problems", "问题管理", "system:problem:read", "基础资料"],
+        ["app-versions", "应用版本", "system:app_version:read", "基础资料"],
+        ["notices", "公告管理", "marketing:notice:read", "基础资料"],
+      ]),
       { href: "/system?tab=notify", label: "通知模板", perm: "system:notify_template:read", group: "消息触达" },
       { href: "/system?tab=notify-log", label: "发送记录", perm: "system:notify_log:read", phase: 1, group: "消息触达" },
       { href: "/system?tab=notify-blacklist", label: "触达拉黑", perm: "system:notify_blacklist:read", phase: 1, group: "消息触达" },
-      { href: "/system?tab=rules", label: "业务规则", perm: "system:biz_rule:update", phase: 1, group: "业务规则" },
-      { href: "/system?tab=login", label: "登录设置", perm: "system:login_setting:update", phase: 1, group: "业务规则" },
-      // 「应用版本」「银行管理」「问题管理」2026-09-23 并入 运营管理 › 基础管理
-      // （同一组 listAppVersions/saveAppVersion/rollbackAppVersion、listBanks/saveBank、
-      // listProblems/saveProblem），本页不再留第二份。
-      { href: "/system?tab=dict", label: "参数字典", perm: "system:dict:read", group: "基础字典" },
-      { href: "/system?tab=region", label: "地区库", perm: "system:dict:read", group: "基础字典" },
-      { href: "/system?tab=params", label: "系统参数", perm: "system:param:read", group: "基础字典" },
-      { href: "/system?tab=tax", label: "税率与发票", perm: "system:tax:update", phase: 2, group: "开放与市场" },
-      { href: "/system?tab=markets", label: "多国家市场", perm: "system:market:read", phase: 3, group: "开放与市场" },
-      { href: "/system?tab=openapi", label: "OpenAPI 应用", perm: "system:openapi:read", phase: 3, group: "开放与市场" },
+      // 流程组：配置与统计（OpsKit 运营界面）：权限码强制方是 OpsKit；未连 OpsKit 时灰显（FLOW_SOON）
+      { href: "/flow/processes", label: "流程配置", perm: "flow:process:manage", group: "流程", ...FLOW_SOON },
+      { href: "/flow/settings", label: "运营配置", perm: "flow:config:manage", group: "流程", ...FLOW_SOON },
+      { href: "/flow/access", label: "接入管理", perm: "flow:access:manage", group: "流程", ...FLOW_SOON },
+      { href: "/flow/instances", label: "流程实例", perm: "flow:approval:read", group: "流程", ...FLOW_SOON },
+      { href: "/flow/stats", label: "流程统计", perm: "flow:process:manage", group: "流程", ...FLOW_SOON },
     ],
   },
   {
@@ -471,12 +539,8 @@ export const NAV: NavSection[] = [
       { href: "/flow/approvals", label: "审批列表", perm: "flow:approval:read", group: "审批", ...FLOW_SOON },
       { href: "/flow/queue", label: "审核队列", perm: "flow:queue:claim", group: "审批", ...FLOW_SOON },
       { href: "/flow/tickets", label: "工单工作台", perm: "flow:ticket:read", group: "工单", ...FLOW_SOON },
-      { href: "/flow/processes", label: "流程配置", perm: "flow:process:manage", group: "配置", ...FLOW_SOON },
-      { href: "/flow/settings", label: "运营配置", perm: "flow:config:manage", group: "配置", ...FLOW_SOON },
-      { href: "/flow/access", label: "接入管理", perm: "flow:access:manage", group: "配置", ...FLOW_SOON },
-      // V139：追加在末尾（不往既有分组中间插）。实例与对账同审批可见口径；统计是管理视角
-      { href: "/flow/instances", label: "流程实例", perm: "flow:approval:read", group: "流转与统计", ...FLOW_SOON },
-      { href: "/flow/stats", label: "流程统计", perm: "flow:process:manage", group: "流转与统计", ...FLOW_SOON },
+      // 流程配置 / 运营配置 / 接入管理 / 流程实例 / 流程统计 2026-10-28 迁到系统管理 › 流程配置（OM11，V172）；
+      // 本段剩下的四项归工作台（OM00），届时整段撤销
     ],
   },
 ];
@@ -633,7 +697,7 @@ function resolveTabs(
     /*
      * 同一个 tab key 可能在**多个 section 登记，且权限码不同**：
      * `/finance?tab=withdrawals` 在「财务管理 › 提现审核」判 `finance:withdrawal:read`，
-     * 在「我的经营 › 申请提现」判 `finance:withdrawal:apply`。
+     * 在「我的经营 › 提现记录」也判 `finance:withdrawal:read`（V166 前是「申请提现」判 `:apply`）。
      *
      * 只取排名最高的那一条会出错：财务管理的 /finance 叶子多、评分高，于是代理商
      * 拿到的是「提现审核」那条 —— 他没有 `:read`，整个 tab 就被丢掉了，
@@ -670,7 +734,10 @@ function resolveTabs(
       continue;
     }
     if (leaf.perm && !can(perms, leaf.perm)) continue; // 无权限：tab 不渲染，与菜单同一口径
-    out.push({ key, label: leaf.label, phase: leaf.phase });
+    // 分期也与菜单同一口径（isLeafLocked）：ready 的叶子不受分期屏蔽，所以不带 phase 出去。
+    // 此前原样带出 phase，TabHeader 按它隐藏 —— 于是 ready 叶「菜单能点进来、页签条上却没有它」，
+    // 生产跑在 L0 时押金与欠费、对账、发票、风控用户、优惠券、推送触达、报障受理、客服会话都是这样。
+    out.push({ key, label: leaf.label, phase: leaf.ready ? undefined : leaf.phase });
   }
   return { tabs: out, missing };
 }
@@ -785,8 +852,15 @@ export function activeLeafIndex(
 
 /** section 的默认落地地址：首个可点叶子（排除 soon 和 phase-locked），无则 section 首页。 */
 export function sectionDefaultHref(section: NavSection, v: ViewerLike): string {
-  const leaf = visibleLeaves(section, v).find((l) => !l.soon && !isLeafLocked(l));
-  return leaf?.href ?? section.href;
+  const open = visibleLeaves(section, v).filter((l) => !l.soon && !isLeafLocked(l));
+  /*
+   * 落地页先认 section.href（2026-10-28，运营端菜单清单 §一）：菜单按运营顺序排之后，
+   * 第一项不一定是高频页（网点管理的第一项是 BD CRM，日常却是站点管理）。
+   * section.href 指向的叶子对当前角色可见且未锁时落到它，否则退回第一个可点叶 ——
+   * 没这个码的角色不会落到一个看不见的页面上。
+   */
+  const own = open.find((l) => normPath(l.href) === normPath(section.href) || l.href === section.href);
+  return (own ?? open[0])?.href ?? section.href;
 }
 
 /** 叶子是否不可点：待建 或 分期锁定（渲染层统一判定）。 */
@@ -814,9 +888,11 @@ export function routeLockedPhase(
     if (parts.view) return parts.view === view;
     return !tab && !view;
   });
-  // section 首页（无 tab/view）：落到该 path 的首叶，兜底首叶
+  // section 首页（无 tab/view）：落到该 path 的**首个未锁叶**（页面 usePageTab 的默认 tab 也这么取），
+  // 都被锁才判锁。此前取该 path 的首叶 —— 首叶被锁而后面有能用的 tab 时，裸路径整页被拦。
   if (!leaf && !tab && !view) {
-    leaf = leaves.find((l) => leafParts(l.href).path === p) ?? leaves[0];
+    const onPath = leaves.filter((l) => leafParts(l.href).path === p);
+    leaf = onPath.find((l) => !isLeafLocked(l)) ?? onPath[0] ?? leaves[0];
   }
   return leaf && isLeafLocked(leaf) ? leaf.phase : undefined;
 }

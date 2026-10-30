@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.scenario;
 
+import ai.neargo.sharehub.support.LegacyShareParams;
 import ai.neargo.sharehub.agent.dto.AgentDtos.Agent;
 import ai.neargo.sharehub.agent.ext.service.AgentOpsAssessmentService;
 import ai.neargo.sharehub.agent.service.AgentService;
@@ -38,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 执行清单批次 F：停用冻结提现（F1）· 停用改派工单（F2）· 清退（F3）· 平台接管（F4）· 月度考核与运维分成系数（F5）。
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@LegacyShareParams
 class AgentOpsTest extends ApiTestSupport {
 
     @Autowired

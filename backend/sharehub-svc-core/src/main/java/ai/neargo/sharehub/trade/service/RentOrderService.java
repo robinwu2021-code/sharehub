@@ -21,6 +21,16 @@ public interface RentOrderService {
     /** 同上，另可按收款态筛（PAID / UNPAID，C-BL-04）—— 运营催缴要能一眼筛出欠费单。 */
     PageResult<RentOrder> pageAdmin(Integer page, Integer size, String keyword, String status, String payStatus);
 
+    /**
+     * 运营端订单列表的完整筛选（第 5 批，运营方原文 RNT-03 / R02 / MON-06）：
+     * 借出日期区间（业务日，含两端）、商家、站点、设备（借出或归还柜）。
+     */
+    record OrderFilter(String keyword, String status, String payStatus, java.time.LocalDate from, java.time.LocalDate to,
+                       String agentNo, String siteNo, String cabinetNo) {
+    }
+
+    PageResult<RentOrder> pageAdmin(Integer page, Integer size, OrderFilter f);
+
     /** C 端：我的订单（按属主 c_user_no 过滤）。 */
     PageResult<RentOrder> pageByOwner(String cUserNo, Integer page, Integer size);
 
@@ -115,6 +125,16 @@ public interface RentOrderService {
 
     /** 逾期达封顶自动买断：触顶则以封顶价买断并返回 true（执行清单 A1 · E17）。 */
     boolean buyoutIfCapped(String orderNo);
+
+    /**
+     * 到最长时限发起最高收费（V180，{@code rent.overdue.mode=TIME_LIMIT}，运营方原文 RQ-BIL-02）。
+     *
+     * <p>借出时长达到 {@code hours} 的使用中订单：按计费方案总封顶请款，订单进 {@code OVERDUE_CHARGED}
+     * 「已扣款未归还」，宝仍算在用户手里。之后归还只结单、不冲销（RQ-BIL-04 / AC-03）。
+     *
+     * @return 这一单是否在本次发起了最高收费
+     */
+    boolean chargeOverdueIfDue(String orderNo, int hours);
 
     /**
      * 客服干预：按 {@link InterventionDtos#RULES} 迁移状态，并**同事务写审计留痕**。

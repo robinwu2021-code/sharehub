@@ -53,6 +53,9 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     private static final java.util.Set<String> PAY_CHANNELS = java.util.Set.of("NEARPAY", "MANUAL");
 
     private final StlWithdrawalMapper mapper;
+    private final PayoutLedgerPoster postings;
+    /** C10 自开票（V183）：到账即出，开关与税号不满足时什么都不做。 */
+    private final ai.neargo.sharehub.finance.service.SelfBillService selfBills;
     private final WithdrawFeePolicy feePolicy;
     private final WithdrawalStateMachine stateMachine;
     private final PayoutAccountService payoutAccounts;
@@ -79,7 +82,11 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                                  ai.neargo.sharehub.api.platform.port.AgentDirectoryPort agents,
                                  ai.neargo.sharehub.api.platform.port.SysParamPort params,
                                  ai.neargo.sharehub.common.event.DomainEventBus events,
-                                 @org.springframework.beans.factory.annotation.Value("${sharehub.flow.withdrawal.engine:LOCAL}") String engine) {
+                                 @org.springframework.beans.factory.annotation.Value("${sharehub.flow.withdrawal.engine:LOCAL}") String engine,
+                                 PayoutLedgerPoster postings,
+                                 ai.neargo.sharehub.finance.service.SelfBillService selfBills) {
+        this.postings = postings;
+        this.selfBills = selfBills;
         this.events = events;
         this.viaOpsKit = "OPSKIT".equalsIgnoreCase(engine == null ? "" : engine.trim());
         this.params = params;
@@ -128,7 +135,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
              * 能在申请时拦的，就不要留到审批之后。
              */
             if (payoutAccounts.defaultOf(req.payeeType(), req.payeeNo()).isEmpty()) {
-                throw new IllegalArgumentException("该受益方还没有可用的收款账户，无法提交提现 —— 请先补录收款账户");
+                throw ai.neargo.sharehub.common.BizException.badRequest("error.withdrawal.no_payout_account");
             }
             e.setApprovalState(WithdrawalApprovalState.SUBMITTING.name());
             e.setApprovalRound(1);
@@ -391,6 +398,9 @@ public class WithdrawalServiceImpl implements WithdrawalService {
             throw new IllegalArgumentException(
                     "该渠道流水号已登记在另一张提现单上，请核对后重填：" + e.getPayRef());
         }
+        // 到账即冲减应付（G19）：付款任务批量确认与单笔登记回执都走这里，记账只有这一个入口
+        if (ok) postings.onWithdrawalPaid(e);
+        if (ok) selfBills.onWithdrawalPaid(e);
         return toVO(require(withdrawNo));
     }
 

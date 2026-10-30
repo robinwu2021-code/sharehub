@@ -52,6 +52,8 @@ export default {
     price: "价格",
     dailyCap: "每日封顶",
     buyout: "买断价",
+    maxCharge: "最高租赁收费",
+    lostFee: "遗失费",
     deposit: "押金",
     freeDeposit: "免押金",
     freeDepositOn: "银行卡预授权，免押金",

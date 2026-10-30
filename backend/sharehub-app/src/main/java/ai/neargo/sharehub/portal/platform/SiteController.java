@@ -34,9 +34,11 @@ import java.util.List;
 public class SiteController {
 
     private final SiteService sites;
+    private final ai.neargo.sharehub.agent.service.AgentService agents;
 
-    public SiteController(SiteService sites) {
+    public SiteController(SiteService sites, ai.neargo.sharehub.agent.service.AgentService agents) {
         this.sites = sites;
+        this.agents = agents;
     }
 
     @GetMapping
@@ -47,8 +49,10 @@ public class SiteController {
                                  @RequestParam(required = false) Boolean showArchived,
                                  @RequestParam(required = false) String status,
                                  @RequestParam(required = false) Boolean missingOwner,
-                                 @RequestParam(required = false) Boolean missingOpenHours) {
-        return sites.page(new SiteService.Query(page, size, keyword, showArchived, status, missingOwner, missingOpenHours));
+                                 @RequestParam(required = false) Boolean missingOpenHours,
+                                 // V162：商家详情的「站点与点位」按它取
+                                 @RequestParam(required = false) String agentNo) {
+        return sites.page(new SiteService.Query(page, size, keyword, showArchived, status, missingOwner, missingOpenHours, agentNo));
     }
 
     @GetMapping("/summary")
@@ -66,6 +70,10 @@ public class SiteController {
     @PostMapping
     @PreAuthorize("@perm.can('location:poi:create')")
     public Site create(@RequestBody SiteReq body) {
+        // 带商家号 = 为商家建站（V162）：同事务写归属、运维责任与默认点位；不带 = 直营站点（原规则）
+        if (body != null && body.agentNo() != null && !body.agentNo().isBlank()) {
+            return agents.createSite(body.agentNo().trim(), body);
+        }
         return sites.create(body);
     }
 

@@ -4,13 +4,13 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- 站在 neargo 地基上（ADR-006）：继承 neargo-parent → 得 Spring Boot 4.0.x + Java 21
+    <!-- 站在 neargo 地基上（ADR-006）：继承 neargo-build-parent 2.0.0-SNAPSHOT（原 neargo-parent 1.0.0 已下线）→ 得 Spring Boot 4.0.x + Java 21
          + maven-enforcer(锁 JDK21) + MyBatis-Plus BOM + neargo commons 版本管理。
          relativePath 留空 → 从本机 ~/.m2 私仓解析（neargo commons 已发布/安装于此）。 -->
     <parent>
         <groupId>ai.neargo</groupId>
-        <artifactId>neargo-parent</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <artifactId>neargo-build-parent</artifactId>
+        <version>2.0.0-SNAPSHOT</version>
         <relativePath/>
     </parent>
 

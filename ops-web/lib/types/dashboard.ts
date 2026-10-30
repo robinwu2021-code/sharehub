@@ -70,3 +70,52 @@ export interface OpsFlowMetrics {
   removalExpected: number;
   removalRecoveryRate: number | null;
 }
+
+/**
+ * 商家营收首页汇总（后端 `MerchantRevenueController.RevenueSummary`，`GET /api/ops/merchant-revenue/summary`）。
+ *
+ * 口径（商家一期 §10.1）：交易额 / 退款 / 净交易额按**订单**（已结算、按结束时间落窗口）；
+ * 税前营收与我的分成按**分成明细**；`pending` / `settledUnpaid` / `paid` 是**现在**的钱的状态，不随窗口变。
+ * `prev*` 是等长的上一个窗口，用来算环比 —— 前端只在上期非 0 时显示百分比。
+ * 商家会话由服务端数据范围收窄到自己；运营看到的是全平台。
+ */
+export interface RevenueSummary {
+  from: string;
+  to: string;
+  orderCount: number;
+  gross: number;
+  refund: number;
+  net: number;
+  preTax: number;
+  myShare: number;
+  pending: number;
+  settledUnpaid: number;
+  paid: number;
+  prevOrderCount: number;
+  prevGross: number;
+  prevMyShare: number;
+}
+/** 营收趋势的一天。缺天由后端补 0，折线不断。 */
+export interface RevenueDay {
+  date: string;
+  orderCount: number;
+  gross: number;
+}
+/** 按设备的营收排行（默认前 10）。 */
+export interface RevenueByDevice {
+  cabinetNo: string;
+  orderCount: number;
+  gross: number;
+}
+
+/**
+ * 营收首页设备提醒（后端 `DeviceAlertQuery.DeviceAlerts`，`GET /api/ops/merchant-revenue/alerts`）。
+ * 只数在用设备；离线与「在线无可借」互斥。样本最多 20 个柜号。按「现在」，不随时间窗口变。
+ */
+export interface DeviceAlerts {
+  deployed: number;
+  offline: number;
+  noBorrowable: number;
+  offlineSample: string[];
+  noBorrowableSample: string[];
+}

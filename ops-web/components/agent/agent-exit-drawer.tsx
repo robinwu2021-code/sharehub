@@ -44,9 +44,9 @@ const STEPS: { key: AgentExitStatus; label: string }[] = [
 /** 每一步在做什么、门禁在拦什么 —— 让操作人知道这一步为什么不能跳。 */
 const STEP_HINT: Record<AgentExitStatus, string> = {
   RECLAIMING: "先把站点、站点责任、机柜、未完结工单全部收回 —— 资产没收回就结账，结完才发现还有柜子在它手里产生分润。",
-  SETTLING: "把分润出账、结算单付清、在途提现办结。这一步允许该代理提现与打款（其余停用期间冻结），否则钱永远结不清。",
-  CLOSING: "关闭将停用该代理全部登录账号并归档代理档案，不可恢复。系统里没有代理保证金，保证金如有需线下退还。",
-  CLOSED: "清退已完成：账号已停用、代理已归档。",
+  SETTLING: "把分润出账、结算单付清、在途提现办结。这一步允许该商家提现与打款（其余停用期间冻结），否则钱永远结不清。",
+  CLOSING: "关闭将停用该商家全部登录账号并归档商家档案，不可恢复。系统里没有商家保证金，保证金如有需线下退还。",
+  CLOSED: "清退已完成：账号已停用、商家已归档。",
 };
 
 function timelineOf(e: AgentExit): TimelineItem[] {
@@ -80,7 +80,7 @@ export function AgentExitDrawer({ exitNo, onClose }: { exitNo: string | null; on
   const advance = useMutation({
     mutationFn: (no: string) => api.advanceAgentExit(no),
     onSuccess: (e) => {
-      notify.success(e.status === "CLOSED" ? `代理 ${e.agentNo} 已清退：账号已停用、档案已归档` : `已推进到「${AGENT_EXIT_STATUS[e.status].label}」`);
+      notify.success(e.status === "CLOSED" ? `商家 ${e.agentNo} 已清退：账号已停用、档案已归档` : `已推进到「${AGENT_EXIT_STATUS[e.status].label}」`);
       for (const k of [["agent-exit"], ["agent-exit-gate"], ["agents"], ["agent-accounts"]]) qc.invalidateQueries({ queryKey: k });
     },
   });
@@ -93,7 +93,7 @@ export function AgentExitDrawer({ exitNo, onClose }: { exitNo: string | null; on
     <Drawer
       open={!!exitNo}
       onOpenChange={(o) => !o && onClose()}
-      title="代理清退进度"
+      title="商家清退进度"
       desc="收回资产 → 结清 → 关闭账号，每一步门禁全部通过才能推进"
       width="w-[640px]"
     >
@@ -105,7 +105,7 @@ export function AgentExitDrawer({ exitNo, onClose }: { exitNo: string | null; on
         <div className="space-y-5">
           <DetailHeader
             no={e.exitNo}
-            title={<>清退代理 <RefLink kind="agent" no={e.agentNo} /></>}
+            title={<>清退商家 <RefLink kind="agent" no={e.agentNo} /></>}
             badge={<StatusBadge map={AGENT_EXIT_STATUS} value={e.status} />}
             meta={`发起 ${fmtTime(e.startedAt)} · ${e.startedBy ?? "-"}`}
             stepper={<StatusStepper steps={STEPS} current={e.status} />}
@@ -120,15 +120,15 @@ export function AgentExitDrawer({ exitNo, onClose }: { exitNo: string | null; on
                   : gate && !gate.allPassed ? `门禁还差 ${pending} 项，逐项处理后再推进` : null,
                 confirm: action === "close"
                   ? {
-                    title: `关闭并归档代理 ${e.agentNo}`,
-                    desc: "将停用该代理全部登录账号并归档代理档案，不可恢复。请输入代理编号确认。",
+                    title: `关闭并归档商家 ${e.agentNo}`,
+                    desc: "将停用该商家全部登录账号并归档商家档案，不可恢复。请输入商家编号确认。",
                     confirmText: "关闭并归档",
                     requireText: e.agentNo,
                   }
                   : {
                     title: AGENT_EXIT_TRANSITIONS[action].label,
                     desc: action === "reclaimed"
-                      ? "确认站点、责任、机柜与工单都已收回。进入结清后，该代理可以提现与打款，用于把账结清。"
+                      ? "确认站点、责任、机柜与工单都已收回。进入结清后，该商家可以提现与打款，用于把账结清。"
                       : "确认分润已出账、结算单已付清、提现已办结。进入关闭后只剩「停用账号并归档」一步。",
                     confirmText: "确认推进",
                   },

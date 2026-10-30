@@ -80,6 +80,8 @@ function InputForField({
         onBlur={onBlur}
         onChange={(e) => set(e.target.value)}
       >
+        {/* 当前值为空且不在选项里：给一个空占位。否则浏览器显示第一项、表单值却是空，保存时报「不能为空」，看着像已选 */}
+        {!(f.options ?? []).some((o) => o.value === ((cur as string) ?? "")) && <option value="">{f.placeholder ?? "请选择"}</option>}
         {(f.options ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </Select>
     );

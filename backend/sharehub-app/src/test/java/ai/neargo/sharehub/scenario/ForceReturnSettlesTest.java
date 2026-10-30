@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.scenario;
 
+import ai.neargo.sharehub.support.LegacyShareParams;
 import ai.neargo.sharehub.support.ApiTestSupport;
 import ai.neargo.sharehub.support.FixtureCleanup;
 import ai.neargo.sharehub.trade.dto.InterventionDtos;
@@ -27,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 要免单的话另走「减免」（waive），那是有留痕的决定，而不是强制归还的副作用。
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@LegacyShareParams
 class ForceReturnSettlesTest extends ApiTestSupport {
 
     @Autowired

@@ -15,7 +15,7 @@ import type { WorkOrderStatus } from "@/lib/types/workorder";
 import type { CabinetStatus, OnlineStatus } from "@/lib/types/device";
 
 const ORDER_STATES: OrderStatus[] = [
-  "CREATED", "DISPENSING", "IN_USE", "RETURNED", "SETTLED", "EXCEPTION", "CLOSED",
+  "CREATED", "DISPENSING", "IN_USE", "OVERDUE_CHARGED", "RETURNED", "SETTLED", "EXCEPTION", "CLOSED",
 ];
 const WO_STATES: WorkOrderStatus[] = ["CREATED", "DISPATCHED", "PROCESSING", "DONE", "CLOSED"];
 const CAB_STATES: CabinetStatus[] = ["IN_STOCK", "DEPLOYED", "FAULT", "RETIRED"];

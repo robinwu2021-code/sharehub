@@ -4,6 +4,7 @@ import { cabinets } from "./device";
 import { contracts, locations, sites } from "./location";
 import { workOrders } from "./workorder";
 import { setQcStatus } from "./device-asset";
+import { sysParams } from "./system";
 import { CABINET_TRANSITIONS, canCabinetAction } from "../../types";
 import type { Cabinet, CabinetStatus, Contract, WorkOrder } from "../../types";
 
@@ -93,6 +94,26 @@ describe("上线门禁", () => {
     passTrial();
     dg.goLive(no);
     expect(() => dg.goLive(no)).toThrowError(/当前是「DEPLOYED」|Illegal transition/);
+  });
+});
+
+describe("一期跳过合同 / 勘测（V174 site.venue_gate.enabled=0）", () => {
+  const setVenueGate = (v: string) => { sysParams.find((p) => p.paramKey === "site.venue_gate.enabled")!.value = v; };
+
+  it("★ 筹备站点、无合同、未勘测：一期这两项判通过并写明跳过；打开开关后照旧拦", () => {
+    sites.find((s) => s.siteNo === siteNo)!.status = "PREPARING";
+    for (const k of contracts.filter((x) => x.siteNo === siteNo)) k.status = "EXPIRED" as Contract["status"];
+    setVenueGate("0");
+    for (const key of ["CONTRACT", "SURVEY"]) {
+      expect(item(key)).toMatchObject({ passed: true, detail: dg.PHASE1_SKIP });
+    }
+    setVenueGate("1");
+    try {
+      expect(item("CONTRACT").passed).toBe(false);
+      expect(item("SURVEY").passed).toBe(false);
+    } finally {
+      setVenueGate("0");
+    }
   });
 });
 

@@ -12,4 +12,7 @@ public interface LocationQueryPort {
 
     /** 点位的归属链；点位不存在时返回 {@code null}。 */
     LocationOwnership ownershipOf(String locationNo);
+
+    /** 站点的默认点位号（V162）；没有返回 null。 */
+    String defaultLocationOf(String siteNo);
 }

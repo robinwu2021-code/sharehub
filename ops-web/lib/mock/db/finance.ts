@@ -7,7 +7,7 @@ import type {
   ShareSummary, RechargeOrder, RechargePackage, PageQuery,
   ReconHandleStatus, ReconHandleResult, ReconAction, ReconStats,
   InvoiceStatus, InvoiceAction,
-  PayoutAccount, PayReceiptPayload, WithdrawApplyPayload, InvoiceView,} from "../../types";
+  PayoutAccount, PayReceiptPayload, WithdrawApplyPayload, InvoiceView, TaxInvoice, SelfBill, PayableRow,} from "../../types";
 import {
   STL_TRANSITIONS, canSettlementTransition,
   RECON_TRANSITIONS, canReconTransition, RECON_TERMINAL,
@@ -21,7 +21,7 @@ import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } fr
 import { agents } from "./agent";
 import { venues } from "./location";
 // 提现手续费口径唯一来源（系统域 §11 业务规则）；只读不写，财务域不另存一份费率
-import { bizRules } from "./system";
+import { bizRules, taxSettings } from "./system";
 import { orders } from "./order";
 import { cUsers } from "./user";
 // 期间筛选与报表域共用 REPORT_PERIODS 的窗口换算
@@ -85,12 +85,15 @@ export const shareRecords: ShareRecord[] = SHARE_PERIODS.flatMap((period, pi) =>
         // 代理明细带依据：同一伙伴在一单里可以有出资 + 运维两条，靠它区分（V53）
         basis: payee.dimension === "AGENT" ? (["OPERATE", "INVEST", "DEVELOP"] as const)[k % 3] : "",
         grossAmount: gmv,
+        // G22 快照：一期口径税前、阿联酋 VAT 5%（与后端 V155 默认同），基数 = 实收 ÷ 1.05
+        baseMode: "PRE_TAX" as const, taxRate: 5, baseAmount: Number((gmv / 1.05).toFixed(2)), refundNo: null,
         // 老周期的明细已结算、当期的还挂着：两种状态都要有样本，
         // 否则「这笔结没结」在页面上看不出差别。
         ...(pi === 0
           ? { status: "PENDING" as const, settleNo: null }
           : { status: "DONE" as const, settleNo: `STL${7000 + pi * 10 + i}` }),
-        amount: Number((gmv * rate).toFixed(2)), rate, currency: "AED",
+        // 与后端 ShareGeneratorImpl 同：税前基数 × 比例，向下取整到分（分账合计不得超过基数）
+        amount: Math.floor((gmv / 1.05) * rate * 100) / 100, rate, currency: "AED",
         period,
         // 明细时间必须落在它声明的周期内，否则「按周期汇总」和「按时间筛选」会互相打脸
         createdAt: `${period}-${String(4 + k * 8).padStart(2, "0")}T${String(9 + (i % 8)).padStart(2, "0")}:20:00.000Z`,
@@ -407,6 +410,118 @@ export const listReconciles = (q: ReconQuery = {}) =>
     kwHit(q.keyword, x.batchNo, x.period, x.handledBy, x.handleNote) &&
     (!q.status || x.status === q.status) &&
     (!q.handleStatus || x.handleStatus === q.handleStatus));
+
+// ————————————————————————————————————————————————————————————————
+// C 端租赁税务票据（V181，运营方原始需求 C01）：后端收款时自动开、退款批准自动冲红。
+// mock 只种几张，覆盖 已开 / 贷项通知单 / 主体缺项被挡 三态；retry 按当前税务设置重判主体。
+
+const taxSplit = (gross: number, rate: number) => {
+  const net = round2(gross / (1 + rate / 100));
+  return { netAmount: net, taxAmount: round2(gross - net), grossAmount: round2(gross) };
+};
+const issuerMissing = () => {
+  const s = taxSettings.find((t) => t.country === "AE");
+  const miss: string[] = [];
+  if (!s?.issuerLegalName) miss.push("issuerLegalName");
+  if (!s?.issuerAddress) miss.push("issuerAddress");
+  if (!s?.trn || s.trn === "-") miss.push("trn");
+  return { s, miss };
+};
+export const taxInvoices: TaxInvoice[] = orders.filter((o) => o.feeAmount > 0).slice(0, 6).map((o, i) => {
+  const blocked = i === 5;
+  const amt = taxSplit(o.feeAmount, 5);
+  return {
+    invoiceNo: `INV-2026-${String(i + 1).padStart(6, "0")}`, kind: "INVOICE", refInvoiceNo: null,
+    orderNo: o.orderNo, cUserNo: o.cUserNo, payNo: `PAY${o.orderNo.slice(-8)}`, refundNo: null,
+    issuerCountry: "AE", issuerLegalName: blocked ? null : "ShareHub FZ-LLC", issuerAddress: blocked ? null : "Dubai Silicon Oasis, Dubai, UAE",
+    issuerTrn: "1000****00003", issuerTitle: "ShareHub FZ-LLC", taxRatePercent: 5, taxIncluded: true, ...amt,
+    currency: o.currency, lineDesc: `Power bank rental @${o.cabinetNo}`,
+    status: blocked ? "BLOCKED" : "ISSUED", failReason: blocked ? "ISSUER_MISSING:issuerLegalName,issuerAddress" : null,
+    issuedAt: blocked ? null : iso((i + 1) * 86_400_000), createdAt: iso((i + 1) * 86_400_000),
+  };
+});
+{
+  const ref = taxInvoices[0];
+  taxInvoices.push({
+    ...ref, invoiceNo: "CN-2026-000001", kind: "CREDIT_NOTE", refInvoiceNo: ref.invoiceNo, payNo: null, refundNo: "RFD00000001",
+    ...taxSplit(-Math.min(5, ref.grossAmount), 5), lineDesc: `Credit note for ${ref.invoiceNo}`,
+  });
+}
+// 跨期应付（SHR-05）：与后端同一口径 —— 应得 = 分润明细合计，已出结算单 = 已确认 + 已付，未付 = 应得 − 已付
+export const listPayables = (q: PageQuery & { payeeType?: string; payeeNo?: string; fromPeriod?: string; toPeriod?: string; onlyOutstanding?: boolean } = {}) => {
+  const rows = new Map<string, PayableRow>();
+  for (const r of shareRecords) {
+    if (!r.payeeNo) continue;
+    const k = `${r.dimension}|${r.payeeNo}|${r.period}`;
+    const row = rows.get(k) ?? { payeeType: r.dimension, payeeNo: r.payeeNo, payeeName: r.payeeName ?? null, period: r.period,
+      currency: r.currency ?? "AED", earned: 0, settled: 0, paid: 0, outstanding: 0 };
+    row.earned = round2(row.earned + Number(r.amount));
+    rows.set(k, row);
+  }
+  for (const st of settlements) {
+    const row = rows.get(`${st.payeeType}|${st.payeeNo}|${st.period}`);
+    if (!row) continue;
+    if (st.status === "CONFIRMED" || st.status === "PAID") row.settled = round2(row.settled + Number(st.totalAmount));
+    if (st.status === "PAID") row.paid = round2(row.paid + Number(st.totalAmount));
+  }
+  const list = [...rows.values()].map((r) => ({ ...r, outstanding: round2(r.earned - r.paid) }))
+    .sort((a, b) => b.period.localeCompare(a.period) || a.payeeNo.localeCompare(b.payeeNo));
+  return paginate(list, q.page, q.size, (r) =>
+    (!q.payeeType || r.payeeType === q.payeeType) && (!q.payeeNo || r.payeeNo === q.payeeNo.trim())
+    && (!q.fromPeriod || r.period >= q.fromPeriod) && (!q.toPeriod || r.period <= q.toPeriod)
+    && (!q.onlyOutstanding || r.outstanding !== 0));
+};
+
+// 商家分成自开票（V183，C10）：后端在提现到账时出；mock 不预置，补出走 issueSelfBill，规则与后端一致
+export const selfBills: SelfBill[] = [];
+export const listSelfBills = (q: PageQuery & { agentNo?: string } = {}) =>
+  paginate([...selfBills].reverse(), q.page, q.size, (x) =>
+    (!q.agentNo || x.agentNo === q.agentNo) && kwHit(q.keyword, x.billNo, x.withdrawNo, x.supplierName));
+export const issueSelfBill = (withdrawNo: string) => {
+  const had = selfBills.find((b) => b.withdrawNo === withdrawNo);
+  if (had) return { ...had };
+  const w = withdrawals.find((x) => x.withdrawNo === withdrawNo);
+  if (!w) notFound("提现单", "Withdrawal", withdrawNo);
+  if (w!.status !== "PAID") fail(`提现单 ${withdrawNo} 尚未到账，不能出自开票`, `Withdrawal ${withdrawNo} has not been paid`);
+  const m = agents.find((a) => a.agentNo === w!.payeeNo);
+  if (!m?.vatTrn) fail(`商家 ${w!.payeeNo} 没有 VAT 税号，请先在商家档案补录`, `Merchant ${w!.payeeNo} has no VAT TRN`);
+  const { s, miss } = issuerMissing();
+  if (miss.length) fail(`平台开票主体缺 ${miss.join("、")}`, `Platform issuer is missing ${miss.join(", ")}`);
+  const b: SelfBill = {
+    billNo: `SB-2026-${String(selfBills.length + 1).padStart(6, "0")}`, withdrawNo, agentNo: w!.payeeNo,
+    supplierName: m!.name, supplierAddress: m!.address ?? null, supplierTrn: m!.vatTrn!,
+    recipientName: s!.issuerLegalName ?? null, recipientTrn: s!.trn, taxRatePercent: s!.ratePercent,
+    ...(({ netAmount, taxAmount, grossAmount }) => ({ netAmount, taxAmount, grossAmount }))(taxSplit(Number(w!.amount), s!.ratePercent)),
+    currency: w!.currency ?? "AED", payRef: w!.payRef ?? null, issuedAt: new Date().toISOString(),
+  };
+  selfBills.push(b);
+  return { ...b };
+};
+
+export const listTaxInvoices = (q: PageQuery & { orderNo?: string; kind?: string; status?: string } = {}) =>
+  paginate([...taxInvoices].reverse(), q.page, q.size, (x) =>
+    (!q.orderNo || x.orderNo === q.orderNo.trim()) && (!q.kind || x.kind === q.kind) && (!q.status || x.status === q.status));
+export const getTaxInvoice = (invoiceNo: string) => {
+  const t = taxInvoices.find((x) => x.invoiceNo === invoiceNo);
+  if (!t) notFound("税务发票", "Tax invoice", invoiceNo);
+  return t!;
+};
+/** 只有 BLOCKED 可重试；主体仍缺项 → 原样 BLOCKED 并更新原因（与后端一致：不报错，如实告诉缺什么）。 */
+export const retryTaxInvoice = (invoiceNo: string) => {
+  const t = getTaxInvoice(invoiceNo);
+  if (t.status !== "BLOCKED") fail("该票已开出，不能重试", "Invoice already issued");
+  const { s, miss } = issuerMissing();
+  Object.assign(t, {
+    issuerCountry: s?.country ?? null, issuerLegalName: s?.issuerLegalName ?? null, issuerAddress: s?.issuerAddress ?? null,
+    issuerTrn: s?.trn ?? null, issuerTitle: s?.invoiceTitle ?? null, taxRatePercent: s?.ratePercent ?? 0, taxIncluded: s?.includedInPrice ?? true,
+  });
+  if (miss.length) {
+    t.failReason = `ISSUER_MISSING:${miss.join(",")}`;
+  } else {
+    Object.assign(t, taxSplit(t.grossAmount, t.taxRatePercent), { status: "ISSUED", failReason: null, issuedAt: new Date().toISOString() });
+  }
+  return { ...t };
+};
 
 export type InvoiceQuery = PageQuery & { status?: string };
 export const listInvoices = (q: InvoiceQuery = {}) =>
@@ -1027,6 +1142,10 @@ export const payoutAccounts: PayoutAccount[] = [
     accountName: "Emaar Malls", accountMasked: "****9012", currency: "AED",
     isDefault: true, status: "ACTIVE" },
   // AG002 **故意没有账户** —— 代理门户「你还不能收款」那条路径要有数据能走到
+  // AG003 有账户：付款任务（V158）在 mock 下要有一个能付的商家，否则预览永远是 0 笔、整条流程走不下去
+  { accountNo: "PA004", payeeType: "AGENT", payeeNo: "AG003", bankCode: "ENBD",
+    accountName: "Deira Agent Trading LLC", accountMasked: "****5521", currency: "AED",
+    isDefault: true, status: "ACTIVE" },
 ];
 
 export function listPayoutAccounts(q: { page?: number; size?: number; keyword?: string; payeeType?: string; payeeNo?: string } = {}) {

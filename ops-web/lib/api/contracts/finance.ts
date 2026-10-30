@@ -1,12 +1,13 @@
 // 覆盖范围：分账规则与流水、总账、结算、提现审批、对账、发票、分润统计、充值订单。
-import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ, PayoutAccountQ, WithdrawalQ, AdjustmentQ } from "../query";
+import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ, TaxInvoiceQ, TaxInvoiceExportQ, SelfBillQ, PayableQ, ApprovalQ, ReportQ, PayoutAccountQ, WithdrawalQ, AdjustmentQ } from "../query";
 import type {
   PageResult, ShareRule, LedgerEntry, Settlement, SettlementDraft, Withdrawal,
-  ShareRecord, Reconcile, ReconAction, ReconDiff, ReconStats, Invoice, InvoiceView, ShareSummary, RechargeOrder,
+  ShareRecord, Reconcile, ReconAction, ReconDiff, ReconStats, Invoice, InvoiceView, TaxInvoice, SelfBill, PayableRow, ApprovalRequest, PendingApproval, ShareSummary, RechargeOrder,
 
   VoucherDetail,
   VoucherCreatePayload, PayoutAccount, PayReceiptPayload, WithdrawApplyPayload,
   SettlementView, Statement, StatementLang, Adjustment, AdjustmentConfirmPayload,
+  PayoutPreview, PayoutTask, PayoutTaskStatus, PayoutConfirmPayload,
 } from "../../types";
 
 export interface FinanceApi {
@@ -39,7 +40,8 @@ export interface FinanceApi {
    * 手工记账（补一张凭证）。**借贷必须相等**，服务端强制，页面绕不过去。
    * 只新增不修改：已过账凭证要更正就再记一张反向凭证 —— 直接改历史分录会让账实相符无从追溯。
    */
-  createVoucher(x: VoucherCreatePayload): Promise<LedgerEntry[]>;
+  /** 借方合计 ≥ approval.voucher.threshold 时不入账、返回 PendingApproval（SEC-03）；真后端入账返回 {voucherNo}。 */
+  createVoucher(x: VoucherCreatePayload): Promise<LedgerEntry[] | { voucherNo: string } | PendingApproval>;
   listSettlements(q?: SettlementQ): Promise<PageResult<Settlement>>;
   listWithdrawals(q?: WithdrawalQ): Promise<PageResult<Withdrawal>>;
   /** 提现审批：驳回必须带原因；auditorName 取当前登录用户（后端以会话为准，前端透传便于 mock）。 */
@@ -97,6 +99,28 @@ export interface FinanceApi {
   listInvoices(q?: InvoiceQ): Promise<PageResult<Invoice>>;
   /** 发票详情：发票 + 它由哪几笔订单开出来。列表里没有订单号清单。 */
   getInvoice(invoiceNo: string): Promise<InvoiceView>;
+  /** C 端租赁税务票据（V181）：系统自动开出，运营只看与重试。 */
+  listTaxInvoices(q?: TaxInvoiceQ): Promise<PageResult<TaxInvoice>>;
+  getTaxInvoice(invoiceNo: string): Promise<TaxInvoice>;
+  /** BLOCKED（开票主体不全）的票在补齐主体后重开。 */
+  retryTaxInvoice(invoiceNo: string): Promise<TaxInvoice>;
+  /** 登记表 xlsx / pdf，或 zip = 区间内已开出的票逐张 PDF 打包（K8 / RQ-INV-07~08）。 */
+  exportTaxInvoices(q: TaxInvoiceExportQ): Promise<void>;
+  /** 单张票 PDF（RQ-INV-06）；BLOCKED 的票后端 409。 */
+  downloadTaxInvoicePdf(invoiceNo: string): Promise<void>;
+  /** 商家分成自开票（V183，C10）：到账自动出；补出 = 对一笔已到账提现补一张（已出过原样返回）。 */
+  listSelfBills(q?: SelfBillQ): Promise<PageResult<SelfBill>>;
+  /** 跨期应付（SHR-05）：收款方 × 期间 的应得 / 已出结算单 / 已付 / 未付。 */
+  listPayables(q?: PayableQ): Promise<PageResult<PayableRow>>;
+  /** 资金操作审批（SEC-03）：补偿 / 免单归财务审，凭证由另一位记账人审；申请人不能批自己的。 */
+  listApprovals(q?: ApprovalQ): Promise<PageResult<ApprovalRequest>>;
+  approveApproval(requestNo: string): Promise<ApprovalRequest>;
+  rejectApproval(requestNo: string, note: string): Promise<ApprovalRequest>;
+  issueSelfBill(withdrawNo: string): Promise<SelfBill>;
+  downloadSelfBillPdf(billNo: string): Promise<void>;
+  /** 商家门户：本商家的自开票（商家号只取会话），与下载。 */
+  listMySelfBills(q?: PageQ): Promise<PageResult<SelfBill>>;
+  downloadMySelfBillPdf(billNo: string): Promise<void>;
   saveShareRule(x: Partial<ShareRule> & { ruleNo?: string }): Promise<ShareRule>;
   /** 登记/编辑发票草稿。开具后（ISSUED/VOID）抬头与金额由服务端拒绝修改。 */
   saveInvoice(x: Partial<Invoice> & { invoiceNo?: string }): Promise<Invoice>;
@@ -135,4 +159,17 @@ export interface FinanceApi {
   /** 分润统计：dimension 是维度切换器的参数——一张表两种主体，不是两个接口。 */
   listShareSummaries(q?: ShareSummaryQ): Promise<PageResult<ShareSummary>>;
   listRechargeOrders(q?: RechargeQ): Promise<PageResult<RechargeOrder>>;
+
+  // === 付款任务（V158，商家一期 B4）===
+  /** 预览：只读，不占结算单。 */
+  previewPayoutTask(cutoffDate: string): Promise<PayoutPreview>;
+  /** 生成：只传截止日，金额由服务端按结算单重算。 */
+  createPayoutTask(cutoffDate: string): Promise<PayoutTask>;
+  listPayoutTasks(q?: PageQ & { status?: PayoutTaskStatus }): Promise<PageResult<PayoutTask>>;
+  getPayoutTask(taskNo: string): Promise<PayoutTask>;
+  /** 复核：复核人不得是发起人；驳回必填原因，整任务撤回。 */
+  auditPayoutTask(taskNo: string, approve: boolean, rejectReason?: string): Promise<PayoutTask>;
+  /** 转账文件（CSV 文本，含完整 IBAN）。非信封端点，由页面包成文件下载。 */
+  exportPayoutTask(taskNo: string): Promise<string>;
+  confirmPayoutTask(taskNo: string, body: PayoutConfirmPayload): Promise<PayoutTask>;
 }

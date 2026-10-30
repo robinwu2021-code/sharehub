@@ -167,6 +167,8 @@ export interface Site extends Archivable {
   opsEmployeeNo?: string | null;
   /** 运营信息。列表不返回（只详情给），故可空。 */
   ops?: SiteOps | null;
+  /** 站点的默认点位（建站时自动建，4a508d8b · V162）。绑定不选点位时落在这里。 */
+  defaultLocationNo?: string | null;
 }
 
 /**
@@ -194,6 +196,13 @@ export interface SitePoint extends Archivable {
   spotDesc: string;
   cabinetCount: number;
   status: "ACTIVE" | "PAUSED";
+  /**
+   * 站点的默认点位：建站时同事务自动建，每站至多一个（技术设计 §2.3）。
+   * 绑定设备时不选点位就落到出库单商家默认站点的这一个。
+   */
+  isDefault?: boolean;
+  /** 归属商家：由所属站点派生（只读）；空 = 平台直营站点。 */
+  agentNo?: string | null;
 }
 /**
  * 场地方行业（SSOT）。与后端 `loc.VenueIndustry`、`loc_venue.industry` 列注释三方同名同值。
@@ -301,6 +310,13 @@ export type ContractAuditStage = "OPS" | "FINANCE";
 export type ContractTerminationStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 /** 合同条款（后端 `ContractTerms`）。与流程信息分开，避免 Contract 平铺二十个字段。 */
+/**
+ * 合同保存入参：后端写入面是**平铺**的（`ContractReq`：venueNo、siteNo、shareMode、shareBase、
+ * guaranteeAmount、currency、settlePeriod……），读出参的条款却嵌在 `terms` 里。
+ * 表单按写入面平铺填，编辑时把详情的 `terms` 摊平进来；嵌套的 terms / flow 不随保存发出。
+ */
+export type ContractSaveReq = Partial<Omit<Contract, "terms" | "flow">> & Partial<ContractTerms> & { contractNo?: string };
+
 export interface ContractTerms {
   shareMode: ContractShareMode | null;
   shareBase: ContractShareBase | null;

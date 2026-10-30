@@ -19,6 +19,7 @@ import java.util.List;
 /**
  * 代理端实名登录实现。设计理由（含「为什么接口在 platform」）见 {@link AgentIdentityPort} 的类注释。
  */
+@lombok.extern.slf4j.Slf4j
 @Service
 public class AgentLoginServiceImpl implements AgentIdentityPort {
 
@@ -26,7 +27,7 @@ public class AgentLoginServiceImpl implements AgentIdentityPort {
      * 统一的失败文案。**「号不存在」和「码不对」必须说同一句话** ——
      * 一旦分开，这个接口就能被用来批量判断某个手机号是不是本平台代理商。
      */
-    private static final String LOGIN_FAILED = "手机号或验证码不正确";
+    private static final String LOGIN_FAILED = "账号或验证码不正确";
 
     private final AgtPrincipalMapper principalMapper;
     private final AgtAccountMapper accountMapper;
@@ -44,38 +45,51 @@ public class AgentLoginServiceImpl implements AgentIdentityPort {
         this.otpGate = otpGate;
     }
 
+    /**
+     * 发登录验证码。标识是**一个**字段：含 {@code @} 走邮箱（主登录方式，R1），否则走手机号（R8）。
+     *
+     * <p>手机号不要求先验证（用户 2026-10-28 裁决：运营代录的手机号也可以登录）。
+     * 已验证的号优先认人，见 {@link #resolve}。
+     */
     @Override
-    public String sendLoginOtp(String rawPhone) {
-        String phone = normalizer.phone(rawPhone);
-        AgtPrincipal p = findByPhone(phone);
+    public String sendLoginOtp(String identifier) {
+        Target t = resolve(identifier);
         /*
          * 查无此人 → 静默返回，**不抛错**。
          * 抛错的话，调用方从「报错 vs 成功」就能读出这个号在不在库里 ——
-         * 批量跑一遍就是一份代理商手机号名单。宁可让输错号的人等一条永远不到的短信。
+         * 批量跑一遍就是一份商家邮箱 / 手机号名单。宁可让输错号的人等一条永远不到的码。
          */
-        if (p == null || !AccountStatus.ACTIVE.name().equals(p.getStatus())) {
+        if (t == null) return null;
+        try {
+            return t.email() != null ? otpGate.issueEmail(t.email()) : otpGate.issue(t.phone());
+        } catch (IllegalStateException throttled) {
+            /*
+             * 重发太频繁 / 当日已达上限：**同样静默**（需求方案 §四：号码不存在、验证码错误、超频对外提示一致）。
+             * 只有存在的账号才会被限流，回 429 就等于告诉对方「这个号是商家」。代价是被限的人收不到码，
+             * 但他本来就该等。
+             */
+            log.info("商家登录发码被限流，静默返回 principalNo={}", t.principal().getPrincipalNo());
             return null;
         }
-        return otpGate.issue(phone);
     }
 
     @Override
-    public String verifyLoginOtp(String rawPhone, String otp) {
+    public String verifyLoginOtp(String identifier, String otp) {
         if (otp == null || otp.isBlank()) {
             throw new IllegalArgumentException(LOGIN_FAILED);
         }
-        String phone = normalizer.phone(rawPhone);
-        AgtPrincipal p = findByPhone(phone);
-        if (p == null || !AccountStatus.ACTIVE.name().equals(p.getStatus())) {
+        Target t = resolve(identifier);
+        if (t == null) {
             /*
-             * 即使人不存在也**不能直接返回** —— 要先让它走一遍和真实路径一样的失败，
-             * 否则「秒失败 vs 验完码再失败」的耗时差同样能区分出号存不存在。
-             * 这里直接抛同一句文案；OTP 本身的节流由 OtpGate 负责。
+             * 即使人不存在也**不能直接返回别的话** —— 要和真实路径的失败说同一句，
+             * 否则「号不存在 vs 码不对」两句话本身就能区分出号存不存在。
+             * OTP 本身的节流由 OtpGate 负责。
              */
             throw new IllegalArgumentException(LOGIN_FAILED);
         }
         try {
-            otpGate.verify(phone, otp);
+            if (t.email() != null) otpGate.verifyEmail(t.email(), otp);
+            else otpGate.verify(t.phone(), otp);
         } catch (IllegalArgumentException | BizException e) {
             /*
              * **必须同时接 BizException**：2026-09-25 的 i18n 批次把 OtpService 的
@@ -89,7 +103,79 @@ public class AgentLoginServiceImpl implements AgentIdentityPort {
              */
             throw new IllegalArgumentException(LOGIN_FAILED);
         }
+        AgtPrincipal p = t.principal();
+        // 首登即验证（R4）：能收到这封邮件的人就是这个邮箱的主人。之后这个邮箱才占唯一。
+        if (t.email() != null && !Integer.valueOf(1).equals(p.getEmailVerified())) {
+            p.setEmailVerified(1);
+            principalMapper.updateById(p);
+        }
+        // 手机号同理：收到短信码就证明了号码归属。号已被别人验证过时不抢（phone_uk 唯一），保持未验证
+        if (t.phone() != null && !Integer.valueOf(1).equals(p.getPhoneVerified())
+                && principalMapper.selectCount(new LambdaQueryWrapper<AgtPrincipal>()
+                        .eq(AgtPrincipal::getPhoneUk, hasher.hash(t.phone()))) == 0) {
+            p.setPhoneVerified(1);
+            principalMapper.updateById(p);
+        }
         return p.getPrincipalNo();
+    }
+
+    @Override
+    public String resolvePrincipal(String identifier) {
+        Target t = resolve(identifier);
+        return t == null ? null : t.principal().getPrincipalNo();
+    }
+
+    /** 一次登录要找的人：邮箱登录时 {@code email} 非空，手机号登录时 {@code phone} 非空。 */
+    private record Target(AgtPrincipal principal, String email, String phone) {
+    }
+
+    /** 标识 → 可登录的自然人；查不到、停用、格式不对一律 null（不区分，见上）。 */
+    private Target resolve(String identifier) {
+        if (identifier == null || identifier.isBlank()) return null;
+        try {
+            if (IdentifierNormalizer.looksLikeEmail(identifier)) {
+                String email = IdentifierNormalizer.email(identifier);
+                AgtPrincipal p = findByEmail(email);
+                return active(p) ? new Target(p, email, null) : null;
+            }
+            // 用户 2026-10-28：运营代录的手机号也可以登录（不要求先验证）。已验证的那一个优先，
+            // 否则取最早建的 —— 与邮箱同一口径
+            String phone = normalizer.phone(identifier);
+            String h = hasher.hash(phone);
+            AgtPrincipal p = principalMapper.selectOne(new LambdaQueryWrapper<AgtPrincipal>()
+                    .eq(AgtPrincipal::getPhoneUk, h).last("limit 1"));
+            if (p == null) {
+                p = principalMapper.selectOne(new LambdaQueryWrapper<AgtPrincipal>()
+                        .eq(AgtPrincipal::getPhoneHash, h).orderByAsc(AgtPrincipal::getId).last("limit 1"));
+            }
+            return active(p) ? new Target(p, null, phone) : null;
+        } catch (IllegalArgumentException malformed) {
+            return null;
+        }
+    }
+
+    /**
+     * 邮箱 → 自然人。已验证的那一个优先（唯一）；没有已验证的，取最早建的那个未验证行。
+     *
+     * <p>同一邮箱出现多个未验证自然人，只可能是运营在不同商家上录了同一个邮箱 —— 而开通时按邮箱命中已有的人会复用
+     * （需求方案 §五「开通产物」），所以正常路径下不会有第二行。真出现时取最早的，并留 WARN 让运营核对。
+     */
+    private AgtPrincipal findByEmail(String normalizedEmail) {
+        String h = hasher.hash(normalizedEmail);
+        AgtPrincipal verified = principalMapper.selectOne(new LambdaQueryWrapper<AgtPrincipal>()
+                .eq(AgtPrincipal::getEmailUk, h).last("limit 1"));
+        if (verified != null) return verified;
+        List<AgtPrincipal> rows = principalMapper.selectList(new LambdaQueryWrapper<AgtPrincipal>()
+                .eq(AgtPrincipal::getEmailHash, h).orderByAsc(AgtPrincipal::getId).last("limit 2"));
+        if (rows.size() > 1) {
+            log.warn("同一未验证邮箱挂在多个自然人上，登录取最早的 principalNo={}；请运营在商家档案核对邮箱是否录错",
+                    rows.get(0).getPrincipalNo());
+        }
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    private static boolean active(AgtPrincipal p) {
+        return p != null && AccountStatus.ACTIVE.name().equals(p.getStatus());
     }
 
     @Override
@@ -127,12 +213,6 @@ public class AgentLoginServiceImpl implements AgentIdentityPort {
                 .findFirst()
                 // 不说「该主体不存在」，说「你不属于它」—— 前者会泄露别家主体编号的存在性
                 .orElseThrow(() -> new IllegalArgumentException("你不属于该运营主体，无法切换"));
-    }
-
-    private AgtPrincipal findByPhone(String normalizedPhone) {
-        return principalMapper.selectOne(new LambdaQueryWrapper<AgtPrincipal>()
-                .eq(AgtPrincipal::getPhoneHash, hasher.hash(normalizedPhone))
-                .last("limit 1"));
     }
 
     private static OperatorMembership toVO(AgtAccount a) {

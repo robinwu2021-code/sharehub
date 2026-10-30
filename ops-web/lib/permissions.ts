@@ -24,13 +24,15 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
   ],
   // 运维：设备、工单、巡检、OTA、系统参数。
   OPS: [
+    // 设备质检（V186，矩阵 Q2）；device:inventory:* 暂留（Q1 过渡）
+    "device:qc:inspect",
     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
     "flow:todo:read", "flow:approval:read", "flow:approval:submit", "flow:approval:decide", "flow:queue:claim", "flow:ticket:read", "flow:ticket:handle", "flow:ticket:dispatch", "flow:config:manage",
     "dashboard:overview:read", "dashboard:todo:read", "device:cabinet:*", "device:slot:read",
     "device:powerbank:*", "device:command:*", "device:inventory:*", "device:ota:*",
-    "device:vendor:read", "location:poi:read", "location:venue:read", "location:overview:read",
+    "device:vendor:read", "location:poi:read", "location:venue:read", "location:overview:read", "location:contract:read",
     "order:order:read", "order:exception:read", "order:exception:handle", "workorder:*",
-    "agent:scope:assign", "report:device:read", "report:location:read",
+    "agent:scope:assign", "report:device:read", "report:location:read", "report:inventory:read",
     "system:notify_template:read", "system:dict:read", "system:notify_log:read",
     "system:app_version:read", "system:market:read", "system:param:read",
   ],
@@ -55,6 +57,8 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
   ],
   // 财务：计价、分润、结算、提现、银行字典、税率、支付渠道。
   FINANCE: [
+    // 库存只读（V186，矩阵 Q4）
+    "device:inventory:read",
     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
     "flow:todo:read", "flow:approval:read", "flow:approval:submit", "flow:approval:decide",
     // 押金解冻/买断与欠费催缴（真源表 §4）：动钱的归财务。
@@ -84,6 +88,8 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
   ],
   // 只读。
   VIEWER: [
+    // 库存 / 充电宝 / 台账导出只读（V186）
+    "device:inventory:read", "device:powerbank:read", "device:cabinet:export",
     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
     "flow:approval:read", "flow:ticket:read",
     "dashboard:overview:read", "dashboard:todo:read", "device:cabinet:read", "device:slot:read",
@@ -92,12 +98,24 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
     "finance:settlement:read", "finance:withdrawal:read", "agent:agent:read", "report:*",
   ],
   // 代理商：**强制数据范围 = 自己的主体**，看到什么由数据范围再收一道。
+  // 仓管（V186，矩阵 Q3）：到货质检、发货、盘点录入、期初导入；入库 / 签收 / 复核等码随 S4 端点补
+  WAREHOUSE: [
+    "dashboard:overview:read", "dashboard:todo:read",
+    "device:cabinet:read", "device:cabinet:import", "device:slot:read", "device:powerbank:read",
+    "device:qc:inspect",
+    "device:inventory:read", "device:inventory:inbound", "device:inventory:transfer", "device:inventory:stocktake",
+    // 库存报表（V206）
+    "report:inventory:read",
+  ],
   AGENT: [
     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
     "flow:todo:read", "flow:ticket:read", "flow:ticket:handle",
     "dashboard:overview:read", "device:cabinet:read", "device:slot:read", "workorder:wo:create",
     "workorder:wo:read", "order:order:read", "finance:share_record:read",
-    "finance:withdrawal:apply", "agent:settlement:read", "location:poi:read", "finance:payout_account:read",
+    // 一期提现 = 平台按付款任务主动付款（需求方案 D8），商家只看提现记录 —— 与后端 RolePerms 同步
+    "finance:withdrawal:read", "agent:settlement:read", "location:poi:read", "finance:payout_account:read",
+    // 商家资料（V175）：只作用于自己（/api/agent/me/**），不是 agent:agent:read
+    "agent:profile:read", "agent:profile:update",
   ],
 };
 
@@ -217,4 +235,5 @@ export const ROLE_LABEL: Record<Role, string> = {
   BD: "拓展",
   VIEWER: "只读",
   AGENT: "代理商",
+  WAREHOUSE: "仓管",
 };

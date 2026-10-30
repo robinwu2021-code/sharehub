@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { sysParams } from "./system";
 import * as ss from "./site-status";
 import { pauseSite, resumeSite } from "./operation";
 import { sites, contracts, locations } from "./location";
@@ -78,7 +79,13 @@ describe("站点状态机", () => {
   });
 });
 
+const setVenueGate = (v: string) => { sysParams.find((p) => p.paramKey === "site.venue_gate.enabled")!.value = v; };
+
 describe("开业清单", () => {
+  // 验的是合同 / 勘测门禁强制时的规则；一期默认跳过（V174），这里显式打开、跑完还原
+  beforeEach(() => setVenueGate("1"));
+  afterEach(() => setVenueGate("0"));
+
   it("★ 五条都真查数据——空站点应该全不通过（写死 true 的清单永远全绿）", () => {
     const c = ss.siteOpeningChecklist(no);
     expect(c.allPassed).toBe(false);
@@ -146,5 +153,16 @@ describe("摘要条", () => {
     const after = ss.siteSummary();
     expect(after.missingOwner).toBe(before.missingOwner - 1);
     expect(after.missingOpenHours).toBe(before.missingOpenHours - 1);
+  });
+});
+
+describe("一期跳过合同 / 勘测（V174 site.venue_gate.enabled=0）", () => {
+  it("空站点的合同、勘测两项照列、判通过、写明一期跳过；其它项照常查", () => {
+    setVenueGate("0");
+    const c = ss.siteOpeningChecklist(no);
+    for (const key of ["contract", "survey"]) {
+      expect(c.items.find((i) => i.key === key)).toMatchObject({ passed: true, detail: expect.stringContaining("一期跳过") });
+    }
+    expect(c.items.filter((i) => !i.passed).map((i) => i.key).sort()).toEqual(["openHours", "owner", "point"]);
   });
 });

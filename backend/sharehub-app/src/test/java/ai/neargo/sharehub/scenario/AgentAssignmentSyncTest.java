@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.scenario;
 
+import ai.neargo.sharehub.support.MerchantCoreProfile;
 import ai.neargo.sharehub.support.ApiTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.AfterEach;
@@ -20,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @see ai.neargo.sharehub.agent.ext.AgentOwnershipSync
  */
+@MerchantCoreProfile({"AG006"})
 class AgentAssignmentSyncTest extends ApiTestSupport {
 
     /** 测试站点：初始为平台直营（{@code agent_no IS NULL}），下挂 3 点位 / 7 机柜。 */

@@ -31,6 +31,7 @@ import java.util.function.Function;
  * 支付编排实现。**业务代码只依赖 {@link PaymentPort} 接口**，永远不 new 具体实现，
  * 也不在这里出现任何渠道密钥（ADR-005：明文在 KMS/vault）。
  */
+@lombok.extern.slf4j.Slf4j
 @Service
 public class PaymentServiceImpl implements PaymentService {
 
@@ -42,8 +43,14 @@ public class PaymentServiceImpl implements PaymentService {
     private final PayRefundMapper refundMapper;
     private final PaymentPort port;
 
+    /** 支付方式（第 5 批，运营方原文 PAY-01）：调用方没指明渠道时的缺省，系统参数 pay.default_channel。 */
+    private final ai.neargo.sharehub.api.platform.port.SysParamPort params;
+    static final String KEY_DEFAULT_CHANNEL = "pay.default_channel";
+
     public PaymentServiceImpl(PayOrderMapper payMapper, PayAuthMapper authMapper,
-                              PayRefundMapper refundMapper, PaymentPort port) {
+                              PayRefundMapper refundMapper, PaymentPort port,
+                              ai.neargo.sharehub.api.platform.port.SysParamPort params) {
+        this.params = params;
         this.payMapper = payMapper;
         this.authMapper = authMapper;
         this.refundMapper = refundMapper;
@@ -57,6 +64,22 @@ public class PaymentServiceImpl implements PaymentService {
         require(orderNo, "orderNo");
         require(type, "type");
         requirePositive(amount, "amount");
+        // 此前结算请款一律传 null，pay_order.channel_code 全是空 —— 运营看不出钱从哪个渠道收的（PAY-01）
+        if (channelCode == null || channelCode.isBlank()) channelCode = params.textOf(KEY_DEFAULT_CHANNEL, "NEARPAY");
+
+        /*
+         * 幂等（V179，D2 / D3）：同一键已经请过款就返回那一单，不再请第二次。
+         * 先查是为了正常重放时给出原结果；真正的并发由唯一键 uk_pay_order_idem 兜底 ——
+         * 两个请求同时查不到、同时插入时，后插的那个撞键，事务回滚，钱只请一次。
+         */
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            PayOrder seen = payMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PayOrder>()
+                    .eq(PayOrder::getTenantId, TENANT_MAIN).eq(PayOrder::getIdempotencyKey, idempotencyKey).last("limit 1"));
+            if (seen != null) {
+                log.info("重复请款，返回首单 payNo={} orderNo={}", seen.getPayNo(), orderNo);
+                return toVO(seen);
+            }
+        }
 
         PayOrder e = new PayOrder();
         e.setTenantId(TENANT_MAIN);
@@ -68,7 +91,8 @@ public class PaymentServiceImpl implements PaymentService {
         e.setCurrency(currency == null || currency.isBlank() ? "AED" : currency);
         e.setChannelCode(channelCode);
         e.setStatus(PayOrderStatus.INIT.name());
-        payMapper.insert(e);
+        e.setIdempotencyKey(idempotencyKey == null || idempotencyKey.isBlank() ? null : idempotencyKey);
+        payMapper.insert(e);   // 并发撞 uk_pay_order_idem → DuplicateKeyException，在调通道之前就失败
 
         PaymentPort.PayResult r = port.pay(new PaymentPort.PayRequest(
                 e.getPayNo(), orderNo, cUserNo, type, e.getAmount(), e.getCurrency(), channelCode, idempotencyKey));

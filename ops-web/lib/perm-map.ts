@@ -81,6 +81,9 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "agent:performance:read": "agent:performance:read",
   "agent:scope:assign": "agent:scope:assign",
   "agent:settlement:read": "agent:settlement:read",
+  // 商家资料（V175）：只作用于自己（/api/agent/me/**）
+  "agent:profile:read": "agent:profile:read",
+  "agent:profile:update": "agent:profile:update",
   "agent:share:config": "agent:share:config",
   // ——— cs ———
   "cs:session:read": "cs:session:read",
@@ -101,6 +104,10 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "device:command:send": "device:command:send",
   "device:inventory:read": "device:inventory:read",
   "device:inventory:stocktake": "device:inventory:stocktake",
+  "device:inventory:diff": "device:inventory:diff",
+  "device:inventory:inbound": "device:inventory:inbound", // V192：到货登记 / 入库 / 不合格处置   // V186：资产差异处置（原借 :transfer）
+  "device:inventory:warehouse": "device:inventory:warehouse", // V201：仓库 / 供应商 新建编辑归档
+  "device:qc:inspect": "device:qc:inspect",           // V186：质检（原借 cabinet / powerbank :update）
   "device:inventory:transfer": "device:inventory:transfer",
   "device:inventory:update": "device:inventory:transfer",   // 翻译：界面守的是调拨单新建/编辑 → POST /api/ops/inventory-transfers（后端无 :update 这个码）
   "device:ota:manage": "device:ota:manage",   // ⚠️ D6d：后端无角色持有 → 除 ADMIN 外必 403
@@ -134,6 +141,9 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "finance:share_rule:update": "finance:share_rule:update",
   "finance:withdrawal:apply": "finance:withdrawal:apply",
   "finance:withdrawal:audit": "finance:withdrawal:audit",
+  // 付款任务（V158）：生成与导出各自一码 —— 导出文件含完整 IBAN，只给少数人
+  "finance:withdrawal:create": "finance:withdrawal:create",
+  "finance:withdrawal:export": "finance:withdrawal:export",
   // 打款回执，与 :audit 分码（功能权限清单 §6）——「同意打出去」与「确实出去了」是两次动作
   "finance:withdrawal:pay": "finance:withdrawal:pay",
   "finance:withdrawal:read": "finance:withdrawal:read",
@@ -224,6 +234,7 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "report:custom:read": "report:custom:read",
   "report:device:export": "report:device:export",
   "report:device:read": "report:device:read",
+  "report:inventory:read": "report:inventory:read", // V206：库存报表
   "report:finance:export": "report:finance:export",
   "report:finance:read": "report:finance:read",
   "report:location:export": "report:location:export",

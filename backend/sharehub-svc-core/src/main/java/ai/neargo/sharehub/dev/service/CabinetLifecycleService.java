@@ -27,6 +27,9 @@ public interface CabinetLifecycleService {
     /** 调拨签收（C4）：IN_TRANSIT → IN_STOCK，回写所在仓。 */
     void receive(String cabinetNo, String warehouseNo);
 
+    /** 撤机回仓签收：IN_TRANSIT → IN_STOCK，离开出库池但不进仓，质检打回待检 —— 由到仓待检单复检后入库。 */
+    void receiveForInspection(String cabinetNo);
+
     /** 装机工单完工后（C5）：在库且门禁全过即自动上线；返回是否上线。不过则保持在库，门禁由人看。 */
     boolean goLiveIfReady(String cabinetNo, String cause);
 

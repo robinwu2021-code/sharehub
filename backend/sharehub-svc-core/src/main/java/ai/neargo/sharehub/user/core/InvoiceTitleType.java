@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.user.core;
 
+import ai.neargo.sharehub.common.BizException;
+
 /**
  * 发票抬头类型（{@code usr_invoice_title.type}，DDL 注释 {@code 'PERSONAL/COMPANY'}）。
  *
@@ -15,13 +17,13 @@ public enum InvoiceTitleType {
     /** 企业抬头：税号必填。 */
     COMPANY;
 
-    /** 宽松解析：非法值抛 {@link IllegalArgumentException}（全局映射 400）。 */
+    /** 宽松解析：非法值抛 {@link BizException}（400，文案走 i18n key —— 中文字面量会原样送到英文 / 阿语界面）。 */
     public static InvoiceTitleType of(String v) {
-        if (v == null || v.isBlank()) throw new IllegalArgumentException("抬头类型必填");
+        if (v == null || v.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "titleType");
         try {
             return valueOf(v.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("抬头类型非法: " + v + "（仅 PERSONAL/COMPANY）");
+            throw BizException.badRequest("error.common.invalid_value", v + " (PERSONAL/COMPANY)");
         }
     }
 }

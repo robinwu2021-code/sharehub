@@ -55,7 +55,8 @@ export interface QcTarget {
 }
 
 /** 质检抽屉。`target` 为 null 时关闭。 */
-export function QcDrawer({ target, onClose }: { target: QcTarget | null; onClose: () => void }) {
+/** intakeNo：在到仓待检里质检时传入，结论写回待检明细（V192）；不传则是设备详情里的单台质检。 */
+export function QcDrawer({ target, onClose, intakeNo }: { target: QcTarget | null; onClose: () => void; intakeNo?: string }) {
   const qc = useQueryClient();
   const [form, setForm] = useState<Record<string, unknown>>({});
   useEffect(() => {
@@ -71,12 +72,22 @@ export function QcDrawer({ target, onClose }: { target: QcTarget | null; onClose
         result: form.result === "FAILED" ? "FAILED" : null,
         note: String(form.note ?? "").trim() || null,
       };
-      return t.itemType === "CABINET" ? api.inspectCabinet(t.itemNo, req) : api.inspectPowerbank(t.itemNo, req);
+      if (intakeNo) {
+        return api.inspectIntakeItem(intakeNo, t.itemType, t.itemNo, req).then((d) => ({
+          itemNo: t.itemNo, result: d.items.find((i) => i.itemType === t.itemType && i.itemNo === t.itemNo)?.qcResult,
+        }));
+      }
+      return (t.itemType === "CABINET" ? api.inspectCabinet(t.itemNo, req) : api.inspectPowerbank(t.itemNo, req))
+        .then((r) => ({ itemNo: r.itemNo, result: r.result }));
     },
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ["qc-records", r.itemNo] });
       qc.invalidateQueries({ queryKey: ["go-live-gate", r.itemNo] });
       qc.invalidateQueries({ queryKey: ["devices"] });
+      if (intakeNo) {
+        qc.invalidateQueries({ queryKey: ["intake", intakeNo] });
+        qc.invalidateQueries({ queryKey: ["intakes"] });
+      }
       if (r.result === "PASSED") notify.success(`${r.itemNo} 质检通过，可以发货调拨 / 上线`);
       else notify.info(`${r.itemNo} 已判质检不通过：不能发货调拨、也不能上线`);
       onClose();
@@ -99,6 +110,18 @@ export function QcDrawer({ target, onClose }: { target: QcTarget | null; onClose
   );
 }
 
+/** 阈值快照 → 短文本；老记录没有快照显示「-」。 */
+function ruleText(json: string | null): string {
+  if (!json) return "-";
+  try {
+    const r = JSON.parse(json) as { minBattery?: number; maxCycles?: number; powerOn?: boolean; slotsOk?: boolean };
+    if (r.minBattery != null) return `电量 ≥ ${r.minBattery}% · 循环 ≤ ${r.maxCycles}`;
+    return "通电 · 仓位 必过";
+  } catch {
+    return "-";
+  }
+}
+
 const cols: Column<QcRecord>[] = [
   { header: "质检单号", cell: (r) => <span className="tabular-nums">{r.qcNo}</span> },
   { header: "结论", cell: (r) => <StatusBadge map={QC_STATUS} value={r.result} /> },
@@ -112,6 +135,7 @@ const cols: Column<QcRecord>[] = [
       </span>
     ),
   },
+  { header: "判定规则", cell: (r) => <span className="txt-caption text-muted-foreground">{ruleText(r.ruleSnapshot)}</span> },
   { header: "备注", cell: (r) => <span className="txt-caption">{r.note ?? "-"}</span> },
   { header: "质检人", cell: (r) => <span className="text-muted-foreground">{r.inspectedBy}</span> },
   { header: "时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.inspectedAt)}</span> },

@@ -11,6 +11,8 @@ import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { QuickActions } from "@/components/quick-actions";
 import { AlarmTodoPanel } from "@/components/dashboard/alarm-todo-panel";
 import { OpsFlowMetricsPanel } from "@/components/dashboard/ops-flow-metrics";
+import { MerchantRevenueHome } from "@/components/dashboard/merchant-revenue-home";
+import { useAuth } from "@/lib/auth";
 import { money } from "@/lib/utils";
 import { usePortalTitle } from "@/lib/hooks/use-portal-title";
 import type { DashboardAlert } from "@/lib/types";
@@ -24,6 +26,23 @@ const ALERT_TYPE: StatusMap<DashboardAlert["type"]> = {
 };
 
 export default function DashboardPage() {
+  // 商家门户的首页就是营收（商家一期 B5，需求方案 §10.2）：看板那套「今日 GMV / 在线率 / 待审提现」
+  // 是运营的问题，不是商家的。分支放在取数之前，商家会话不再拉一份用不上的运营看板。
+  const role = useAuth((s) => s.role);
+  return role === "AGENT" ? <MerchantHome /> : <OpsDashboard />;
+}
+
+function MerchantHome() {
+  const portalTitle = usePortalTitle(null, true);
+  return (
+    <div>
+      <PageTitle title={portalTitle ?? "营收概览"} desc="交易额、分成与钱的状态" />
+      <MerchantRevenueHome />
+    </div>
+  );
+}
+
+function OpsDashboard() {
   const { data, isLoading } = useQuery({ queryKey: ["dashboard"], queryFn: () => api.getDashboard() });
   // 拍板 #5：AGENT 门户下标题换「我的看板」（本页无 tab 概念，恒视为默认位）
   const portalTitle = usePortalTitle(null, true);
@@ -106,7 +125,7 @@ export default function DashboardPage() {
                 </Card>
               </Link>
             )}
-            <Link href="/finance?tab=withdrawals">
+            <Link href="/settlement?tab=withdrawals">
               <Card className="hover:border-primary/50 transition-colors cursor-pointer">
                 <CardContent className="pt-5">
                   <p className="text-muted-foreground text-sm">待审提现</p>

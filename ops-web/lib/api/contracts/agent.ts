@@ -1,7 +1,7 @@
 // 覆盖范围：代理商主档、区域分配、业绩、资金账户、分润规则。
 import type { PageQ, ArchiveQ, AssignmentRecordQ, AssignableAssetQ , ReportQ, ApplyQ } from "../query";
 import type {
-  PageResult, Agent, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission, GrantLoginResult,
+  PageResult, Agent, MerchantProfile, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission, GrantLoginResult,
   AgentAssignmentRecord, AssignableAsset, AssignAssetsPayload, ReclaimAssetsPayload,
   AgentApply, ApplyStatus, OperatorType, MyApplyView,
   AgentExit, AgentOpsAssessment, Checklist,
@@ -48,6 +48,11 @@ export interface AgentApi {
    *
    * 驳回必须带原因 —— 它会原样回显给申请人。
    */
+  /**
+   * 重发开通邀请（`agent:apply:approve`）：作废旧口令、发新的一次性口令（首登强制改）并重寄邀请邮件。
+   * 口令只在这次响应里出现。
+   */
+  resendAgentInvite(agentNo: string): Promise<{ agentNo: string; initialPassword: string }>;
   auditAgentApply(x: {
     applyNo: string; approve: boolean; rejectReason?: string;
     shareRate?: number; regionScope?: string; operatorName?: string;
@@ -60,7 +65,8 @@ export interface AgentApi {
    * 合成一个的话「能录入」就等于「能放行」，四眼原则以后没有落脚点。
    */
   createAgentApply(x: {
-    phone: string; email: string; operatorName: string; operatorType: OperatorType;
+    /** 选填（商家一期 B2）：邮箱是主登录标识；不填手机号的商家只能用邮箱登录。 */
+    phone?: string; email: string; operatorName: string; operatorType: OperatorType;
     /**
      * 业务联系人姓名，可选。**联系电话/邮箱不单独收** —— 默认就是上面
      * `phone`/`email` 的明文，不让人把同一个号填两遍（运营可在代理商档案里改）。
@@ -105,6 +111,11 @@ export interface AgentApi {
   getAgentAccount(accountNo: string): Promise<AgentAccount>;
   /** 分润规则详情（权限码 `agent:share:config`）。 */
   getAgentCommission(ruleNo: string): Promise<AgentCommission>;
+
+  // === 商家门户：商家资料（V175，agent:profile:*，商家号取自会话）===
+  getMyProfile(): Promise<MerchantProfile>;
+  /** 只改联系人（姓名、电话、邮箱）；不影响登录方式。 */
+  updateMyContact(x: { contactName: string; phone?: string; email?: string }): Promise<MerchantProfile>;
 
   // === 代理清退（运营核心流程 F3）===
   /**

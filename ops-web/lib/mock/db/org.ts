@@ -65,6 +65,7 @@ export const roles: RoleRow[] = [
   { roleNo: "R5", code: "BD", name: "拓展", permCount: 0, memberCount: 5, builtin: true, dataScope: "REGION", scopeRefs: "DU-MAR,DU-DEI,DU-DT", archivedAt: null },
   { roleNo: "R6", code: "VIEWER", name: "只读", permCount: 0, memberCount: 2, builtin: true, dataScope: "ALL", scopeRefs: "", archivedAt: null },
   { roleNo: "R7", code: "AGENT", name: "代理商", permCount: 0, memberCount: 9, builtin: true, dataScope: "AGENT", scopeRefs: "AG001,AG002", archivedAt: null },
+  { roleNo: "R8", code: "WAREHOUSE", name: "仓管", permCount: 0, memberCount: 2, builtin: true, dataScope: "REGION", scopeRefs: "AE-DU", archivedAt: null },
   /*
    * 自定义（非内置）角色。**没有它，离线根本走不通「改角色权限」这条路** ——
    * 内置角色只读，勾选树、全选/清空、可见菜单预览全是禁用态。
@@ -104,6 +105,7 @@ const PERM_CATALOG: ReadonlyArray<readonly [string, string]> = [
   ["device:command:batch", "批量指令 下发"],
   ["device:inventory:read", "库存/调拨/盘点 查看"],
   ["device:inventory:transfer", "调拨 执行"],
+  ["device:inventory:warehouse", "仓库与供应商 维护"],
   ["device:inventory:stocktake", "盘点 执行"],
   ["device:ota:read", "固件版本库 查看"],
   ["device:ota:publish", "固件 发布投放"],
@@ -202,6 +204,7 @@ const PERM_CATALOG: ReadonlyArray<readonly [string, string]> = [
   ["org:performance:read", "绩效报表 查看"],
 
   ["report:device:read", "设备报表 查看"],
+  ["report:inventory:read", "库存报表 查看"],
   ["report:device:export", "设备报表 导出"],
   ["report:location:read", "点位报表 查看"],
   ["report:location:export", "点位报表 导出"],

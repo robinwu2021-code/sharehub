@@ -35,6 +35,16 @@ public class SysParamServiceImpl extends AbstractCrudService<SysParam, SysParamE
      */
     @Override
     public SysParamEntry save(SysParam body) {
+        if (body != null && body.getParamKey() != null && !LocalBizZone.KEY.equals(body.getParamKey())) {
+            SysParam current = selectByKey(body.getParamKey());
+            lockDictionary(body, current);
+            if (current != null) {
+                body.setValue(validated(current, body.getValue()));
+                // 每个参数的取值变化都进审计改前改后：半年后要答得出「当时服务费是多少、谁改的」
+                ai.neargo.sharehub.audit.AuditChanges.record(
+                        current.getLabel() == null ? current.getParamKey() : current.getLabel(), current.getValue(), body.getValue());
+            }
+        }
         if (body != null && LocalBizZone.KEY.equals(body.getParamKey())) {
             String v = body.getValue() == null ? "" : body.getValue().trim();
             try {
@@ -60,6 +70,85 @@ public class SysParamServiceImpl extends AbstractCrudService<SysParam, SysParamE
             body.setValue(v);
         }
         return super.save(body);
+    }
+
+    /** 元数据只由迁移维护：请求体带来的一律丢弃，以库里为准（新建的参数没有元数据 = 自由文本）。 */
+    private static void lockDictionary(SysParam body, SysParam current) {
+        body.setValueType(current == null ? null : current.getValueType());
+        body.setValueOptions(current == null ? null : current.getValueOptions());
+        body.setMinValue(current == null ? null : current.getMinValue());
+        body.setMaxValue(current == null ? null : current.getMaxValue());
+        body.setPattern(current == null ? null : current.getPattern());
+        body.setNullable(current == null ? 1 : current.getNullable());
+        body.setHint(current == null ? null : current.getHint());
+        body.setPendingDecision(current == null ? 0 : current.getPendingDecision());
+    }
+
+    /**
+     * 按字典校验并归一取值。非法值**写入时拒**（理由见 {@link #save} 的类注释：读取处兜底会让「已保存」与「已生效」脱节）。
+     * 归一：去首尾空白；ENUM 转大写；BOOL 认 1/0/true/false 存 1/0；DECIMAL 去掉多余的 0。
+     */
+    static String validated(SysParam p, String raw) {
+        String v = raw == null ? "" : raw.trim();
+        String key = p.getParamKey();
+        if (v.isEmpty()) {
+            if (p.getNullable() != null && p.getNullable() == 0) {
+                throw ai.neargo.sharehub.common.BizException.badRequest("error.sysparam.required", key);
+            }
+            return "";
+        }
+        String type = p.getValueType() == null ? "TEXT" : p.getValueType();
+        switch (type) {
+            case "BOOL" -> {
+                if (v.equals("1") || v.equalsIgnoreCase("true")) return "1";
+                if (v.equals("0") || v.equalsIgnoreCase("false")) return "0";
+                throw ai.neargo.sharehub.common.BizException.badRequest("error.sysparam.bad_value", key, v, "1 / 0");
+            }
+            case "INT", "DECIMAL" -> {
+                java.math.BigDecimal n;
+                try {
+                    n = new java.math.BigDecimal(v);
+                } catch (NumberFormatException e) {
+                    throw ai.neargo.sharehub.common.BizException.badRequest("error.sysparam.bad_value", key, v, type);
+                }
+                if ("INT".equals(type) && n.stripTrailingZeros().scale() > 0) {
+                    throw ai.neargo.sharehub.common.BizException.badRequest("error.sysparam.bad_value", key, v, "INT");
+                }
+                if ((p.getMinValue() != null && n.compareTo(p.getMinValue()) < 0) || (p.getMaxValue() != null && n.compareTo(p.getMaxValue()) > 0)) {
+                    throw ai.neargo.sharehub.common.BizException.badRequest("error.sysparam.out_of_range", key, v,
+                            plain(p.getMinValue()), plain(p.getMaxValue()));
+                }
+                return "INT".equals(type) ? n.toBigInteger().toString() : n.stripTrailingZeros().toPlainString();
+            }
+            case "ENUM" -> {
+                String u = v.toUpperCase();
+                java.util.List<ai.neargo.sharehub.platform.sys.dto.SysDtos.ParamOption> opts = optionsOf(p);
+                if (opts.stream().noneMatch(o -> o.value().equals(u))) {
+                    throw ai.neargo.sharehub.common.BizException.badRequest("error.sysparam.bad_value", key, v,
+                            String.join(" / ", opts.stream().map(ai.neargo.sharehub.platform.sys.dto.SysDtos.ParamOption::value).toList()));
+                }
+                return u;
+            }
+            default -> {
+                if (p.getPattern() != null && !p.getPattern().isBlank() && !v.matches(p.getPattern())) {
+                    throw ai.neargo.sharehub.common.BizException.badRequest("error.sysparam.bad_value", key, v, p.getPattern());
+                }
+                return v;
+            }
+        }
+    }
+
+    private static String plain(java.math.BigDecimal d) {
+        return d == null ? "-" : d.stripTrailingZeros().toPlainString();
+    }
+
+    @SuppressWarnings("unchecked")
+    static java.util.List<ai.neargo.sharehub.platform.sys.dto.SysDtos.ParamOption> optionsOf(SysParam p) {
+        if (p.getValueOptions() == null || p.getValueOptions().isBlank()) return java.util.List.of();
+        java.util.List<java.util.Map<String, Object>> raw = ai.neargo.sharehub.common.Json.read(p.getValueOptions(), java.util.List.class);
+        if (raw == null) return java.util.List.of();
+        return raw.stream().map(m -> new ai.neargo.sharehub.platform.sys.dto.SysDtos.ParamOption(
+                String.valueOf(m.get("value")), String.valueOf(m.get("label")))).toList();
     }
 
     @Override
@@ -96,7 +185,8 @@ public class SysParamServiceImpl extends AbstractCrudService<SysParam, SysParamE
 
     @Override
     protected String[] filterFields() {
-        return new String[]{"groupName"};
+        // pendingDecision（V191）：系统设置页「只看待拍板」
+        return new String[]{"groupName", "pendingDecision"};
     }
 
     @Override
@@ -112,6 +202,9 @@ public class SysParamServiceImpl extends AbstractCrudService<SysParam, SysParamE
     @Override
     protected SysParamEntry toVO(SysParam e) {
         return new SysParamEntry(e.getParamKey(), e.getLabel(), e.getValue(),
-                e.getGroupName(), SysCtx.fmt(e.getUpdatedAt()));
+                e.getGroupName(), SysCtx.fmt(e.getUpdatedAt()),
+                e.getValueType() == null ? "TEXT" : e.getValueType(), optionsOf(e), e.getMinValue(), e.getMaxValue(),
+                e.getPattern(), e.getNullable() == null || e.getNullable() != 0, e.getHint(),
+                e.getPendingDecision() != null && e.getPendingDecision() == 1);
     }
 }

@@ -56,6 +56,7 @@ ord_complaint  # c_user_no region_id
 ord_deposit  # c_user_no region_id
 ord_exception  # c_user_no region_id
 ord_refund  # c_user_no region_id
+ord_tax_invoice  # c_user_no —— V181；同 ord_refund：运营端按财务权限全局看，C 端经 ConsumerContext.assertOwner 断言属主
 ord_reservation  # c_user_no region_id site_no
 pay_auth  # c_user_no
 pay_order  # c_user_no

@@ -144,9 +144,18 @@ public class LocService {
 
     // —— 点位 ——
     public PageResult<Location> pageLocations(Integer page, Integer size, String keyword, Boolean showArchived) {
+        return pageLocations(page, size, keyword, showArchived, null, null);
+    }
+
+    /** 带站点 / 商家筛选（V162）：商家详情的「站点与点位」与绑定抽屉按它取。默认点位排最前。 */
+    public PageResult<Location> pageLocations(Integer page, Integer size, String keyword, Boolean showArchived,
+                                              String siteNo, String agentNo) {
         Page<LocLocation> p = new Page<>(pg(page), sz(size));
         LambdaQueryWrapper<LocLocation> w = new LambdaQueryWrapper<>();
         if (!Boolean.TRUE.equals(showArchived)) w.isNull(LocLocation::getArchivedAt);
+        if (kw(siteNo)) w.eq(LocLocation::getSiteNo, siteNo);
+        if (kw(agentNo)) w.eq(LocLocation::getAgentNo, agentNo);
+        if (kw(siteNo) || kw(agentNo)) w.orderByDesc(LocLocation::getIsDefault);
         if (kw(keyword)) {
             w.and(q -> q.like(LocLocation::getName, keyword).or().like(LocLocation::getSiteName, keyword));
         }
@@ -156,16 +165,44 @@ public class LocService {
         return new PageResult<>(rows, r.getTotal());
     }
 
+    /**
+     * 点位新建 / 编辑（V162 改造）。
+     *
+     * <ul>
+     *   <li><b>编号服务端取</b>：路径上没有编号 = 新建，取号器给号；路径上有编号却查不到 = 404，
+     *       不再「顺手按客户端给的号新建」（打错一位就多出一个真实点位）。请求体里的 locationNo 不作数。</li>
+     *   <li><b>站点必须存在</b>，站点名与商家**由站点派生**：此前新建点位从不写 agent_no，
+     *       商家因此看不到自己站点上的新点位；站点名也不再收客户端传的。</li>
+     *   <li><b>点位不能换站点</b>：机柜的站点与商家都随点位派生，换站点会让已绑定的机柜指错地方。</li>
+     *   <li>默认点位标记不经这里改（建站时定）。</li>
+     * </ul>
+     */
+    @Transactional
     public Location savePoint(String locationNo, Location in) {
-        String no = (locationNo != null && !locationNo.isBlank()) ? locationNo
-                : (in.locationNo() != null && !in.locationNo().isBlank()) ? in.locationNo()
-                : "LOC" + (200 + Math.toIntExact(locationMapper.selectCount(null)));
-        LocLocation e = locationMapper.selectOne(new LambdaQueryWrapper<LocLocation>().eq(LocLocation::getLocationNo, no));
-        boolean insert = (e == null);
-        if (insert) { e = new LocLocation(); e.setLocationNo(no); e.setTenantId("MAIN"); }
-        e.setName(in.name());
-        e.setSiteNo(in.siteNo());
-        e.setSiteName(in.siteName());
+        if (in == null) throw BizException.badRequest("error.common.missing_parameter", "body");
+        if (in.name() == null || in.name().isBlank()) throw BizException.badRequest("error.common.missing_parameter", "name");
+        boolean insert = locationNo == null || locationNo.isBlank();
+        LocLocation e;
+        if (insert) {
+            e = new LocLocation();
+            e.setLocationNo(ai.neargo.sharehub.loc.DefaultPoints.nextNo(jdbc));
+            e.setTenantId("MAIN");
+            e.setIsDefault(0);
+        } else {
+            e = locationMapper.selectOne(new LambdaQueryWrapper<LocLocation>().eq(LocLocation::getLocationNo, locationNo).last("limit 1"));
+            if (e == null) throw BizException.notFound(locationNo);
+        }
+        String siteNo = insert ? in.siteNo() : e.getSiteNo();
+        if (!insert && in.siteNo() != null && !in.siteNo().isBlank() && !in.siteNo().equals(e.getSiteNo())) {
+            throw BizException.conflict("error.location.site_immutable", e.getLocationNo());
+        }
+        if (siteNo == null || siteNo.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "siteNo");
+        LocSite site = siteMapper.selectOne(new LambdaQueryWrapper<LocSite>().eq(LocSite::getSiteNo, siteNo).last("limit 1"));
+        if (site == null) throw BizException.notFound(siteNo);
+        e.setName(in.name().trim());
+        e.setSiteNo(site.getSiteNo());
+        e.setSiteName(site.getName());
+        e.setAgentNo(site.getAgentNo());
         e.setSpotDesc(in.spotDesc());
         // 机柜数不回写：同 saveSite，它是聚合值不是属性
         // 词表校验（C2）：此前任意字符串都能落库，两端徽标映射不上、按状态筛也筛不到
@@ -314,7 +351,7 @@ public class LocService {
     private static Location toLocation(LocLocation e) {
         // 机柜数同 toSite：platform 算不出（dev_cabinet 属于 core），返回 null 表示「这里答不了」
         return new Location(e.getLocationNo(), e.getName(), e.getSiteNo(), e.getSiteName(),
-                e.getSpotDesc(), null, e.getStatus());
+                e.getSpotDesc(), null, e.getStatus(), e.getIsDefault() != null && e.getIsDefault() == 1, e.getAgentNo());
     }
 
     // ───────────────── 归档 / 取消归档（前端契约 Archivable）─────────────────

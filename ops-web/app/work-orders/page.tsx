@@ -52,7 +52,7 @@ import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import {
   WO_TRANSITIONS, canTransition, inspectionPeriodKey, inspectionRunnable, woDeriveBlocked, woTakeoverBlocked,
-  woSlaRemain, fmtMinutes,
+  woSlaRemain, fmtMinutes, REMOVAL_DISPOSITION_LABEL, type RemovalDisposition,
 } from "@/lib/types";
 import type {
   WorkOrder, WorkOrderAction, WorkOrderDraft, WorkOrderStatus,
@@ -78,7 +78,7 @@ const BOARD_COLS: { key: string; label: string }[] = [
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
 // 本页用的是 `?view=` 而不是 `?tab=`，菜单里那四条叶子也是 view —— 两边必须一致。
 // 抢单池 / 成本汇总不进这里：它们是「工单列表」下的子视图（`?sub=`），开成 tab 就得加菜单叶，而菜单改动要走库迁移。
-const TAB_KEYS = ["list", "board", "sla", "inspection"] as const;
+const TAB_KEYS = ["list", "board", "inspection", "sla"] as const; // 与菜单同序（OM06）：巡检生成工单，SLA 量所有工单
 type Sub = "all" | "pool" | "costs";
 
 const ACTION_LABEL: Record<WorkOrderAction, string> = {
@@ -410,6 +410,11 @@ function WorkOrdersInner() {
       { key: "priority", label: "优先级", type: "select", options: PRIO_OPTIONS, required: true, section: "基本信息" },
       { key: "description", label: "问题描述", type: "textarea", rows: 4, required: true, maxLength: 200, section: "问题与时限", placeholder: "现象、影响面、已做过的排查" },
       { key: "expectedAt", label: "期望完成时间", type: "date", section: "问题与时限", help: "超期工单会在看板与 SLA 统计里标红" },
+      // 撤机去向（ae233365 · V164）：只对撤机单有意义，别的类型禁用并清空
+      { key: "disposition", label: "撤机去向", type: "select", section: "基本信息",
+        options: (Object.keys(REMOVAL_DISPOSITION_LABEL) as RemovalDisposition[]).map((k) => ({ value: k, label: REMOVAL_DISPOSITION_LABEL[k] })),
+        disabledWhen: (v) => v.type !== "REMOVE",
+        help: "回商家待绑定：柜子撤下后留在同一商家名下，可再绑到它的其它站点点位；回仓：撤下后生成回仓调拨单，离开商家" },
     ];
   }, [cabinetOpts.data, cabinetOpts.isLoading]);
 

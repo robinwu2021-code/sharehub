@@ -106,6 +106,35 @@ class ArchitectureTest {
                 .check(ALL);
     }
 
+    @Test
+    @DisplayName("设备履历只追加：只有 MovementRecorder 碰得到履历 Mapper，且只插入、只查询（V196，I8）")
+    void movementLogIsAppendOnly() {
+        noClasses().that().doNotHaveFullyQualifiedName("ai.neargo.sharehub.dev.movement.MovementRecorder")
+                .should().dependOnClassesThat().haveFullyQualifiedName("ai.neargo.sharehub.dev.movement.DevMovementLogMapper")
+                .because("履历的写口只有一个：散落的写入点就是漏记与改写的来源")
+                .check(ALL);
+        var writes = ALL.get("ai.neargo.sharehub.dev.movement.MovementRecorder").getMethodCallsFromSelf().stream()
+                .filter(c -> c.getTargetOwner().getName().endsWith("DevMovementLogMapper"))
+                .map(c -> c.getName())
+                .filter(n -> n.startsWith("update") || n.startsWith("delete"))
+                .toList();
+        assertThat(writes).as("履历只追加，不改不删").isEmpty();
+    }
+
+    @Test
+    @DisplayName("库存账动作只经 InventoryPort（S2.5）：出库 / 签收 / 调整 / 退回不得绕过端口直调出库池服务")
+    void ledgerActionsGoThroughInventoryPort() {
+        var bypass = ALL.stream()
+                .filter(c -> !c.getPackageName().startsWith("ai.neargo.sharehub.inv.port")
+                        && !c.getPackageName().startsWith("ai.neargo.sharehub.dev.service"))
+                .flatMap(c -> c.getMethodCallsFromSelf().stream())
+                .filter(call -> call.getTargetOwner().getName().equals("ai.neargo.sharehub.dev.service.CabinetPoolService"))
+                .filter(call -> java.util.Set.of("issue", "claim", "redirect", "returnToWarehouse").contains(call.getName()))
+                .map(call -> call.getOriginOwner().getSimpleName() + "." + call.getName())
+                .toList();
+        assertThat(bypass).as("切到独立进销存时只换端口实现 —— 绕过端口的调用会在切换后继续改本地表").isEmpty();
+    }
+
     // ───────────────────────── 棘轮：控制器直连 Mapper ─────────────────────────
 
     @Test

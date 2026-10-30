@@ -6,6 +6,7 @@ import { useAuth, type Role, type Realm } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { looksLikePhone } from "@/lib/login-realm";
+import { segmentedItemClass, segmentedTrackClass } from "@/components/ui/segmented";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,7 +38,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
  * 验证码登录本身就是完整的登录方式，不是等口令做好之前的临时方案。
  *
  * **不传 role** —— 角色由账号决定（D6a）。此前这里写死 `"ADMIN"`。
+ *
+ * **2026-10-28 商家一期 B2：商家改为邮箱优先**（需求方案 R1 / R8），上面「两个池形状不重叠」
+ * 对邮箱不再成立 —— 员工与商家都可能输入邮箱。所以：手机号仍判为商家、员工号仍判为员工，
+ * **只有邮箱**多出一个「员工 / 商家」二选一。不做后端探测：「这个邮箱属于哪个池」的探测端点本身就是可枚举面。
+ * 选择记在本机（只是便利，不是凭据），商家第二次来不必再点。
  */
+
+const POOL_KEY = "sharehub.login.emailPool";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -50,16 +58,30 @@ export default function LoginPage() {
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  // 邮箱时的池选择（见上）。只对邮箱生效，其余形状仍由输入推导
+  const [emailPool, setEmailPool] = useState<Exclude<Realm, "">>(() => {
+    try { return localStorage.getItem(POOL_KEY) === "AGENT" ? "AGENT" : "STAFF"; } catch { return "STAFF"; }
+  });
 
   // realm 不再是状态 —— 它是输入的**函数**。存成状态就会出现「输入改了、realm 还是旧的」
   // 那一类不一致，而它只在切换的那一瞬出现，最难复现。
-  const realm: Exclude<Realm, ""> = looksLikePhone(identifier) ? "AGENT" : "STAFF";
+  const isEmail = identifier.includes("@");
+  const realm: Exclude<Realm, ""> = looksLikePhone(identifier) ? "AGENT" : isEmail ? emailPool : "STAFF";
+
+  // 商家两种登录方式：验证码，或开通时发的口令（用户 2026-10-28：代录商家给初始密码，登录后改）
+  const [agentMode, setAgentMode] = useState<"otp" | "password">("otp");
+  const usePassword = realm === "STAFF" || agentMode === "password";
+
+  function pickPool(p: Exclude<Realm, "">) {
+    setEmailPool(p); setErr(""); setOtpSent(false);
+    try { localStorage.setItem(POOL_KEY, p); } catch { /* 隐私模式等：只是少记一次选择 */ }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setErr("");
     try {
-      const r = await api.login(realm, identifier, password, realm === "AGENT" ? otp : undefined);
+      const r = await api.login(realm, identifier, password, usePassword ? undefined : otp);
       login({
         realm,
         subjectNo: r.subjectNo,
@@ -83,7 +105,7 @@ export default function LoginPage() {
 
   /** 发送登录验证码。查无此号后端也回 ok —— 所以这里不能据响应判断号存不存在。 */
   async function sendOtp() {
-    if (!identifier.trim()) { setErr("请先填写手机号"); return; }
+    if (!identifier.trim()) { setErr("请先填写邮箱或手机号"); return; }
     setSending(true); setErr("");
     try {
       const r = await api.sendLoginOtp(identifier.trim());
@@ -120,11 +142,34 @@ export default function LoginPage() {
                 把推导结果明写出来。判错时（比如员工号哪天变成纯数字）用户看得见
                 「这里要发验证码」，而不是只收到一句「登录失败」再去猜为什么。
               */}
+              {isEmail && (
+                <div className={segmentedTrackClass("mt-1")} role="radiogroup" aria-label="账号类型">
+                  {([["STAFF", "我是员工"], ["AGENT", "我是商家"]] as const).map(([k, label]) => (
+                    <button key={k} type="button" role="radio" aria-checked={emailPool === k}
+                      className={segmentedItemClass(emailPool === k, "px-3 py-1 text-xs")} onClick={() => pickPool(k)}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
-                {realm === "AGENT" ? "手机号 —— 用验证码登录" : "邮箱或员工号 —— 用口令登录"}
+                {realm === "AGENT"
+                  ? `${isEmail ? "商家邮箱" : "商家手机号"} —— 用${agentMode === "otp" ? "验证码" : "口令"}登录`
+                  : "邮箱或员工号 —— 用口令登录"}
               </p>
+              {realm === "AGENT" && (
+                <div className={segmentedTrackClass("mt-1")} role="radiogroup" aria-label="登录方式">
+                  {([["otp", "验证码"], ["password", "口令"]] as const).map(([k, label]) => (
+                    <button key={k} type="button" role="radio" aria-checked={agentMode === k}
+                      className={segmentedItemClass(agentMode === k, "px-3 py-1 text-xs")}
+                      onClick={() => { setAgentMode(k); setErr(""); }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            {realm === "STAFF" ? (
+            {usePassword ? (
               <div className="space-y-1">
                 <label className="text-sm text-muted-foreground" htmlFor="password">{t("login.password")}</label>
                 <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("login.password")} autoComplete="current-password" />
@@ -141,7 +186,7 @@ export default function LoginPage() {
                 </div>
                 {otpSent && (
                   <p className="text-xs text-muted-foreground">
-                    验证码已发送。若手机号未注册，同样显示已发送 —— 这样这个入口才不能被用来试探谁是平台代理商。
+                    验证码已发送。若该邮箱或手机号未注册，同样显示已发送 —— 这样这个入口才不能被用来试探谁是平台商家。
                   </p>
                 )}
               </div>

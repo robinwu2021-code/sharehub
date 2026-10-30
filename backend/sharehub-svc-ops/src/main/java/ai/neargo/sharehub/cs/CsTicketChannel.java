@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.cs;
 
+import ai.neargo.sharehub.common.BizException;
+
 /**
  * 客服受理单的来源渠道（{@code cs_ticket.channel}，DDL 注释
  * {@code 'APP/MP/H5/PHONE/EMAIL/MANUAL/ALARM'}）。
@@ -32,14 +34,13 @@ public enum CsTicketChannel {
     /** 由业务告警派生。 */
     ALARM;
 
-    /** 宽松解析：非法值抛 {@link IllegalArgumentException}（全局映射 400）。 */
+    /** 宽松解析：非法值抛 {@link BizException}（400，文案走 i18n key —— 中文字面量会原样送到英文 / 阿语界面）。 */
     public static CsTicketChannel of(String v) {
-        if (v == null || v.isBlank()) throw new IllegalArgumentException("受理渠道必填");
+        if (v == null || v.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "channel");
         try {
             return valueOf(v.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException(
-                    "受理渠道非法: " + v + "（仅 APP/MP/H5/PHONE/EMAIL/MANUAL/ALARM）");
+            throw BizException.badRequest("error.common.invalid_value", v + " (APP/MP/H5/PHONE/EMAIL/MANUAL/ALARM)");
         }
     }
 }

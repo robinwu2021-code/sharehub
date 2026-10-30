@@ -23,6 +23,8 @@ import java.util.List;
 @Service
 public class AgentServiceImpl implements AgentService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AgentServiceImpl.class);
+
     /** 取号要绕开逻辑删除过滤，只能走原生 SQL —— 见 BizNoSequence 的类注释。 */
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
@@ -32,9 +34,20 @@ public class AgentServiceImpl implements AgentService {
 
     private final ai.neargo.sharehub.common.event.DomainEventBus events;
 
+    /** 默认站点（V157）：建站、写运维责任、划拨归属。agent → loc 是既有依赖方向，loc 不反向依赖 agent。 */
+    private final ai.neargo.sharehub.loc.service.SiteService sites;
+    private final ai.neargo.sharehub.loc.ext.service.SiteAgentService siteAgents;
+    private final ai.neargo.sharehub.agent.ext.service.AgentAssignmentService assignments;
+
     public AgentServiceImpl(AgentMapper mapper, ai.neargo.sharehub.common.event.DomainEventBus events,
                             ai.neargo.sharehub.agent.ext.service.AgentExitService exits,
-                            org.springframework.jdbc.core.JdbcTemplate jdbc) {
+                            org.springframework.jdbc.core.JdbcTemplate jdbc,
+                            ai.neargo.sharehub.loc.service.SiteService sites,
+                            ai.neargo.sharehub.loc.ext.service.SiteAgentService siteAgents,
+                            ai.neargo.sharehub.agent.ext.service.AgentAssignmentService assignments) {
+        this.sites = sites;
+        this.siteAgents = siteAgents;
+        this.assignments = assignments;
         this.jdbc = jdbc;
         this.exits = exits;
         this.events = events;
@@ -57,6 +70,7 @@ public class AgentServiceImpl implements AgentService {
     }
 
     @Override
+    @Transactional
     public Agent save(String agentNo, Agent in) {
         /*
          * **建档时一律服务端取号，不看客户端传了什么**。
@@ -83,7 +97,18 @@ public class AgentServiceImpl implements AgentService {
             AuditChanges.record("分成比例", e.getShareRate(), in.shareRate());
             AuditChanges.record("类型", e.getAgentType(), AgentType.of(in.agentType()).name());
             AuditChanges.record("状态", e.getStatus(), in.status() == null ? "ENABLED" : in.status());
+            if (in.address() != null) AuditChanges.record("位置", e.getAddress(), in.address());
+            if (in.industry() != null) AuditChanges.record("行业", e.getIndustry(), in.industry());
+            // 税号决定分成付款出不出自开票单据，改动要能追溯
+            if (in.vatTrn() != null) AuditChanges.record("VAT 税号", e.getVatTrn(), in.vatTrn());
+            if (in.licenseNo() != null) AuditChanges.record("营业执照号", e.getLicenseNo(), in.licenseNo());
         }
+        // 不传 = 不改；空串 = 清掉（商家注销 VAT 登记）
+        if (in.vatTrn() != null) e.setVatTrn(in.vatTrn().isBlank() ? null : in.vatTrn().trim());
+        if (in.licenseNo() != null) e.setLicenseNo(in.licenseNo().isBlank() ? null : in.licenseNo().trim());
+        String nameBefore = e.getName(), addressBefore = e.getAddress();
+        java.math.BigDecimal lngBefore = e.getLng(), latBefore = e.getLat();
+        applyCoreProfile(e, in);
         e.setName(in.name());
         // contact 已退役（V123）：不再从写入面接收，存量留在库里待人工归位
         e.setContactName(in.contactName());
@@ -111,12 +136,93 @@ public class AgentServiceImpl implements AgentService {
         }
         e.setStatus(want);
         if (insert) mapper.insert(e); else mapper.updateById(e);
+        boolean locationChanged = !java.util.Objects.equals(nameBefore, e.getName())
+                || !java.util.Objects.equals(addressBefore, e.getAddress())
+                || !sameDecimal(lngBefore, e.getLng()) || !sameDecimal(latBefore, e.getLat());
+        syncDefaultSite(e, locationChanged);
         if (!insert && !java.util.Objects.equals(before, e.getStatus())) {
             // 停用 → 工单侧改派名下未完结工单（F2）；提现侧在服务层按实时状态拦，不靠事件
             events.publish(new ai.neargo.sharehub.api.platform.event.AgentStatusChangedEvent(no, before, e.getStatus(), null,
                     java.time.LocalDateTime.now().toString()));
         }
         return toVO(e);
+    }
+
+    /**
+     * 位置与行业（V157，需求方案 D6）。**不传 = 不改**：这几项多由运营后补，只改联系人的保存不该清空位置。
+     *
+     * <p>位置三项要么都给要么都不给 —— 只给地址没有坐标，建出来的站点在地图上没有落点，
+     * 「找附近」排不到它，而且不报错（V121 记过同一个坑）。
+     */
+    private static void applyCoreProfile(AgtAgent e, Agent in) {
+        boolean anyLocation = in.address() != null || in.lng() != null || in.lat() != null;
+        if (anyLocation) {
+            if (in.address() == null || in.address().isBlank() || in.lng() == null || in.lat() == null) {
+                throw BizException.badRequest("error.agent.location_incomplete");
+            }
+            if (in.lng().abs().compareTo(java.math.BigDecimal.valueOf(180)) > 0
+                    || in.lat().abs().compareTo(java.math.BigDecimal.valueOf(90)) > 0) {
+                throw BizException.badRequest("error.common.invalid_value", in.lng() + "," + in.lat());
+            }
+            e.setAddress(in.address().trim());
+            e.setLng(in.lng());
+            e.setLat(in.lat());
+        }
+        if (in.industry() != null) {
+            e.setIndustry(ai.neargo.sharehub.loc.VenueIndustry.of(in.industry())
+                    .orElseThrow(() -> BizException.badRequest("error.agent.industry_invalid", in.industry()))
+                    .name());
+        }
+    }
+
+    /**
+     * 默认站点（优化方案 §2.4）：位置补齐时建站，位置或店名变了同步站点地址、坐标与名称。
+     *
+     * <p>建站时**同一事务**写归属与运维责任：归属走划拨（留流水并级联 agent_no），
+     * 责任行给分润用 —— 数据范围读 agent_no、分润读责任行，两者只建一份会让「谁看得到」与「谁分到钱」分开
+     * （见 docs/technical/设备绑定与商家归属-现状分析.md §四.1）。之后位置变更只动地址坐标，不动归属。
+     */
+    private void syncDefaultSite(AgtAgent e, boolean locationChanged) {
+        if (e.getAddress() == null || e.getLng() == null || e.getLat() == null) return;
+        boolean exists = e.getDefaultSiteNo() != null && !e.getDefaultSiteNo().isBlank();
+        if (exists && !locationChanged) return;
+        var site = sites.upsertDefaultSite(e.getDefaultSiteNo(), e.getName(), e.getAddress(), e.getLng(), e.getLat());
+        if (exists) return;
+
+        e.setDefaultSiteNo(site.siteNo());
+        mapper.updateById(e);
+        attachSite(e.getAgentNo(), site.siteNo(), "商家默认站点（系统建）");
+    }
+
+    /**
+     * 站点归商家（V157 / V162）：经划拨写归属（留流水并级联站点、点位、机柜的 agent_no），并写 OPERATE 责任行。
+     * 数据范围读 agent_no、分润读责任行 —— 两者只写一份，「谁看得到」与「谁分到钱」就会分开。
+     */
+    private void attachSite(String agentNo, String siteNo, String remark) {
+        // 划拨同事务写 OPERATE 责任行（V165 起由划拨服务统一处理，这里不再另写一份）
+        assignments.assign(new ai.neargo.sharehub.agent.ext.dto.AgentExtDtos.AssignReq(
+                agentNo, "SITE", siteNo, "ASSIGN", ai.neargo.sharehub.auth.SecurityUtils.userNo()));
+        log.info("站点归商家 agentNo={} siteNo={}（{}）", agentNo, siteNo, remark);
+    }
+
+    /**
+     * 运营为商家新建站点（V162；用户 2026-10-28：商家可有多个站点，一期由运营代建，商家端只读）。
+     *
+     * <p>一个事务：建站（含默认点位）→ 划给商家 → 写运维责任。商家须存在且已补齐核心资料 ——
+     * 划拨门禁要求如此（只有默认站点例外），先在这里说清楚，比让划拨那一步抛错更好懂。
+     */
+    @Override
+    @Transactional
+    public ai.neargo.sharehub.loc.dto.LocDtos.Site createSite(String agentNo, ai.neargo.sharehub.loc.dto.SiteDtos.SiteReq req) {
+        AgtAgent a = mapper.selectOne(new LambdaQueryWrapper<AgtAgent>().eq(AgtAgent::getAgentNo, agentNo).last("limit 1"));
+        if (a == null) throw BizException.notFound(agentNo);
+        var site = sites.createForMerchant(req);
+        attachSite(agentNo, site.siteNo(), "运营为商家建站");
+        return sites.get(site.siteNo());
+    }
+
+    private static boolean sameDecimal(java.math.BigDecimal a, java.math.BigDecimal b) {
+        return a == null ? b == null : b != null && a.compareTo(b) == 0;
     }
 
     // region_scope 的 JSON 转换已提取到 RegionScopeJson —— 入驻审核的激活派生也要写这一列，
@@ -132,7 +238,8 @@ public class AgentServiceImpl implements AgentService {
                  * 代理商的真实机柜数在「设备/点位划拨」页按关系现算。
                  */
                 0, e.getStatus(), e.getArchivedAt() == null ? null : e.getArchivedAt().toString(),
-                e.getContactName(), e.getPhone(), e.getEmail());
+                e.getContactName(), e.getPhone(), e.getEmail(),
+                e.getAddress(), e.getLng(), e.getLat(), e.getIndustry(), e.getDefaultSiteNo(), e.getVatTrn(), e.getLicenseNo());
     }
 
     // ── 归档 / 取消归档（前端契约 Archivable）──

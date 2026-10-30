@@ -48,13 +48,14 @@ export {
   archiveAgent, unarchiveAgent, grantAgentLogin,
   // S1 设备/点位划拨
   agentAssignmentRecords, listAgentAssignmentRecords, listAssignableAssets,
+  checkAgentCoreProfile, syncDefaultSite,
   assignAgentAssets, reclaimAgentAssets, refreshAgentAssetCounts, AgentAssignError,
 } from "./agent";
 export type { AssignmentRecordQuery, AssignableAssetQuery } from "./agent";
 // 入驻申请（ADR-030 §三 · D4）。**这一行不是误提交** —— 它配套 ./apply.ts，
 // 缺了它 lib/api/mocks/agent.ts 的四个入驻方法会编译不过（tsc 会红）。
 export {
-  applies, listAgentApplies, acceptAgentApply, auditAgentApply, createAgentApply,
+  applies, listAgentApplies, acceptAgentApply, auditAgentApply, createAgentApply, resendAgentInvite,
   sendApplyOtp, selfServiceApply, myApply,
 } from "./apply";
 
@@ -79,7 +80,7 @@ export {
 
 export {
   shareRules, settlements, withdrawals, ledger, shareRecords, reconciles, invoices,
-  listShareRecords, listReconciles, listInvoices, getInvoice, saveShareRule, saveInvoice, auditWithdrawal, payWithdrawal, resubmitWithdrawalApproval, retryWithdrawalApprovalEffect, applyWithdrawal,
+  listShareRecords, listReconciles, listInvoices, getInvoice, taxInvoices, listTaxInvoices, getTaxInvoice, retryTaxInvoice, selfBills, listSelfBills, issueSelfBill, listPayables, saveShareRule, saveInvoice, auditWithdrawal, payWithdrawal, resubmitWithdrawalApproval, retryWithdrawalApprovalEffect, applyWithdrawal,
   shareSummaries, listShareSummaries,
   rechargeOrders, listRechargeOrders,
   rechargePackages, listRechargePackages, saveRechargePackage,

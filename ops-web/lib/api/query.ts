@@ -1,6 +1,7 @@
 // 统一查询参数类型。全部列表接口的 q 参数只能从这里取，禁止在域文件里就地 `PageQ & {...}`。
 // 合并规则：结构完全等价的类型收敛到一个「形状名」，旧名以 alias 保留（类型等价，不破坏任何引用）。
 // 分类：① 通用形状（PageQ / StatusQ / StatusTypeQ）② 域特有形状（各 <Domain>Q）。
+import type { PoolFilter } from "../types";
 
 /** 分页三件套 + 关键词。索引签名保留：http-client 的 qs() 直接序列化整个 q。 */
 export interface PageQ { page?: number; size?: number; keyword?: string; [k: string]: unknown; }
@@ -10,7 +11,11 @@ export interface PageQ { page?: number; size?: number; keyword?: string; [k: str
 /** 单 status 过滤。原 OrderQ / StatusQ 结构相同，已合并。 */
 export type StatusQ = PageQ & { status?: string };
 /** 订单列表：StatusQ + 收款态（PAID / UNPAID，C-BL-04 —— 运营催缴筛欠费单）。 */
-export type OrderQ = StatusQ & { payStatus?: string };
+export type OrderQ = StatusQ & {
+  payStatus?: string;
+  /** 第 5 批：借出日期（业务日，含两端）、商家、站点、设备（借出或归还柜）。 */
+  from?: string; to?: string; agentNo?: string; siteNo?: string; cabinetNo?: string;
+};
 
 /** status + type 双筛。原 WoQ / ReservationQ 结构相同，已合并。 */
 export type StatusTypeQ = PageQ & { status?: string; type?: string };
@@ -38,7 +43,17 @@ export type ArchiveQ = PageQ & { showArchived?: boolean };
 // ——— 域特有形状 ———
 
 /** 设备：在线状态 + 业务状态双筛。 */
-export type CabinetQ = PageQ & { onlineStatus?: string; status?: string; showArchived?: boolean };
+export type CabinetQ = PageQ & {
+  onlineStatus?: string; status?: string; showArchived?: boolean;
+  /** 出库单商家（技术设计 §3.3） */
+  issuedAgentNo?: string;
+  /** 出库单筛选：未绑定 / 已绑定 / 全部 */
+  pool?: PoolFilter;
+};
+/** 站点列表：加按商家筛（技术设计 §3.6）。 */
+export type SiteQ = ArchiveQ & { agentNo?: string };
+/** 点位列表：加按站点、商家筛。 */
+export type LocationQ = ArchiveQ & { siteNo?: string; agentNo?: string };
 /** 告警记录：级别 + 处理状态。 */
 /**
  * 告警记录筛选。`status` / `domain` 后端按逗号拆成 IN —— 「未关闭」就是 `OPEN,ACKED`，
@@ -82,6 +97,17 @@ export type ShareSummaryQ = PageQ & {
 export type ReconQ = PageQ & { status?: string; handleStatus?: string };
 /** 发票：状态筛选（DRAFT/ISSUED/VOID）。 */
 export type InvoiceQ = PageQ & { status?: string };
+/** 租赁税务票据（V181）：按订单号精确查，按票种/状态筛。 */
+export type TaxInvoiceQ = PageQ & { orderNo?: string; kind?: string; status?: string };
+/** 后端导出（K8）：报表 xlsx / pdf；税务发票再加 zip（批量 PDF）与开票日期区间（业务日，含两端）。 */
+export type ExportFormat = "xlsx" | "pdf";
+export type SelfBillQ = PageQ & { agentNo?: string };
+export type ApprovalQ = PageQ & { status?: string; kind?: string };
+/** 系统参数：pendingDecision=1 只看运营方待拍板（V191）。 */
+export type SysParamQ = PageQ & { groupName?: string; pendingDecision?: string };
+export type PayableQ = PageQ & { payeeType?: string; payeeNo?: string; fromPeriod?: string; toPeriod?: string; onlyOutstanding?: boolean };
+export type ReportExportQ = { keyword?: string; period?: string };
+export type TaxInvoiceExportQ = { format: ExportFormat | "zip"; orderNo?: string; kind?: string; status?: string; from?: string; to?: string };
 /** 充值订单：状态 + 日期范围。 */
 export type RechargeQ = PageQ & { status?: string; from?: string; to?: string };
 /** 免费订单：按减免原因筛选。 */
@@ -146,3 +172,10 @@ export interface WithdrawalQ extends PageQ {
   payeeNo?: string;
   status?: string;
 }
+
+/** 库存流水（S4）：按仓 / 设备类型 / 设备号或单号筛。 */
+export interface StockLedgerQ extends PageQ { warehouseNo?: string; itemType?: string; }
+/** 盘点单列表（S4）。 */
+export interface StockCountQ { warehouseNo?: string; status?: string; [k: string]: unknown; }
+/** 期间报表（S6）：日期含两端，YYYY-MM-DD。 */
+export interface StockPeriodQ { from: string; to: string; warehouseNo?: string; [k: string]: unknown; }

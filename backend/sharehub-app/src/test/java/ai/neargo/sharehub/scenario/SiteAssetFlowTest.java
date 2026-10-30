@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.scenario;
 
+import ai.neargo.sharehub.support.LegacyShareParams;
 import ai.neargo.sharehub.finance.service.SettlementService;
 import ai.neargo.sharehub.loc.service.SiteService;
 import ai.neargo.sharehub.support.ApiTestSupport;
@@ -30,6 +31,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 撤机清点与回仓 + 撤场自动关闭 + 结算调整项（C7 / C8 / C9）。
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+// 撤场结清会出场地方结算单（押金 / 进场费调整项）—— 验的是开关打开时的逻辑，一期默认关（V155）
+@LegacyShareParams
+// 勘测清单项、装机驱动上线验的是合同 / 勘测门禁强制时的逻辑，一期默认跳过（V174）
+@ai.neargo.sharehub.support.VenueGateOn
 class SiteAssetFlowTest extends ApiTestSupport {
 
     @Autowired
@@ -238,12 +243,15 @@ class SiteAssetFlowTest extends ApiTestSupport {
     @DisplayName("C7 / C8 / C9 撤场：提前期不足 400；撤机须清点、不符落差异、柜子回库、生成回仓单；门禁全过自动关闭；关闭生成押金 / 进场费调整项并入出账")
     void withdrawCloseAndSettle() {
         String w = warehouse();
-        // 回仓默认取第一个仓；本类别的用例也建仓，这里显式配成本用例的仓（结束时复原）
+        // 回仓默认取配置的仓；这里显式配成本用例的仓，结束时**复原成原值**（V182 种的是 WH001）——
+        // 此前复原成空串，之后的用例与本地库都落到「取第一个仓」，掩盖了配置口径
+        String before = jdbc.queryForList("SELECT value FROM sys_param WHERE param_key='inv.return_warehouse'", String.class)
+                .stream().findFirst().orElse("");
         jdbc.update("UPDATE sys_param SET value=? WHERE param_key='inv.return_warehouse'", w);
         try {
             withdrawCloseAndSettle(w);
         } finally {
-            jdbc.update("UPDATE sys_param SET value='' WHERE param_key='inv.return_warehouse'");
+            jdbc.update("UPDATE sys_param SET value=? WHERE param_key='inv.return_warehouse'", before);
         }
     }
 

@@ -26,8 +26,12 @@ public class LocalAgentDirectory implements AgentDirectoryPort {
     private final ai.neargo.sharehub.agent.ext.mapper.AgtExitMapper exits;
     private final ai.neargo.sharehub.agent.ext.mapper.AgtOpsAssessmentMapper assessments;
 
+    private final ai.neargo.sharehub.agent.ext.mapper.AgtCommissionMapper commissions;
+
     public LocalAgentDirectory(AgentMapper agents, ai.neargo.sharehub.agent.ext.mapper.AgtExitMapper exits,
-                               ai.neargo.sharehub.agent.ext.mapper.AgtOpsAssessmentMapper assessments) {
+                               ai.neargo.sharehub.agent.ext.mapper.AgtOpsAssessmentMapper assessments,
+                               ai.neargo.sharehub.agent.ext.mapper.AgtCommissionMapper commissions) {
+        this.commissions = commissions;
         this.agents = agents;
         this.exits = exits;
         this.assessments = assessments;
@@ -73,6 +77,41 @@ public class LocalAgentDirectory implements AgentDirectoryPort {
         AgtAgent a = agents.selectOne(new LambdaQueryWrapper<AgtAgent>()
                 .eq(AgtAgent::getAgentNo, agentNo).last("limit 1"));
         return a == null ? null : toBrief(a);
+    }
+
+    @Override
+    public boolean readyForDevices(String agentNo) {
+        AgtAgent a = agentNo == null || agentNo.isBlank() ? null : agents.selectOne(new LambdaQueryWrapper<AgtAgent>()
+                .eq(AgtAgent::getAgentNo, agentNo).last("limit 1"));
+        return a != null && ai.neargo.sharehub.agent.AgentStatus.ENABLED.name().equals(a.getStatus())
+                && a.getAddress() != null && !a.getAddress().isBlank() && a.getLng() != null && a.getLat() != null
+                && a.getIndustry() != null && !a.getIndustry().isBlank();
+    }
+
+    @Override
+    public String defaultSiteNo(String agentNo) {
+        AgtAgent a = agentNo == null || agentNo.isBlank() ? null : agents.selectOne(new LambdaQueryWrapper<AgtAgent>()
+                .eq(AgtAgent::getAgentNo, agentNo).last("limit 1"));
+        return a == null ? null : a.getDefaultSiteNo();
+    }
+
+    @Override
+    public MerchantTaxProfile taxProfileOf(String agentNo) {
+        AgtAgent a = agentNo == null || agentNo.isBlank() ? null : agents.selectOne(new LambdaQueryWrapper<AgtAgent>()
+                .eq(AgtAgent::getAgentNo, agentNo).last("limit 1"));
+        return a == null ? null : new MerchantTaxProfile(a.getAgentNo(), a.getName(), a.getAddress(), a.getVatTrn());
+    }
+
+    @Override
+    public java.math.BigDecimal fixedPerOrder(String agentNo, String onDate) {
+        if (agentNo == null || agentNo.isBlank()) return null;
+        var c = commissions.selectOne(new LambdaQueryWrapper<ai.neargo.sharehub.agent.ext.entity.AgtCommission>()
+                .eq(ai.neargo.sharehub.agent.ext.entity.AgtCommission::getAgentNo, agentNo)
+                .eq(ai.neargo.sharehub.agent.ext.entity.AgtCommission::getDimension, "ORDER_COUNT")
+                .eq(ai.neargo.sharehub.agent.ext.entity.AgtCommission::getStatus, "ACTIVE")
+                .le(onDate != null, ai.neargo.sharehub.agent.ext.entity.AgtCommission::getEffectiveAt, onDate)
+                .orderByDesc(ai.neargo.sharehub.agent.ext.entity.AgtCommission::getEffectiveAt).last("limit 1"));
+        return c == null || c.getFixedAmount() == null || c.getFixedAmount().signum() <= 0 ? null : c.getFixedAmount();
     }
 
     private AgentBrief toBrief(AgtAgent a) {

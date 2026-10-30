@@ -31,7 +31,8 @@ export const en: Messages = {
     disabled: "Disabled",
     mockData: "Mock data",
     logout: "Sign out",
-    agent: "Agent",
+    menu: "Menu",
+    agent: "Merchant",
     soon: "Soon",
     switchView: "Switch view",
     more: "More",
@@ -67,7 +68,7 @@ export const en: Messages = {
   lang: { label: "Language", zh: "中文", en: "English", ar: "العربية" },
   online: { ONLINE: "Online", OFFLINE: "Offline" },
   orderStatus: {
-    CREATED: "Created", DISPENSING: "Dispensing", IN_USE: "In use",
+    CREATED: "Created", DISPENSING: "Dispensing", IN_USE: "In use", OVERDUE_CHARGED: "Charged, not returned",
     RETURNED: "Returned", SETTLED: "Settled", CLOSED: "Closed", EXCEPTION: "Exception",
   },
   woStatus: {

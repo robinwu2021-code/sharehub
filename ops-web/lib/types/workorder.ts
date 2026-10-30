@@ -114,8 +114,20 @@ export interface WorkOrder {
 }
 
 /** 开单入参（页面「新建工单」抽屉提交的形状）。 */
+/**
+ * 撤机去向（后端 RemovalDisposition，ae233365 · V164）：
+ * 回商家待绑定 = 同一商家换点位 / 换站点，不生成回仓单；回仓 = 退出、维修、返厂（缺省）。
+ */
+export type RemovalDisposition = "RETURN_TO_POOL" | "RETURN_TO_WAREHOUSE";
+export const REMOVAL_DISPOSITION_LABEL: Record<RemovalDisposition, string> = {
+  RETURN_TO_WAREHOUSE: "回仓（退出 / 维修 / 返厂）",
+  RETURN_TO_POOL: "回商家待绑定（同一商家换点位 / 换站点）",
+};
+
 export interface WorkOrderDraft {
   type: WorkOrderType;
+  /** 仅撤机单（REMOVE）用；缺省回仓。 */
+  disposition?: RemovalDisposition;
   cabinetNo: string;
   locationName?: string;
   priority: WorkOrderPriority;

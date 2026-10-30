@@ -16,6 +16,7 @@ import ai.neargo.sharehub.report.service.ReportService;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -45,10 +46,69 @@ public class ReportController {
 
     private final ReportService reportService;
     private final PermChecker perm;
+    private final ExportSupport exports;
 
-    public ReportController(ReportService reportService, PermChecker perm) {
+    private final ai.neargo.sharehub.inv.service.InventoryReportService inventoryReports;
+
+    public ReportController(ReportService reportService, PermChecker perm, ExportSupport exports,
+                            ai.neargo.sharehub.inv.service.InventoryReportService inventoryReports) {
+        this.inventoryReports = inventoryReports;
         this.reportService = reportService;
         this.perm = perm;
+        this.exports = exports;
+    }
+
+    /**
+     * 三张周期报表的后端导出（K8 / RQ-RPT-03 / AC-09）：同列表的筛选、全量（到 {@link ExportSupport#MAX_ROWS}），
+     * {@code format=xlsx|pdf}。权限同 trend：按 kind 逐个校验，OPS 导不出财务报表。
+     */
+    @GetMapping("/{kind}/export")
+    @PreAuthorize("@perm.can('report:device:read') or @perm.can('report:location:read') "
+            + "or @perm.can('report:finance:read')")
+    public void export(@PathVariable String kind,
+                       @RequestParam(required = false) String format,
+                       @RequestParam(required = false) String keyword,
+                       @RequestParam(required = false) String period,
+                       jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        String k = kind.trim().toLowerCase();
+        String code = switch (k) {
+            case "device", "location", "finance" -> "report:" + k + ":read";
+            default -> throw ai.neargo.sharehub.common.BizException.badRequest("error.common.invalid_value", "kind");
+        };
+        if (!perm.can(code)) throw new AccessDeniedException(code);
+        var fmt = ai.neargo.sharehub.common.export.ExportFormat.of(format);
+        String filter = java.util.stream.Stream.of(keyword, period).filter(v -> v != null && !v.isBlank())
+                .collect(java.util.stream.Collectors.joining(" · "));
+        ai.neargo.sharehub.common.export.ExportFile file = switch (k) {
+            case "device" -> {
+                var f = ExportSupport.fetchAll((p, sz) -> reportService.device(p, sz, keyword, period).getList());
+                yield exports.render(fmt, "export.report.device", filter,
+                        java.util.List.of("export.col.location", "export.col.online_rate", "export.col.turnover",
+                                "export.col.fault_rate", "export.col.cabinets", "export.col.orders"),
+                        f.rows().stream().map(r -> java.util.Arrays.<Object>asList(r.locationName(), r.onlineRate(),
+                                r.turnover(), r.faultRate(), r.cabinetCount(), r.orders())).toList(),
+                        f.truncated(), "device-report");
+            }
+            case "location" -> {
+                var f = ExportSupport.fetchAll((p, sz) -> reportService.location(p, sz, keyword, period).getList());
+                yield exports.render(fmt, "export.report.location", filter,
+                        java.util.List.of("export.col.site", "export.col.revenue", "export.col.cost", "export.col.payback",
+                                "export.col.roi", "export.col.orders", "export.col.currency"),
+                        f.rows().stream().map(r -> java.util.Arrays.<Object>asList(r.siteName(), r.revenue(), r.cost(),
+                                r.payback(), r.roi(), r.orders(), r.currency())).toList(),
+                        f.truncated(), "site-report");
+            }
+            default -> {
+                var f = ExportSupport.fetchAll((p, sz) -> reportService.finance(p, sz, keyword, period).getList());
+                yield exports.render(fmt, "export.report.finance", filter,
+                        java.util.List.of("export.col.period", "export.col.gmv", "export.col.share", "export.col.settle",
+                                "export.col.net", "export.col.currency"),
+                        f.rows().stream().map(r -> java.util.Arrays.<Object>asList(r.period(), r.gmv(), r.share(),
+                                r.settle(), r.net(), r.currency())).toList(),
+                        f.truncated(), "finance-report");
+            }
+        };
+        file.writeTo(response);
     }
 
     // —— 三张周期报表（统计到昨日，T+1）——
@@ -69,6 +129,15 @@ public class ReportController {
                                                @RequestParam(required = false) String keyword,
                                                @RequestParam(required = false) String period) {
         return reportService.location(page, size, keyword, period);
+    }
+
+    /** 库存报表（V206）：现算，不走 T+1 快照；期间默认本月。 */
+    @GetMapping("/inventory")
+    @PreAuthorize("@perm.can('report:inventory:read')")
+    public ai.neargo.sharehub.inv.dto.InventoryReportDtos.InventoryReport inventory(
+            @RequestParam(required = false) java.time.LocalDate from, @RequestParam(required = false) java.time.LocalDate to,
+            @RequestParam(required = false) String warehouseNo) {
+        return inventoryReports.report(from, to, warehouseNo);
     }
 
     @GetMapping("/finance")

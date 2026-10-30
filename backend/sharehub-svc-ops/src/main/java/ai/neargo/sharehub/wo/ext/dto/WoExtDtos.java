@@ -57,7 +57,17 @@ public final class WoExtDtos {
     public record WorkOrderDraft(String type, String source, String sourceNo, String priority,
                                  String cabinetNo, String locationNo, String locationName,
                                  String agentNo, String siteNo, String description,
-                                 String expectedAt) {
+                                 String expectedAt,
+                                 // V164：撤机去向 RETURN_TO_POOL / RETURN_TO_WAREHOUSE（只对撤机单有效，缺省回仓）
+                                 String disposition) {
+
+        /** V164 之前的形状：去向缺省（撤机单按回仓）。 */
+        public WorkOrderDraft(String type, String source, String sourceNo, String priority,
+                              String cabinetNo, String locationNo, String locationName,
+                              String agentNo, String siteNo, String description, String expectedAt) {
+            this(type, source, sourceNo, priority, cabinetNo, locationNo, locationName, agentNo, siteNo, description,
+                    expectedAt, null);
+        }
     }
 
     /** 接单入参。 */

@@ -8,6 +8,7 @@
 import { client } from "../http-client";
 import type { ReportApi } from "../contracts/report";
 import type { PageQ, ReportQ, ReportTrendQ, ReportCustomQ } from "../query";
+import { downloadFile } from "../download";
 
 export const reportHttp: ReportApi = {
   // ⚠️ 后端缺口：period=LAST_7D|LAST_30D|LAST_13W|LAST_12M
@@ -16,6 +17,7 @@ export const reportHttp: ReportApi = {
   listReportLocation: (q?: ReportQ) => client.get("/api/ops/reports/location", q),
   // ⚠️ 后端缺口
   listReportFinance: (q?: ReportQ) => client.get("/api/ops/reports/finance", q),
+  exportReport: (kind, format, q = {}) => downloadFile(`/api/ops/reports/${kind}/export`, { format, ...q }, `${kind}-report.${format}`),
   // ⚠️ 后端缺口
   listReportScreen: (q?: PageQ) => client.get("/api/ops/reports/screen", q),
   // ⚠️ 后端缺口：dim=SITE|SCENE|MONTH & metrics=GMV,ORDERS,...（csv 多值）
@@ -28,4 +30,5 @@ export const reportHttp: ReportApi = {
   listReportMetrics: () => client.get("/api/ops/reports/metrics"),
   // ⚠️ 后端缺口：消费者漏斗 + 画像
   getConsumerInsight: () => client.get("/api/ops/reports/consumer-insight"),
+  getInventoryReport: (q) => client.get("/api/ops/reports/inventory", q ?? {}),
 };

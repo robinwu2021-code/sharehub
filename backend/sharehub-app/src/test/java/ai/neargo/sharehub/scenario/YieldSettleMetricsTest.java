@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.scenario;
 
+import ai.neargo.sharehub.support.LegacyShareParams;
 import ai.neargo.sharehub.alarm.engine.AlarmEngine;
 import ai.neargo.sharehub.finance.service.SettlementService;
 import ai.neargo.sharehub.support.ApiTestSupport;
@@ -31,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 执行清单批次 G：低效站点（G1）· 保底补差（G2）· 对账单（G3）· 工单成本（G4）· 运营指标（G5）。
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@LegacyShareParams
 class YieldSettleMetricsTest extends ApiTestSupport {
 
     @Autowired

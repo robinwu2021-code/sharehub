@@ -41,11 +41,13 @@ import java.time.ZoneOffset;
 @TestConfiguration
 public class FixedBizClock {
 
-    /** 业务时区（+4）刚跨入 10-01 的那一瞬：UTC 20:30 → 迪拜 2026-10-01 00:30。跨日**且**跨月。 */
-    public static final Instant JUST_AFTER_BIZ_MIDNIGHT = Instant.parse("2026-09-30T20:30:00Z");
+    /** 业务时区（+4）刚跨入 07-01 的那一瞬：UTC 20:30 → 迪拜 2030-07-01 00:30。跨日**且**跨月。 */
+    // 2026-10-29 从 2026-09-30 挪到 2030：用例要求「真实日期」与钉住的业务日期不同月、且钉住的在未来，
+    // 真实日历走到 2026-10 那天起 ReferFeePeriod / TodayWindow 的前提就不成立了。挪远一点，几年内不用再动
+        public static final Instant JUST_AFTER_BIZ_MIDNIGHT = Instant.parse("2030-06-30T20:30:00Z");
 
-    /** 业务时区仍在 09-30 的最后半小时：UTC 19:30 → 迪拜 2026-09-30 23:30。 */
-    public static final Instant JUST_BEFORE_BIZ_MIDNIGHT = Instant.parse("2026-09-30T19:30:00Z");
+    /** 业务时区仍在 06-30 的最后半小时：UTC 19:30 → 迪拜 2030-06-30 23:30。 */
+    public static final Instant JUST_BEFORE_BIZ_MIDNIGHT = Instant.parse("2030-06-30T19:30:00Z");
 
     /**
      * 可变的固定时钟 —— 一个上下文里要验多个时刻，不想为此起多个 Spring 上下文。

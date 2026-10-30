@@ -460,7 +460,18 @@ const TRANSFER_STATUS_LABEL: Record<InvTransferStatus, string> = {
 export class TransferError extends Error {
   constructor(msg: string) { super(msg); this.name = "TransferError"; }
 }
-export const saveOtaRollout = (x: Partial<OtaRollout>) => upsert(otaRollouts, x, "rolloutNo", () => nextNo("OTA", otaRollouts));
+/** 新建投放：必须挂版本库（版本号 / 供应商取版本库）；按设备 / 点位投放须给对象（同后端 OtaServiceImpl）。 */
+export const saveOtaRollout = (x: Partial<OtaRollout>) => {
+  if (!x.rolloutNo) {
+    if (!x.releaseNo) fail("请选择版本库里的固件版本", "releaseNo is required");
+    const rel = otaReleases.find((r) => r.releaseNo === x.releaseNo) ?? notFound("固件版本", "Release", x.releaseNo!);
+    const scope = x.scope ?? "ALL";
+    if (scope !== "ALL" && !x.targetRef?.trim()) fail("按设备或点位投放须填写投放对象", "targetRef is required");
+    x = { ...x, fwVersion: rel.version, vendorCode: rel.vendorCode ?? undefined, scope, targetRef: scope === "ALL" ? null : x.targetRef!.trim(),
+      strategy: x.strategy ?? "GRAY", progress: x.progress ?? 0, status: x.status ?? "PENDING" };
+  }
+  return upsert(otaRollouts, x, "rolloutNo", () => nextNo("OTA", otaRollouts));
+};
 
 /** 版本库查询：关键词(版本号/发布单号/说明) + 固件类型 / 供应商 / 发布状态三筛。 */
 export const listOtaReleases = (q: PageQuery & { fwType?: string; vendorCode?: string; status?: string } = {}) =>
@@ -508,9 +519,10 @@ export const unarchivePowerbank = (no: string) => unarchiveRow(powerbanks, "powe
 export function importCabinets(rows: Partial<Cabinet>[]): { imported: number; updated: number } {
   let imported = 0, updated = 0;
   for (const r of rows) {
-    // 归属站点/站点名不从 CSV 里塞（模板也没这两列）：由点位反查，否则一台机柜会有互相矛盾的归属。
-    // 点位留空即「到货未上架」，归属随之清空——CSV 的空值是明确表态，不是「保持原样」。
-    const row = { ...r, ...cabinetPlacement(r.locationNo) };
+    // 2026-10-28：导入不再受理点位（模板也去掉了这一列）—— 上点位只走出库单的绑定（ae233365 · V164）。
+    // 新导入的柜子一律在库、无归属；已存在的柜子重导不动它的点位与归属。
+    const { locationNo: _ignored, siteNo: _s, agentNo: _a, locationName: _n, ...rest } = r;
+    const row = rest;
     const i = cabinets.findIndex((c) => c.cabinetNo === row.cabinetNo);
     if (i >= 0) { cabinets[i] = { ...cabinets[i], ...row }; updated++; }
     else { cabinets.unshift({ ...DEFAULT_CABINET, ...row } as Cabinet); imported++; }
@@ -562,10 +574,12 @@ export function saveCabinet(x: Partial<Cabinet> & { cabinetNo?: string }): Cabin
     throw new CabinetError(`仓位数不得小于当前在仓充电宝数（${prev.availableCount}）：请先调拨出宝再缩仓`);
   }
 
-  const locationNo = (x.locationNo ?? "").trim() || null;
-  if (locationNo && !locations.some((l) => l.locationNo === locationNo)) {
-    throw new CabinetError(`点位不存在：${locationNo}，请先在「渠道与场地 · 点位管理」建档`);
+  // 改点位不走编辑（后端 400 error.device.bind_via_action，ae233365 · V164）：上点位只经出库单绑定，
+  // 那里校验「点位商家 = 出库单商家」。编辑带了不同的点位直接拒；新建一律在库、无点位。
+  if (x.locationNo !== undefined && (x.locationNo || null) !== (prev?.locationNo ?? null)) {
+    throw new CabinetError("改点位请走「库存管理 › 出库单」的绑定 / 解绑，编辑不改点位");
   }
+  const locationNo = prev?.locationNo ?? null;
 
   const row: Cabinet = {
     ...(prev ?? DEFAULT_CABINET),

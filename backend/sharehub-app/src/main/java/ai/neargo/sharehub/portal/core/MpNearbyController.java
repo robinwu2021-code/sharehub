@@ -190,8 +190,17 @@ public class MpNearbyController {
             out.put("borrowable", cards.borrowable(c));
             out.put("pricePerHour", q.perHour());
             out.put("dailyCap", q.dailyCap());
-            out.put("buyoutPrice", billing == null || billing.buyoutPrice() == null
-                    ? BigDecimal.ZERO : billing.buyoutPrice());
+            /*
+             * 买断价与最高收费取**这台柜子命中的计费方案**（D4，2026-10-29）—— 与借出时定格进订单快照、
+             * 之后实扣的是同一份数。此前读系统设置的默认买断价：用户看到的和实际扣的是两个来源，消费者披露风险。
+             * 方案没配才回落到系统默认。
+             */
+            BigDecimal fallback = billing == null || billing.buyoutPrice() == null ? BigDecimal.ZERO : billing.buyoutPrice();
+            out.put("buyoutPrice", q.lostCharge() != null ? q.lostCharge() : fallback);
+            out.put("maxCharge", q.maxCharge() != null ? q.maxCharge() : fallback);
+            // 两者不同 = 方案配了独立遗失费（K5）：借出页要分开写「最高租赁收费」与「遗失费」
+            out.put("lostFeeSeparate", q.lostCharge() != null && q.maxCharge() != null
+                    && q.lostCharge().compareTo(q.maxCharge()) != 0);
             out.put("depositAmount", DEPOSIT_AMOUNT);
             out.put("freeQuota", DEPOSIT_AMOUNT);
             out.put("currency", q.currency());

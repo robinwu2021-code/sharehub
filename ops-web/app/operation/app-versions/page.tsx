@@ -16,6 +16,7 @@ import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import type { AppVersion } from "@/lib/types";
 import { useCan } from "@/lib/hooks/use-can";
+import { featureReady } from "@/lib/backend-ready";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { currentReleased, grayRelease, validateAppVersion } from "@/lib/rules/operation-rules";
@@ -187,7 +188,11 @@ export default function AppVersionsPage() {
             {v.status === "DRAFT" && (
               <>
                 <Button size="sm" variant="outline" onClick={() => openEdit(v)}><Pencil className="size-4" /> 编辑</Button>
-                <Button size="sm" onClick={() => publish(v)}><Rocket className="size-4" /> 发布</Button>
+                {/* S15 OPT-S15-09：后端还没有发布动作，真实后端下点了状态不会变 —— 禁用并写明原因，不让人以为发出去了 */}
+                <Button size="sm" onClick={() => publish(v)} disabled={!featureReady("app-versions.publish")}
+                  title={featureReady("app-versions.publish") ? undefined : "后端尚无发布动作（服务端评审 S15 OPT-S15-09），补上后可用"}>
+                  <Rocket className="size-4" /> 发布
+                </Button>
               </>
             )}
             {v.status === "RELEASED" && (

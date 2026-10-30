@@ -156,6 +156,17 @@ public class AgentExtController {
      *
      * <p>动作枚举仍写 {@code REVOKE}（库里存量如此），前端适配层已做 REVOKE→RECLAIM 映射。
      */
+        /**
+     * 批量整站换商家（V165）：一个事务，任一站点不满足整批不动 —— 替代前端逐个发请求（S5 OPT-S5-12）。
+     * 只收站点；机柜与点位的商家由站点派生。
+     */
+    @PostMapping("/assignments/batch")
+    @PreAuthorize("@perm.can('agent:scope:assign')")
+    public java.util.List<AssignmentLog> assignBatch(@RequestBody ai.neargo.sharehub.agent.ext.dto.AgentExtDtos.AssignBatchReq body) {
+        return assignmentService.assignBatch(body == null ? null : body.agentNo(), body == null ? null : body.siteNos(),
+                body == null || body.action() == null ? "ASSIGN" : body.action(), body == null ? null : body.operator());
+    }
+
     @PostMapping("/assignments/reclaim")
     @PreAuthorize("@perm.can('agent:scope:assign')")
     public java.util.List<AssignmentLog> reclaim(@RequestBody ReclaimReq body) {

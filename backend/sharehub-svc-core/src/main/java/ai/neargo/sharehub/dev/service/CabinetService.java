@@ -10,6 +10,10 @@ import java.util.Map;
 /** 设备业务：柜机列表/详情(含派生仓位)/远程指令(转 access-gateway 占位)。 */
 public interface CabinetService {
     PageResult<Cabinet> page(Integer page, Integer size, String keyword, String onlineStatus, String status);
+
+    /** 带出库池筛选（V161）：{@code pool} = UNBOUND / BOUND / 空。 */
+    PageResult<Cabinet> page(Integer page, Integer size, String keyword, String onlineStatus, String status,
+                             String issuedAgentNo, String pool);
     CabinetDetail detail(String cabinetNo);
 
     /** 某站点下全部在用机柜（C 端找柜/门店详情）。 */

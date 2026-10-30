@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 机柜状态机 / 上线门禁 / 试借还 / 保护动作 / 停借保还（TDD-运营核心流程/04 §六）。
  * 设备信号经 DeviceSignalService 注入 —— 与网关推送的 /internal/events/device 同一入口。
  */
+@ai.neargo.sharehub.support.VenueGateOn
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DeviceLifecycleTest extends ApiTestSupport {
 
@@ -52,6 +53,28 @@ class DeviceLifecycleTest extends ApiTestSupport {
     @BeforeAll
     void tokens() {
         admin = login("ADMIN");
+    }
+
+    @Test
+    @DisplayName("⓪ 一期跳过合同 / 勘测（V174 开关为 0）：两项照列、判通过、写明一期跳过；站点开业清单同样")
+    void phase1SkipsContractAndSurvey() {
+        jdbc.update("UPDATE sys_param SET value='0' WHERE tenant_id='MAIN' AND param_key='site.venue_gate.enabled'");
+        try {
+            Fx f = fixture(false);
+            JsonNode gate = get("/api/ops/devices/" + f.cabinet + "/go-live-gate", admin).okData();
+            assertThat(failed(gate)).doesNotContain("CONTRACT", "SURVEY").contains("ONLINE", "TRIAL");
+            JsonNode opening = get("/api/ops/sites/" + f.site + "/opening-checklist", admin).okData();
+            for (JsonNode g : java.util.List.of(gate, opening)) {
+                for (JsonNode i : g.path("items")) {
+                    if (java.util.Set.of("CONTRACT", "SURVEY").contains(i.path("key").asText())) {
+                        assertThat(i.path("passed").asBoolean()).isTrue();
+                        assertThat(i.path("detail").asText()).contains("一期跳过");
+                    }
+                }
+            }
+        } finally {
+            jdbc.update("UPDATE sys_param SET value='1' WHERE tenant_id='MAIN' AND param_key='site.venue_gate.enabled'");
+        }
     }
 
     @Test
@@ -100,15 +123,18 @@ class DeviceLifecycleTest extends ApiTestSupport {
     }
 
     @Test
-    @DisplayName("③⑨ 编辑带 status 被忽略；已布放换点位 409；撤机后换点位 → 试借还项重新未通过")
+    @DisplayName("③⑨ 编辑带 status 被忽略；编辑改点位 400、已布放绑定 409；撤机后绑定新点位 → 试借还项重新未通过")
     void editIgnoresStatusAndRelocation() {
         Fx f = fixture(true);
         assertThat(post("/api/ops/cabinets/" + f.cabinet, Map.of("status", "RETIRED"), admin).okData().path("status").asText())
                 .isEqualTo("DEPLOYED");
         String other = location(f.site);
-        assertThat(post("/api/ops/cabinets/" + f.cabinet, Map.of("locationNo", other), admin).status).isEqualTo(409);
+        // V164：点位不再经编辑改，只经绑定动作；已上线的先撤机
+        assertThat(post("/api/ops/cabinets/" + f.cabinet, Map.of("locationNo", other), admin).status).isEqualTo(400);
+        assertThat(post("/api/ops/devices/" + f.cabinet + "/bind", Map.of("locationNo", other), admin).status).isEqualTo(409);
         post("/api/ops/devices/" + f.cabinet + "/undeploy", Map.of("reason", "迁机"), admin).okData();
-        post("/api/ops/cabinets/" + f.cabinet, Map.of("locationNo", other), admin).okData();
+        // 直营站点（商家为空）不经出库池：撤机后直接绑到同站点的另一个点位
+        post("/api/ops/devices/" + f.cabinet + "/bind", Map.of("locationNo", other), admin).okData();
         assertThat(failed(get("/api/ops/devices/" + f.cabinet + "/go-live-gate", admin).okData())).contains("TRIAL");
     }
 

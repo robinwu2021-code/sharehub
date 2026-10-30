@@ -4,6 +4,7 @@ import type {
   Site, SitePoint, Venue, Contract, ContractAttachment, ContractAttachmentReq,
   Lead, LeadStage, LeadFollowUp, LeadFollowUpReq, LeadSaveReq, LeadQ, LeadConvertReq, LeadConversion,
   VenueOnboarding, LifecycleRow, FunnelStage, PageQuery,
+  ContractSaveReq, ContractTerms, ContractShareMode,
 } from "../../types";
 import {
   SITE_COORD_BOUNDS,
@@ -73,6 +74,13 @@ export const contracts: Contract[] = Array.from({ length: 18 }, (_, i) => ({
         size: 1_200_000 + i * 40_000, uploadedBy: p(OPERATORS, i), uploadedAt: iso(i * 30 * 86400_000 - 86400_000),
       }]
     : [],
+  // 默认条款：存量合同最常见的「纯分成、按净额、AED、按月」。没有这一份，详情的条款区从不出现，
+  // 编辑表单也摊不出条款 —— 而真后端的存量行同样有这些列（share_mode 等，缺省按保存时推断）。
+  terms: {
+    shareMode: "SHARE", shareBase: "NET", guaranteeAmount: null, currency: "AED", settlePeriod: "MONTH",
+    depositAmount: null, depositTerms: null, exclusive: false, deviceQuota: null, placementNote: null,
+    autoRenew: false, signerName: null, remark: null,
+  },
 }));
 
 export const leads: Lead[] = Array.from({ length: 20 }, (_, i) => ({
@@ -275,12 +283,70 @@ export const saveVenue = (x: Partial<Venue>) => upsert(venues, x, "venueNo", () 
  * 合同保存。附件不经此路径写入（走 addContractAttachment），但这里必须**兜住不被清空**：
  * 页面的编辑抽屉是字段配置化的，提交体里没有 attachments，直接 upsert 会把已有扫描件抹掉。
  */
-export const saveContract = (x: Partial<Contract>) => {
+const TERM_KEYS = [
+  "shareMode", "shareBase", "guaranteeAmount", "currency", "settlePeriod", "depositAmount", "depositTerms",
+  "exclusive", "deviceQuota", "placementNote", "autoRenew", "signerName", "remark",
+] as const;
+const numOrNull = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
+
+/**
+ * 合同保存。入参平铺（与后端 `ContractReq` 同形），条款收进 `terms`。
+ *
+ * 条款规则与后端 `ContractServiceImpl` 逐条一致：
+ *  · 未给分成模式按填了什么推断（比例 > 0 → 纯分成；否则进场费 > 0 → 固定进场费；否则免费入驻）；
+ *  · 比例在 0~1；纯分成要比例 > 0；保底 + 分成要比例 > 0 且保底 > 0；固定进场费要进场费 > 0；
+ *  · 免费入驻与固定进场费把比例归零，只有保底 + 分成留保底，免费入驻进场费归零；
+ *  · 币种缺省 AED、结算周期缺省按月、分成基数缺省净额。
+ * 入参里**一个条款键都没有**时（测试夹具只改状态）保留原条款，不按缺省覆盖。
+ */
+export const saveContract = (x: ContractSaveReq) => {
   const cur = contracts.find((c) => c.contractNo === x.contractNo);
+  const hasTerms = TERM_KEYS.some((k) => k in x);
+  const rate = Number(x.shareRate ?? cur?.shareRate ?? 0);
+  const fee = Number(x.entryFee ?? cur?.entryFee ?? 0);
+  // 用 || 不用 ??：表单下拉未选时是空串，空串也要按「没给」推断（后端 notBlank 同口径）
+  const mode: ContractShareMode = x.shareMode
+    || (hasTerms ? undefined : cur?.terms?.shareMode || undefined)
+    || (rate > 0 ? "SHARE" : fee > 0 ? "ENTRY_FEE" : "FREE");
+  if (rate < 0 || rate > 1) fail(`分成比例须在 0~1 之间：${rate}`, `Share rate must be between 0 and 1: ${rate}`);
+  const guarantee = numOrNull(hasTerms ? x.guaranteeAmount : cur?.terms?.guaranteeAmount);
+  if ((mode === "SHARE" || mode === "GUARANTEE") && !(rate > 0)) fail("该分成模式须填写大于 0 的分成比例", "A share rate above 0 is required for this mode");
+  if (mode === "GUARANTEE" && !(Number(guarantee) > 0)) fail("保底 + 分成须填写大于 0 的保底金额", "A guarantee amount above 0 is required");
+  if (mode === "ENTRY_FEE" && !(fee > 0)) fail("固定进场费模式须填写大于 0 的进场费", "An entry fee above 0 is required");
+
+  const flat: Record<string, unknown> = { ...x };
+  for (const k of TERM_KEYS) delete flat[k];
+  delete flat.terms;
+  delete flat.flow;
+  const terms: ContractTerms = hasTerms
+    ? {
+        shareMode: mode,
+        shareBase: x.shareBase || "NET",
+        guaranteeAmount: mode === "GUARANTEE" ? guarantee : null,
+        currency: x.currency?.trim() || "AED",
+        settlePeriod: x.settlePeriod || "MONTH",
+        depositAmount: numOrNull(x.depositAmount),
+        depositTerms: x.depositTerms?.trim() || null,
+        exclusive: x.exclusive ?? null,
+        deviceQuota: numOrNull(x.deviceQuota),
+        placementNote: x.placementNote?.trim() || null,
+        autoRenew: x.autoRenew ?? null,
+        signerName: x.signerName?.trim() || null,
+        remark: x.remark?.trim() || null,
+      }
+    : { ...(cur?.terms ?? {
+        shareMode: mode, shareBase: "NET", guaranteeAmount: null, currency: "AED", settlePeriod: "MONTH",
+        depositAmount: null, depositTerms: null, exclusive: null, deviceQuota: null, placementNote: null,
+        autoRenew: null, signerName: null, remark: null,
+      }), shareMode: mode };
   // 表单里已没有状态（R1）：新建不带状态时落 DRAFT（与后端 create 同），编辑保持原状态。
   // 显式带 status 的只剩测试夹具（造一份已生效合同验牵线费），这里不拦它们。
   return upsert(contracts, {
-    ...x, status: x.status ?? cur?.status ?? "DRAFT", attachments: x.attachments ?? cur?.attachments ?? [],
+    ...(flat as Partial<Contract>),
+    shareRate: mode === "FREE" || mode === "ENTRY_FEE" ? 0 : rate,
+    entryFee: mode === "FREE" ? 0 : fee,
+    terms,
+    status: x.status ?? cur?.status ?? "DRAFT", attachments: x.attachments ?? cur?.attachments ?? [],
   }, "contractNo", () => nextNo("CT", contracts));
 };
 /**
@@ -744,3 +810,22 @@ export const archivePoint = (no: string) => archiveRow(locations, "locationNo", 
 export const unarchivePoint = (no: string) => unarchiveRow(locations, "locationNo", no);
 export const archiveVenue = (no: string) => archiveRow(venues, "venueNo", no);
 export const unarchiveVenue = (no: string) => unarchiveRow(venues, "venueNo", no);
+
+// ————————————————————————————— 站点的默认点位（设备出库与绑定 · 技术设计 §2.3） —————————————————————————————
+
+/**
+ * 站点的默认点位：没有就建一个（每站至多一个，技术设计 §2.3）。
+ * 点位的商家由站点派生 —— 今天后端新建点位从不写它，商家因此看不到自己的新点位（技术设计 §一）。
+ */
+export function ensureDefaultPoint(siteNo: string): SitePoint {
+  const site = sites.find((s) => s.siteNo === siteNo) ?? notFound("站点", "Site", siteNo);
+  const existing = locations.find((l) => l.siteNo === siteNo && l.isDefault && !l.archivedAt);
+  if (existing) return existing;
+  const point: SitePoint = {
+    locationNo: nextNo("LOC", locations, 200, "locationNo"),
+    name: `${site.name} · 默认点位`, siteNo, siteName: site.name, spotDesc: "建站时自动建",
+    cabinetCount: 0, status: "ACTIVE", archivedAt: null, isDefault: true, agentNo: site.agentNo ?? null,
+  };
+  locations.unshift(point);
+  return point;
+}

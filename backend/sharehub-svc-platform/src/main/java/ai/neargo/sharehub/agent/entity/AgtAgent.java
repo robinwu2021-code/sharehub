@@ -28,6 +28,23 @@ public class AgtAgent extends BaseEntity implements ai.neargo.sharehub.common.cr
     private String phone;
     /** 联系邮箱，同上。 */
     private String email;
+
+    /**
+     * 位置（V157，商家核心资料，需求方案 D6）：地址 + 坐标三者同时写入。
+     * 补齐后系统建默认站点；缺位置或行业时不能划拨设备。
+     */
+    private String address;
+    private java.math.BigDecimal lng;
+    private java.math.BigDecimal lat;
+    /** 行业（V157）：与场地方同一词表 {@link ai.neargo.sharehub.loc.VenueIndustry}。 */
+    private String industry;
+    /** 默认站点（V157）：补齐位置时系统所建，商家端不出现「站点」这个词。 */
+    private String defaultSiteNo;
+    /** VAT 税号（V183，C10 自开票）：空 = 非 VAT 登记户，分成付款不出自开票单据。 */
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private String vatTrn;
+    /** 营业执照号（V185，运营方原文 MER-01）：发票与合同上要用。 */
+    private String licenseNo;
     private String regionScope;
 
     /**
