@@ -1,9 +1,9 @@
 "use client";
 
-// 库存余额（OM03-08）：当前有多少 —— 按仓库 / 商家 / 型号汇总柜机与充电宝的各状态数量。
+// 库存余额（OM03-08）：默认看库存账（独立进销存，对接明细 B01，见 stock-service-balance）。
 //
-// 由两个既有读端点在页内汇总（listCabinets / listPowerbanks，全量拉取），不新增后端端点：
-// 资产只由设备模块记账，这里就是台账口径的计数。**设备上报的可借数不冲抵资产库存** ——
+// 「设备台账（按状态）」是另一个口径：由 listCabinets / listPowerbanks 在页内汇总，按仓库 / 商家 / 型号数
+// 柜机与充电宝的各状态（含已投放、借出），回答的是「资产在哪、什么状态」，**不是库存账**。**设备上报的可借数不冲抵资产库存** ——
 // 一台在用柜机里有几颗宝是在线运行的事，不改变它们作为资产的状态与归属。
 //
 // 充电宝的「商家」取所在柜机的归属：宝本身不挂商家，它在谁的柜子里就随谁。
@@ -22,6 +22,7 @@ import { CAB_STATUS, PB_STATUS } from "@/components/device/device-maps";
 import type { Cabinet, CabinetStatus, Powerbank, PowerbankStatus } from "@/lib/types";
 import { tally, totalRow, type StockRow as Row } from "@/lib/stock-tally";
 import { StockStagesTable } from "./stock-stages";
+import { ServiceBalance } from "./stock-service-balance";
 
 type Kind = "CABINET" | "POWERBANK";
 type Dim = "WAREHOUSE" | "OWNER" | "MODEL";
@@ -29,16 +30,19 @@ const DIM_LABEL: Record<Dim, string> = { WAREHOUSE: "按仓库", OWNER: "按商�
 const CAB_KEYS = Object.keys(CAB_STATUS) as CabinetStatus[];
 const PB_KEYS = Object.keys(PB_STATUS) as PowerbankStatus[];
 
-/** 库存余额：按状态汇总（台账口径）/ 按生命周期阶段（S6 统一视图）。 */
+type View = "ACCOUNT" | "STATUS" | "STAGE";
+
+/** 库存余额：库存账（库存服务，默认）/ 设备台账按状态 / 按生命周期阶段（S6 统一视图）。 */
 export function StockBalanceTab() {
-  const [view, setView] = useState<"STATUS" | "STAGE">("STATUS");
+  const [view, setView] = useState<View>("ACCOUNT");
   return (
     <div>
       <div className="mb-3">
-        <FilterSelect aria-label="视图" value={view} onChange={(v) => setView(v as "STATUS" | "STAGE")}
-          options={[{ value: "STATUS", label: "按状态汇总" }, { value: "STAGE", label: "按生命周期阶段" }]} />
+        <FilterSelect aria-label="视图" value={view} onChange={(v) => setView(v as View)}
+          options={[{ value: "ACCOUNT", label: "库存账（独立进销存）" }, { value: "STATUS", label: "设备台账（按状态）" },
+            { value: "STAGE", label: "按生命周期阶段" }]} />
       </div>
-      {view === "STATUS" ? <StatusBalance /> : <StockStagesTable />}
+      {view === "ACCOUNT" ? <ServiceBalance /> : view === "STATUS" ? <StatusBalance /> : <StockStagesTable />}
     </div>
   );
 }
@@ -127,7 +131,7 @@ function StatusBalance() {
         />
       </Toolbar>
       <p className="mb-3 txt-caption text-muted-foreground">
-        台账口径的当前数量（不含已归档），设备上报的可借数不冲抵资产库存。
+        设备台账口径（不是库存账）：本地设备表的当前状态数量，含已投放、借出（不含已归档）；设备上报的可借数不冲抵资产库存。
         {kind === "POWERBANK" && dim === "OWNER" && " 充电宝的商家取所在柜机的归属。"}
       </p>
       {missing ? (

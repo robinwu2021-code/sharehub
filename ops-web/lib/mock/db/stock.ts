@@ -1,7 +1,7 @@
 // 库存流水与盘点（S4）mock：演示按独立进销存引擎（盘点可用）。
 // 流水取 mock 履历里进出仓的行（同后端本地引擎口径）；盘点账面 = 该仓在库、未出库的柜机。
 import type {
-  InventoryEngine, StockStage, StockStageCode, StageItem, StageItems, IntakeItemType, StockPeriodRow, InventoryMigrationPlan, InventoryMigrationResult, MigrationCandidate, PageResult, StockCount, StockCountDetail, StockCountStatus, StockLedgerRow,
+  InventoryEngine, DeviceBalance, DeviceSerial, StockStage, StockStageCode, StageItem, StageItems, IntakeItemType, StockPeriodRow, InventoryMigrationPlan, InventoryMigrationResult, MigrationCandidate, PageResult, StockCount, StockCountDetail, StockCountStatus, StockLedgerRow,
 } from "../../types";
 import { fail, notFound } from "../../biz-error";
 import { cabinets, powerbanks, inventoryTransfers, transferItemsOf } from "./device";
@@ -122,14 +122,45 @@ const PB_STAGE: Partial<Record<StockStageCode, (p: Pb) => boolean>> = {
 };
 
 /** 统一库存视图（同后端 stages 口径）。 */
+/** 设备库存余额（同后端 B01，mock 以「在库」阶段的设备为库存服务的账）。 */
+export function deviceBalances(q: { warehouseNo?: string; itemType?: IntakeItemType } = {}): DeviceBalance[] {
+  ensurePoolSeed();
+  const types: IntakeItemType[] = q.itemType ? [q.itemType] : ["CABINET", "POWERBANK"];
+  return WAREHOUSES.filter((w) => !w.archivedAt && (!q.warehouseNo || w.warehouseNo === q.warehouseNo)).flatMap((w) => types.map((t) => {
+    const n = inStockSerials(w.warehouseNo, t).length;
+    return { warehouseNo: w.warehouseNo, warehouseName: w.name, itemType: t, onHand: n, reserved: 0, unavailable: 0, available: n };
+  }));
+}
+
+export function deviceSerials(q: { warehouseNo: string; itemType?: IntakeItemType; page?: number; size?: number }): PageResult<DeviceSerial> {
+  if (!q.warehouseNo) fail("请选择仓库", "Select a warehouse");
+  ensurePoolSeed();
+  const types: IntakeItemType[] = q.itemType ? [q.itemType] : ["CABINET", "POWERBANK"];
+  const all = types.flatMap((t) => inStockSerials(q.warehouseNo, t).map((serialNo) => ({ serialNo, itemType: t, warehouseNo: q.warehouseNo })))
+    .sort((a, b) => a.serialNo.localeCompare(b.serialNo));
+  const page = q.page ?? 1;
+  const size = q.size ?? 50;
+  return { list: all.slice((page - 1) * size, page * size), total: all.length };
+}
+
+function inStockSerials(warehouseNo: string, t: IntakeItemType): string[] {
+  return t === "CABINET"
+    ? cabinets.filter((c) => !c.archivedAt && c.warehouseNo === warehouseNo && CAB_STAGE.IN_STOCK!(c)).map((c) => c.cabinetNo)
+    : powerbanks.filter((p) => !p.archivedAt && p.warehouseNo === warehouseNo && p.status === "IN_STOCK" && !p.cabinetNo).map((p) => p.powerbankNo);
+}
+
 export function stages(): StockStage[] {
   ensurePoolSeed();
   const cab = cabinets.filter((c) => !c.archivedAt);
   const pb = powerbanks.filter((p) => !p.archivedAt);
+  const asOf = new Date().toISOString();
   return STAGE_ORDER.map((stage) => ({
     stage,
     cabinets: CAB_STAGE[stage] ? cab.filter(CAB_STAGE[stage]!).length : 0,
     powerbanks: PB_STAGE[stage] ? pb.filter(PB_STAGE[stage]!).length : 0,
+    // mock 演示独立进销存引擎：在仓取库存服务，其余阶段是本地业务
+    source: stage === "IN_STOCK" ? "SERVICE" as const : "LOCAL" as const,
+    asOf,
   }));
 }
 

@@ -46,8 +46,11 @@ public final class StockDtos {
      * 统一库存视图（S6）：按生命周期阶段的台数。阶段码：INTAKE 到仓待检 · IN_STOCK 在仓 · IN_TRANSIT 在途 ·
      * DISPATCHED 已发货待签收 · ISSUED 已交付待绑定 · BOUND 已绑定待上线 · LIVE 投放中（宝：在柜）· RENTED 借出 ·
      * FAULT 故障 · LOST 遗失 · RETIRED 已离开（报废 / 售出）。
+     *
+     * <p>source（对接明细 B02）：SERVICE 取自库存服务（独立进销存引擎下的「在仓」）、LOCAL 取自本地业务表、
+     * SERVICE_UNAVAILABLE 库存服务此刻查不到（台数为空，不当 0）。asOf 是取数时间。
      */
-    public record StockStage(String stage, long cabinets, long powerbanks) {
+    public record StockStage(String stage, Long cabinets, Long powerbanks, String source, java.time.LocalDateTime asOf) {
     }
 
     /**
@@ -56,6 +59,18 @@ public final class StockDtos {
      */
     public record StageItem(String itemType, String itemNo, String model, String warehouseNo, String agentNo, String siteNo,
                             String locationRef, String intakeNo) {
+    }
+
+    /**
+     * 设备库存余额一行（对接明细 B01）：库存服务里某仓、某设备类型的数量。
+     * onHand 在手 = reserved 占用 + unavailable 不可用（冻结、待检等）+ available 可用。
+     */
+    public record DeviceBalance(String warehouseNo, String warehouseName, String itemType, long onHand, long reserved, long unavailable,
+                                long available) {
+    }
+
+    /** 库存服务里在库的一个设备序列号（余额下钻）。 */
+    public record DeviceSerial(String serialNo, String itemType, String warehouseNo) {
     }
 
     /** total 为该阶段全量台数；items 最多 2000 台（前端分组、筛选）。 */

@@ -903,10 +903,38 @@ export interface StockLedgerRow {
 export type StockStageCode =
   | "INTAKE" | "IN_STOCK" | "IN_TRANSIT" | "DISPATCHED" | "ISSUED" | "BOUND" | "LIVE" | "RENTED" | "FAULT" | "LOST" | "RETIRED";
 
+/**
+ * 设备库存余额一行（对接明细 B01）：库存服务里某仓、某设备类型的数量。
+ * onHand 在手 = reserved 占用 + unavailable 不可用（冻结、待检等）+ available 可用。
+ */
+export interface DeviceBalance {
+  warehouseNo: string;
+  warehouseName: string;
+  itemType: IntakeItemType;
+  onHand: number;
+  reserved: number;
+  unavailable: number;
+  available: number;
+}
+
+/** 库存服务里在库的一个设备序列号（余额下钻）。 */
+export interface DeviceSerial {
+  serialNo: string;
+  itemType: IntakeItemType;
+  warehouseNo: string;
+}
+
+/** 阶段台数的来源（对接明细 B02）：SERVICE 库存服务 · LOCAL 本地业务 · SERVICE_UNAVAILABLE 库存服务此刻查不到（台数为空）。 */
+export type StockStageSource = "SERVICE" | "LOCAL" | "SERVICE_UNAVAILABLE";
+
 export interface StockStage {
   stage: StockStageCode;
-  cabinets: number;
-  powerbanks: number;
+  /** 空 = 库存服务此刻查不到，不当 0。 */
+  cabinets: number | null;
+  powerbanks: number | null;
+  source: StockStageSource;
+  /** 取数时间。 */
+  asOf: string;
 }
 
 /**

@@ -13,6 +13,7 @@ import ai.neargo.sharehub.dev.entity.DevCabinet;
 import ai.neargo.sharehub.dev.entity.DevPowerbank;
 import ai.neargo.sharehub.dev.mapper.CabinetMapper;
 import ai.neargo.sharehub.dev.mapper.PowerbankMapper;
+import ai.neargo.sharehub.inv.dto.StockDtos;
 import ai.neargo.sharehub.inv.dto.StockDtos.StockPeriodRow;
 import ai.neargo.sharehub.inv.dto.StockDtos.StockStage;
 import ai.neargo.sharehub.inv.entity.InvIntakeItem;
@@ -102,16 +103,40 @@ public class StockViewServiceImpl implements StockViewService {
     @org.springframework.transaction.annotation.Transactional(readOnly=true)
     public List<StockStage> stages() {
         List<StockStage> out = new ArrayList<>();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
         for (String stage : STAGES) {
             if ("INTAKE".equals(stage)) {
-                out.add(new StockStage(stage, pendingIntake("CABINET"), pendingIntake("POWERBANK")));
+                out.add(new StockStage(stage, pendingIntake("CABINET"), pendingIntake("POWERBANK"), "LOCAL", now));
+                continue;
+            }
+            if ("IN_STOCK".equals(stage) && service()) {
+                out.add(remoteInStock(now));
                 continue;
             }
             var c = CAB_STAGE.get(stage);
             var p = PB_STAGE.get(stage);
-            out.add(new StockStage(stage, c == null ? 0 : cab(c), "IN_TRANSIT".equals(stage) ? powerbanksInTransit().size() : p == null ? 0 : pb(p)));
+            out.add(new StockStage(stage, c == null ? 0L : cab(c), "IN_TRANSIT".equals(stage) ? (long) powerbanksInTransit().size() : p == null ? 0L : pb(p),
+                    "LOCAL", now));
         }
         return out;
+    }
+
+    /**
+     * 「在仓」是库存账（对接明细 B02）：独立进销存引擎下取库存服务的在手数，与库存余额（B01）同口径。
+     * 库存服务查不到只让这一行为空，其余阶段是本地业务，照常给。
+     */
+    private StockStage remoteInStock(java.time.LocalDateTime now) {
+        try {
+            long cab = 0, pb = 0;
+            for (StockDtos.DeviceBalance b : deviceBalances(null, null)) {
+                if (InventoryLinks.CABINET.equals(b.itemType())) cab += b.onHand();
+                else pb += b.onHand();
+            }
+            return new StockStage("IN_STOCK", cab, pb, "SERVICE", now);
+        } catch (BizException e) {
+            log.warn("生命周期视图「在仓」取数失败：库存服务不可用 {}，本行显示为不可用", e.getMessage());
+            return new StockStage("IN_STOCK", null, null, "SERVICE_UNAVAILABLE", now);
+        }
     }
 
     /** 阶段顺序（= 设备生命周期），与 {@link #CAB_STAGE} / {@link #PB_STAGE} 的键一致；INTAKE 读待检单。 */
@@ -154,7 +179,20 @@ public class StockViewServiceImpl implements StockViewService {
         String type = cabinet ? "CABINET" : "POWERBANK";
         List<ai.neargo.sharehub.inv.dto.StockDtos.StageItem> rows = new ArrayList<>();
         long total;
-        if ("INTAKE".equals(st)) {
+        if ("IN_STOCK".equals(st) && service()) {
+            // 在仓的下钻与台数同源：库存服务里各可见仓的在库序列号；total 是全量，items 最多 STAGE_ITEMS_MAX
+            long all = 0;
+            for (var w : warehouses.list()) {
+                if (w.archivedAt() != null || !isVisibleWarehouse(w.warehouseNo())) continue;
+                PageResult<StockDtos.DeviceSerial> page = deviceSerials(w.warehouseNo(), type, 1, STAGE_ITEMS_MAX);
+                all += page.getTotal();
+                if (rows.size() >= STAGE_ITEMS_MAX) continue;
+                page.getList().forEach(x -> rows.add(new ai.neargo.sharehub.inv.dto.StockDtos.StageItem(type, x.serialNo(), null,
+                        x.warehouseNo(), null, null, null, null)));
+            }
+            List<ai.neargo.sharehub.inv.dto.StockDtos.StageItem> capped = rows.size() > STAGE_ITEMS_MAX ? rows.subList(0, STAGE_ITEMS_MAX) : rows;
+            return new ai.neargo.sharehub.inv.dto.StockDtos.StageItems(st, type, all, capped);
+        } else if ("INTAKE".equals(st)) {
             LambdaQueryWrapper<InvIntakeItem> w = new LambdaQueryWrapper<InvIntakeItem>().eq(InvIntakeItem::getItemType, type)
                     .eq(InvIntakeItem::getDisposition, "PENDING");
             scopeIntakes(w);
@@ -587,6 +625,73 @@ public class StockViewServiceImpl implements StockViewService {
         InventoryApi.CountView view = call(() -> remote.api().count(countNo));
         warehouses.requireVisible(links.warehouseNoOf(view.locationId()));
         return view;
+    }
+
+    // —— 设备库存余额（B01）——
+
+    private static final List<String> DEVICE_TYPES = List.of(InventoryLinks.CABINET, InventoryLinks.POWERBANK);
+
+    @Override
+    public List<StockDtos.DeviceBalance> deviceBalances(String warehouseNo, String itemType) {
+        requireService();
+        String only = warehouseNo == null || warehouseNo.isBlank() ? null : warehouseNo.trim();
+        if (only != null) warehouses.requireVisible(only);
+        List<String> visible = warehouses.visibleWarehouseNos();
+        List<String> types = deviceTypes(itemType);
+        InventoryApi api = remote.api();
+        // 一种设备一次取全部库位，再按本地仓映射回去；没映射过的仓 = 库存服务里没有它的账，各项为 0
+        Map<String, InventoryApi.Balance> byKey = new HashMap<>();
+        for (String type : types) {
+            String item = links.get("item:" + type);
+            if (item == null) continue;
+            for (InventoryApi.Balance b : call(() -> api.balances(null, item))) byKey.put(b.locationId() + "|" + type, b);
+        }
+        List<StockDtos.DeviceBalance> out = new ArrayList<>();
+        for (var w : warehouses.list()) {
+            if (w.archivedAt() != null || (only != null && !only.equals(w.warehouseNo()))) continue;
+            if (visible != null && !visible.contains(w.warehouseNo())) continue;
+            String loc = links.get("wh:" + w.warehouseNo());
+            for (String type : types) {
+                InventoryApi.Balance b = loc == null ? null : byKey.get(loc + "|" + type);
+                out.add(new StockDtos.DeviceBalance(w.warehouseNo(), w.name(), type, n(b == null ? null : b.onHand()),
+                        n(b == null ? null : b.reserved()), n(b == null ? null : b.unavailable()), n(b == null ? null : b.available())));
+            }
+        }
+        return out;
+    }
+
+    @Override
+    public PageResult<StockDtos.DeviceSerial> deviceSerials(String warehouseNo, String itemType, Integer page, Integer size) {
+        requireService();
+        if (warehouseNo == null || warehouseNo.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "warehouseNo");
+        String wh = warehouseNo.trim();
+        warehouses.requireVisible(wh);
+        int p = page == null || page < 1 ? 1 : page;
+        int s = size == null || size < 1 ? 50 : Math.min(size, 500);
+        String loc = links.get("wh:" + wh);
+        if (loc == null) return new PageResult<>(List.of(), 0);
+        InventoryApi api = remote.api();
+        List<StockDtos.DeviceSerial> all = new ArrayList<>();
+        for (String type : deviceTypes(itemType)) {
+            String item = links.get("item:" + type);
+            if (item == null) continue;
+            call(() -> api.serials(item, loc)).forEach(x -> all.add(new StockDtos.DeviceSerial(x.serialNo(), type, wh)));
+        }
+        all.sort(Comparator.comparing(StockDtos.DeviceSerial::serialNo));
+        int from = Math.min((p - 1) * s, all.size());
+        return new PageResult<>(all.subList(from, Math.min(from + s, all.size())), all.size());
+    }
+
+    private static List<String> deviceTypes(String itemType) {
+        if (itemType == null || itemType.isBlank()) return DEVICE_TYPES;
+        String t = itemType.trim();
+        if (!DEVICE_TYPES.contains(t)) throw BizException.badRequest("error.common.invalid_value", "itemType");
+        return List.of(t);
+    }
+
+    private boolean isVisibleWarehouse(String warehouseNo) {
+        List<String> visible = warehouses.visibleWarehouseNos();
+        return visible == null || visible.contains(warehouseNo);
     }
 
     private void requireService() {

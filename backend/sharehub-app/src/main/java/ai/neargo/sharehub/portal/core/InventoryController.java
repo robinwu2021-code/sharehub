@@ -82,6 +82,24 @@ public class InventoryController {
         return stock.stages();
     }
 
+    /** 设备库存余额（对接明细 B01）：库存服务按仓 × 设备类型的在手 / 占用 / 不可用 / 可用。 */
+    @GetMapping("/inventory/balances")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.DeviceBalance> deviceBalances(@RequestParam(required = false) String warehouseNo,
+                                                                                         @RequestParam(required = false) String itemType) {
+        return stock.deviceBalances(warehouseNo, itemType);
+    }
+
+    /** 某仓在库的设备序列号（余额下钻）。 */
+    @GetMapping("/inventory/serials")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public ai.neargo.common.core.PageResult<ai.neargo.sharehub.inv.dto.StockDtos.DeviceSerial> deviceSerials(@RequestParam String warehouseNo,
+                                                                                                         @RequestParam(required = false) String itemType,
+                                                                                                         @RequestParam(required = false) Integer page,
+                                                                                                         @RequestParam(required = false) Integer size) {
+        return stock.deviceSerials(warehouseNo, itemType, page, size);
+    }
+
     /** 阶段下钻（P2 #6）：某阶段 × 类型的设备清单，口径同 stages。 */
     @GetMapping("/inventory/stage-items")
     @PreAuthorize("@perm.can('device:inventory:read')")

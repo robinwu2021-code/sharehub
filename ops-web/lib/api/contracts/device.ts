@@ -121,6 +121,11 @@ export interface DeviceApi {
 
   // === 库存流水与盘点（S4）：盘点只在独立进销存引擎下可用（本地 409）===
   getInventoryEngine(): Promise<InventoryEngine>;
+  /** 设备库存余额（B01）：库存服务按仓 × 设备类型的在手 / 占用 / 不可用 / 可用；服务不可用时报错、不给 0。 */
+  listDeviceBalances(q?: { warehouseNo?: string; itemType?: IntakeItemType }): Promise<import("../../types").DeviceBalance[]>;
+  /** 某仓在库的设备序列号（余额下钻）。 */
+  listDeviceSerials(q: { warehouseNo: string; itemType?: IntakeItemType; page?: number; size?: number })
+    : Promise<PageResult<import("../../types").DeviceSerial>>;
   /** 统一库存视图（S6）：按生命周期阶段的台数。 */
   getStockStages(): Promise<StockStage[]>;
   /** 阶段下钻（P2 #6）：口径同 getStockStages。 */

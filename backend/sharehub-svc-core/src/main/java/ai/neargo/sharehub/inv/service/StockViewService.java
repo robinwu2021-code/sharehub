@@ -19,6 +19,16 @@ public interface StockViewService {
     /** 统一库存视图（S6）：取本地投影，两个引擎同口径。 */
     List<ai.neargo.sharehub.inv.dto.StockDtos.StockStage> stages();
 
+    /**
+     * 设备库存余额（对接明细 B01）：库存服务按仓 × 设备类型的在手 / 占用 / 不可用 / 可用，只列可见的启用仓。
+     * 只在独立进销存引擎；库存服务查不到时报错，不当 0。
+     */
+    java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.DeviceBalance> deviceBalances(String warehouseNo, String itemType);
+
+    /** 某仓在库的设备序列号（余额下钻），按序列号排序分页。 */
+    ai.neargo.common.core.PageResult<ai.neargo.sharehub.inv.dto.StockDtos.DeviceSerial> deviceSerials(String warehouseNo, String itemType,
+                                                                                                 Integer page, Integer size);
+
     /** 阶段下钻（库存缺口 P2 #6）：某阶段 × 设备类型的设备清单（最多 2000 台，total 为全量），口径同 {@link #stages()}。 */
     ai.neargo.sharehub.inv.dto.StockDtos.StageItems stageItems(String stage, String itemType);
 

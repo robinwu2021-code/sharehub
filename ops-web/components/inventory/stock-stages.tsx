@@ -5,7 +5,9 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { IntakeItemType, StageItem, StockStage, StockStageCode } from "@/lib/types";
+import type { IntakeItemType, StageItem, StockStage, StockStageCode, StockStageSource } from "@/lib/types";
+import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
+import { fmtTime } from "@/lib/utils";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
@@ -16,6 +18,10 @@ export const STAGE_LABEL: Record<StockStageCode, string> = {
   BOUND: "已绑定 · 待上线", LIVE: "投放中（宝：在柜）", RENTED: "借出", FAULT: "故障", LOST: "遗失", RETIRED: "已离开（报废 / 售出）",
 };
 const TYPE_LABEL = { CABINET: "机柜", POWERBANK: "充电宝" } as const;
+const SOURCE: StatusMap<StockStageSource> = {
+  SERVICE: { label: "库存服务", tone: "info" }, LOCAL: { label: "本地业务", tone: "muted" },
+  SERVICE_UNAVAILABLE: { label: "库存服务不可用", tone: "danger" },
+};
 
 /** 设备「所在」：在仓的看仓，出库 / 绑定的看商家，宝在柜看柜，待检看待检单。 */
 const whereOf = (i: StageItem) => i.warehouseNo ?? i.agentNo ?? (i.locationRef ? `柜 ${i.locationRef}` : null) ?? (i.intakeNo ? `待检单 ${i.intakeNo}` : "-");
@@ -25,6 +31,7 @@ export function StockStagesTable() {
   const [drill, setDrill] = useState<{ stage: StockStageCode; itemType: IntakeItemType } | null>(null);
   const num = (r: StockStage, itemType: IntakeItemType) => {
     const n = itemType === "CABINET" ? r.cabinets : r.powerbanks;
+    if (n == null) return <span className="text-muted-foreground">-</span>;
     return n
       ? <button type="button" className="tabular-nums text-primary hover:underline" onClick={() => setDrill({ stage: r.stage, itemType })}>{n}</button>
       : <span className="text-muted-foreground">0</span>;
@@ -33,9 +40,14 @@ export function StockStagesTable() {
     { header: "阶段", cell: (r) => STAGE_LABEL[r.stage] ?? r.stage },
     { header: "柜机", className: "text-right tabular-nums", cell: (r) => num(r, "CABINET") },
     { header: "充电宝", className: "text-right tabular-nums", cell: (r) => num(r, "POWERBANK") },
+    { header: "来源", cell: (r) => <StatusBadge map={SOURCE} value={r.source} /> },
   ];
+  const asOf = q.data?.[0]?.asOf;
   return (
     <>
+      <p className="mb-3 txt-caption text-muted-foreground">
+        「在仓」是库存账，取自库存服务；其余阶段是本地业务（出库、投放、借出、维修等）。{asOf && ` 取数时间 ${fmtTime(asOf)}。`}
+      </p>
       <DataTable rowKey={(r: StockStage) => r.stage} columns={cols} rows={q.data} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无数据" />
       <StageDrawer target={drill} onClose={() => setDrill(null)} />
     </>

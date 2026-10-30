@@ -190,6 +190,62 @@ class InventoryServiceEngineTest extends ApiTestSupport {
         }
     }
 
+    @Test
+    @DisplayName("★ B01 设备库存余额取库存服务：在手 / 可用按仓 × 类型，下钻到序列号；服务不可用时报错、不给 0")
+    void deviceBalancesComeFromService() {
+        String c = stocked();
+        String admin = login("ADMIN");
+        JsonNode row = cabinetRow(get("/api/ops/inventory/balances?warehouseNo=WH002&itemType=CABINET", admin).okData());
+        assertThat(row.path("onHand").asLong()).isEqualTo(1);
+        assertThat(row.path("available").asLong()).isEqualTo(1);
+        JsonNode serials = get("/api/ops/inventory/serials?warehouseNo=WH002&itemType=CABINET", admin).okData();
+        assertThat(serials.path("total").asInt()).isEqualTo(1);
+        assertThat(serials.path("list").get(0).path("serialNo").asText()).isEqualTo(c);
+        assertThat(cabinetRow(get("/api/ops/inventory/balances?warehouseNo=WH003", admin).okData()).path("onHand").asLong())
+                .as("没映射过的仓 = 库存服务里没有它的账").isZero();
+
+        remote.useApi(new InventoryFake() {
+            @Override
+            public List<Balance> balances(String locationId, String itemId) {
+                throw new InventoryRemoteException(503, "inventory.unreachable", List.of(), "down", null);
+            }
+        });
+        jdbc.update("REPLACE INTO inventory_sync_state (k, v) VALUES ('item:CABINET', 'IT-CABINET')");
+        assertThat(get("/api/ops/inventory/balances?warehouseNo=WH002", admin).status).as("不当 0").isEqualTo(409);
+        remote.useApi(fake);
+    }
+
+    @Test
+    @DisplayName("★ B02 生命周期视图：在仓取库存服务并标来源；库存服务查不到只这一行为空，其余阶段照常")
+    void stagesLabelSources() {
+        String c = stocked();
+        String admin = login("ADMIN");
+        JsonNode inStock = stageRow(get("/api/ops/inventory/stages", admin).okData(), "IN_STOCK");
+        assertThat(inStock.path("source").asText()).isEqualTo("SERVICE");
+        assertThat(inStock.path("cabinets").asLong()).isEqualTo(1);
+        assertThat(stageRow(get("/api/ops/inventory/stages", admin).okData(), "LIVE").path("source").asText()).isEqualTo("LOCAL");
+        JsonNode drill = get("/api/ops/inventory/stage-items?stage=IN_STOCK&itemType=CABINET", admin).okData();
+        assertThat(drill.path("total").asLong()).isEqualTo(1);
+        assertThat(drill.path("items").get(0).path("itemNo").asText()).as("下钻与台数同源").isEqualTo(c);
+
+        remote.useApi(new InventoryFake() {
+            @Override
+            public List<Balance> balances(String locationId, String itemId) {
+                throw new InventoryRemoteException(503, "inventory.unreachable", List.of(), "down", null);
+            }
+        });
+        JsonNode stages = get("/api/ops/inventory/stages", admin).okData();
+        assertThat(stageRow(stages, "IN_STOCK").path("source").asText()).isEqualTo("SERVICE_UNAVAILABLE");
+        assertThat(stageRow(stages, "IN_STOCK").path("cabinets").isNull()).isTrue();
+        assertThat(stageRow(stages, "LIVE").path("cabinets").isNumber()).as("其余阶段照常").isTrue();
+        remote.useApi(fake);
+    }
+
+    private static JsonNode stageRow(JsonNode rows, String stage) {
+        for (JsonNode r : rows) if (stage.equals(r.path("stage").asText())) return r;
+        throw new AssertionError("no stage " + stage);
+    }
+
     private static JsonNode cabinetRow(JsonNode rows) {
         for (JsonNode r : rows) if ("CABINET".equals(r.path("itemType").asText())) return r;
         throw new AssertionError("no CABINET row: " + rows);

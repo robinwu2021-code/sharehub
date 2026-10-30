@@ -14830,6 +14830,36 @@
   },
   {
    "verb": "GET",
+   "path": "/api/ops/inventory/balances",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#deviceBalances",
+   "summary": "设备库存余额（对接明细 B01）：库存服务按仓 × 设备类型的在手 / 占用 / 不可用 / 可用。",
+   "params": [
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "itemType",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.DeviceBalance>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.DeviceBalance>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/ops/inventory/counts",
    "perm": "device:inventory:read",
    "perms": [
@@ -16212,6 +16242,10 @@
     {
      "name": "failure",
      "type": "String"
+    },
+    {
+     "name": "pendingOperations",
+     "type": "long"
     }
    ],
    "requestShape": null
@@ -18561,6 +18595,48 @@
   },
   {
    "verb": "GET",
+   "path": "/api/ops/inventory/serials",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#deviceSerials",
+   "summary": "某仓在库的设备序列号（余额下钻）。",
+   "params": [
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "query",
+     "name": "itemType",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.common.core.PageResult<ai.neargo.sharehub.inv.dto.StockDtos.DeviceSerial>",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.common.core.PageResult<ai.neargo.sharehub.inv.dto.StockDtos.DeviceSerial>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/ops/inventory/shipments",
    "perm": "device:inventory:read",
    "perms": [
@@ -18716,7 +18792,7 @@
     },
     {
      "name": "available",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "low",
@@ -23798,11 +23874,19 @@
       },
       {
        "name": "cabinets",
-       "type": "long"
+       "type": "Long"
       },
       {
        "name": "powerbanks",
-       "type": "long"
+       "type": "Long"
+      },
+      {
+       "name": "source",
+       "type": "String"
+      },
+      {
+       "name": "asOf",
+       "type": "java.time.LocalDateTime"
       }
      ]
     },
@@ -23836,11 +23920,11 @@
       },
       {
        "name": "closing",
-       "type": "long"
+       "type": "Long"
       },
       {
        "name": "available",
-       "type": "int"
+       "type": "Integer"
       },
       {
        "name": "minQty",
@@ -56222,9 +56306,9 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 627,
-  "records": 606,
-  "withPerm": 544,
+  "endpoints": 629,
+  "records": 616,
+  "withPerm": 546,
   "withBody": 257,
   "shapedResponses": 489
  }
