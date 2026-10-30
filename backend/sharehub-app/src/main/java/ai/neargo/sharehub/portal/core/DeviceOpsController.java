@@ -73,7 +73,7 @@ public class DeviceOpsController {
     @PostMapping("/{deviceNo}/retire")
     @PreAuthorize("@perm.can('device:cabinet:update')")
     public Cabinet retire(@PathVariable String deviceNo, @RequestBody(required = false) ReasonReq body) {
-        return lifecycle.retire(deviceNo, body == null ? null : body.reason());
+        return lifecycle.retireOutOfWarehouse(deviceNo, body == null ? null : body.reason());
     }
 
     @GetMapping("/{deviceNo}/trial-rents")

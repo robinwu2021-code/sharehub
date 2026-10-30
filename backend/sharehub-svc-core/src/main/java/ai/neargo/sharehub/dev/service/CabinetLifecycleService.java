@@ -37,4 +37,10 @@ public interface CabinetLifecycleService {
     boolean goLiveIfReady(String cabinetNo, String cause);
 
     Cabinet retire(String cabinetNo, String reason);
+
+    /**
+     * 设备页上的报废（对接明细 E11）：只收仓外的设备。在仓的（在库、有仓、未出库、未绑定）必须走处置出库 ——
+     * 那条路会在库存服务同步出库；从这里直接报废等于绕过库存账，两边从此对不上。
+     */
+    Cabinet retireOutOfWarehouse(String cabinetNo, String reason);
 }

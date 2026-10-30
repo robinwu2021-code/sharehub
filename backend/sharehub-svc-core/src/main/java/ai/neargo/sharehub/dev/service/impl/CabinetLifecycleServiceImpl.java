@@ -303,6 +303,16 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
 
     @Override
     @Transactional
+    public Cabinet retireOutOfWarehouse(String cabinetNo, String reason) {
+        DevCabinet c = require(cabinetNo);
+        boolean inWarehouse = CabinetStatus.IN_STOCK.name().equals(c.getStatus()) && c.getWarehouseNo() != null
+                && c.getIssuedAgentNo() == null && c.getLocationNo() == null;
+        if (inWarehouse) throw BizException.conflict("error.device.retire_in_warehouse", cabinetNo, c.getWarehouseNo());
+        return retire(cabinetNo, reason);
+    }
+
+    @Override
+    @Transactional
     public Cabinet retire(String cabinetNo, String reason) {
         String r = requireReason(reason);
         DevCabinet c = require(cabinetNo);

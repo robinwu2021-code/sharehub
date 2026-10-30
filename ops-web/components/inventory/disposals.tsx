@@ -47,10 +47,13 @@ export function DisposalsTab() {
   });
   const detailQ = useQuery({ queryKey: ["disposal", openNo], queryFn: () => api.getDisposal(openNo!), enabled: !!openNo });
 
+  // 幂等键：本次处置的提交与重试带同一个；成功后换新（库存服务已出库但响应丢了时，重提不会再出一次）
+  const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
   const create = useMutation({
     mutationFn: (v: Record<string, unknown>) => {
       const k = v.kind as DisposalKind;
       return api.createDisposal({
+        requestKey,
         kind: k, warehouseNo: String(v.warehouseNo ?? ""), note: String(v.note ?? ""),
         supplierNo: k === "RETURN_SUPPLIER" ? String(v.supplierNo ?? "") || null : null,
         reasonCode: k === "SCRAP" ? (String(v.reasonCode ?? "") || null) as DisposalReason | null : null,
@@ -61,6 +64,7 @@ export function DisposalsTab() {
     },
     onSuccess: (d) => {
       notify.success(`已出库 ${d.disposal.disposalNo}（${d.disposal.itemCount} 台）`);
+      setRequestKey(crypto.randomUUID());
       qc.invalidateQueries({ queryKey: ["disposals"] });
       setForm(null);
       setOpenNo(d.disposal.disposalNo);

@@ -52,9 +52,12 @@ public class InventoryOperationServiceImpl implements InventoryOperationService 
     private final IntakeService intakes;
     private final InventoryPort inventory;
     private final TransferOpsService transfers;
+    private final ai.neargo.sharehub.inv.service.DisposalService disposals;
 
     public InventoryOperationServiceImpl(JdbcTemplate jdbc, RemoteInventoryPort remote, MaterialService materials, IntakeService intakes,
-                                         InventoryPort inventory, TransferOpsService transfers) {
+                                         InventoryPort inventory, TransferOpsService transfers,
+                                         ai.neargo.sharehub.inv.service.DisposalService disposals) {
+        this.disposals = disposals;
         this.jdbc = jdbc;
         this.remote = remote;
         this.materials = materials;
@@ -161,6 +164,7 @@ public class InventoryOperationServiceImpl implements InventoryOperationService 
             case "DEVICE_REVOKE" -> inventory.returnToWarehouse(list(in, "cabinetNos"), null, text(in, "reason"), key);
             case "TRANSFER_SHIP" -> transfers.ship(text(in, "transferNo"));
             case "TRANSFER_RECEIVE" -> transfers.receive(text(in, "transferNo"), list(in, "itemNos"), "执行异常重试");
+            case "DISPOSAL" -> disposals.create(Json.read(op.payload(), ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalReq.class));
             default -> throw BizException.conflict("error.inventory.operation_not_retryable", op.kind());
         }
         log.info("库存执行异常原样重试 operationNo={} kind={}", operationNo, op.kind());
@@ -175,7 +179,7 @@ public class InventoryOperationServiceImpl implements InventoryOperationService 
         String perm = switch (op.kind()) {
             case "MATERIAL_DOC" -> isInboundPurpose(Json.read(op.payload(), JsonNode.class)) ? "device:inventory:inbound" : "device:inventory:transfer";
             case "INTAKE_INBOUND" -> "device:inventory:inbound";
-            case "DEVICE_ISSUE", "DEVICE_CLAIM", "DEVICE_REDIRECT", "DEVICE_REVOKE", "TRANSFER_SHIP", "TRANSFER_RECEIVE" -> "device:inventory:transfer";
+            case "DEVICE_ISSUE", "DEVICE_CLAIM", "DEVICE_REDIRECT", "DEVICE_REVOKE", "TRANSFER_SHIP", "TRANSFER_RECEIVE", "DISPOSAL" -> "device:inventory:transfer";
             default -> null;
         };
         return perm != null && StaffContext.hasPerm(perm);

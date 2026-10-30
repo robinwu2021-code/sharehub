@@ -409,6 +409,34 @@ class InventoryServiceEngineTest extends ApiTestSupport {
         assertThat(r.path("phase").asText()).isEqualTo("REJECTED");
     }
 
+    @Test
+    @DisplayName("★★ E10 处置出库过账后响应丢失：原样重试处置单号不变、只出库一次、本地只退役一次")
+    void disposalLostResponseResumes() {
+        String c = stocked();
+        String wh = login("WAREHOUSE");
+        Map<String, Object> body = Map.of("kind", "SCRAP", "reasonCode", "BROKEN", "warehouseNo", "WH002", "note", "E2E 报废 " + tag,
+                "cabinetNos", List.of(c), "requestKey", "RK-DSP-" + tag);
+        fake.loseNextOutboundPostResponse = true;
+        assertThat(post("/api/ops/inventory/disposals", body, wh).status).isEqualTo(409);
+        assertThat(fake.stock).as("库存服务其实已出库").doesNotContainKey(c);
+        assertThat(jdbc.queryForObject("SELECT status FROM dev_cabinet WHERE cabinet_no=?", String.class, c)).as("本地已回滚").isEqualTo("IN_STOCK");
+        String first = post("/api/ops/inventory/disposals", body, wh).okData().path("disposal").path("disposalNo").asText();
+        assertThat(jdbc.queryForObject("SELECT status FROM dev_cabinet WHERE cabinet_no=?", String.class, c)).isEqualTo("RETIRED");
+        assertThat(fake.docs.values().stream().filter(d -> "OUT".equals(d.kind()) && d.serials().contains(c)).count()).isEqualTo(1);
+        assertThat(post("/api/ops/inventory/disposals", body, wh).okData().path("disposal").path("disposalNo").asText())
+                .as("同键再提返回原单").isEqualTo(first);
+    }
+
+    @Test
+    @DisplayName("★ E11 在仓设备不能从设备页直接报废（绕过库存账），要走处置出库")
+    void retireInWarehouseIsRejected() {
+        String c = stocked();
+        Resp r = post("/api/ops/devices/" + c + "/retire", Map.of("reason", "坏了"), login("ADMIN"));
+        assertThat(r.status).isEqualTo(409);
+        assertThat(jdbc.queryForObject("SELECT status FROM dev_cabinet WHERE cabinet_no=?", String.class, c)).isEqualTo("IN_STOCK");
+        assertThat(fake.stock).containsKey(c);
+    }
+
     private static JsonNode stageRow(JsonNode rows, String stage) {
         for (JsonNode r : rows) if (stage.equals(r.path("stage").asText())) return r;
         throw new AssertionError("no stage " + stage);

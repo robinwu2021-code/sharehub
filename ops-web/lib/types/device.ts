@@ -231,6 +231,8 @@ export interface DisposalReq {
   /** 退供应商的物流（V205，可选）。 */
   carrier?: string | null;
   trackingNo?: string | null;
+  /** 幂等键（对接明细 E07 / E10）：表单打开时生成，提交与重试带同一个。 */
+  requestKey?: string;
 }
 export interface SupplierReq {
   name: string;

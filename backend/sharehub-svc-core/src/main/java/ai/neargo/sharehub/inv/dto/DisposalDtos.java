@@ -21,6 +21,6 @@ public final class DisposalDtos {
 
     /** 建单即过账。SCRAP 须 reasonCode；RETURN_SUPPLIER 须 supplierNo，可带物流 carrier / trackingNo（V205）。 */
     public record DisposalReq(String kind, String warehouseNo, String supplierNo, String reasonCode, String note,
-                              List<String> cabinetNos, List<String> powerbankNos, String carrier, String trackingNo) {
+                              List<String> cabinetNos, List<String> powerbankNos, String carrier, String trackingNo, String requestKey) {
     }
 }

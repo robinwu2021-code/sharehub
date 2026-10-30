@@ -127,6 +127,11 @@ public class DisposalServiceImpl implements DisposalService {
     @Transactional
     public DisposalDetail create(DisposalReq r) {
         if (r == null || !notBlank(r.kind())) throw BizException.badRequest("error.common.missing_parameter", "kind");
+        // 同键已完成：直接返回原单（设备此刻已退役，再走一遍本地校验只会被拒）
+        if (notBlank(r.requestKey()) && !"LOCAL".equals(inventory.engine())) {
+            var done = journal.find("DISPOSAL", r.requestKey().trim(), journal.payload(r));
+            if (done != null && "COMPLETED".equals(done.phase())) return get(done.bizRef());
+        }
         DisposalKind kind = Arrays.stream(DisposalKind.values()).filter(k -> k.name().equals(r.kind().trim())).findFirst()
                 .orElseThrow(() -> BizException.badRequest("error.common.invalid_value", "kind"));
         if (!notBlank(r.note())) throw BizException.badRequest("error.common.note_required");
@@ -181,8 +186,17 @@ public class DisposalServiceImpl implements DisposalService {
         ai.neargo.sharehub.inv.dto.ShipmentDtos.ShipInfo ship = kind == DisposalKind.RETURN_SUPPLIER ? new ai.neargo.sharehub.inv.dto.ShipmentDtos.ShipInfo(r.carrier(), r.trackingNo(), null, null) : null;
         shipments.validate(ship);
 
+        // 恢复日志（对接明细 E07 / E10）：独立进销存引擎下按 requestKey 登记；处置单号取日志的业务号 ——
+        // 重试时单号不变、远端步骤续做（原先每次新单号，远端已出库而本地回滚后再提会被拒「不在库」，两边从此分叉）
+        ai.neargo.sharehub.inv.service.InventoryOperationJournal.Operation op = null;
+        if (!"LOCAL".equals(inventory.engine())) {
+            String key = notBlank(r.requestKey()) ? r.requestKey().trim() : "DISPOSAL-" + java.util.UUID.randomUUID();
+            if (key.length() > 128) throw BizException.badRequest("error.common.invalid_value", "requestKey");
+            op = journal.lock("DISPOSAL", key, journal.payload(r), "SERVICE", "DP");
+            if ("COMPLETED".equals(op.phase())) return get(op.bizRef());
+        }
         InvDisposal d = new InvDisposal();
-        d.setDisposalNo(IdGenerator.next("DP"));
+        d.setDisposalNo(op != null ? op.bizRef() : IdGenerator.next("DP"));
         d.setTenantId("MAIN");
         d.setKind(kind.name());
         d.setWarehouseNo(wh.warehouseNo());
@@ -208,7 +222,7 @@ public class DisposalServiceImpl implements DisposalService {
             movements.record(new MovementRecorder.Move(MovementRecorder.POWERBANK, no, MovementEvent.RETIRE, MovementRecorder.wh(wh.warehouseNo()),
                     MovementRecorder.OUT, null, null, why, d.getDisposalNo()));
         }
-        if (!"LOCAL".equals(inventory.engine())) remoteOutbound(kind, reason, supplierNo, supplierName, wh.warehouseNo(), cabNos, pbNos, d);
+        if (op != null) remoteOutbound(kind, reason, supplierNo, supplierName, wh.warehouseNo(), cabNos, pbNos, d, op);
         if (ship != null) shipments.record(ai.neargo.sharehub.inv.ShipmentDocType.DISPOSAL, d.getDisposalNo(),
                 Map.of(MovementRecorder.CABINET, cabNos, MovementRecorder.POWERBANK, pbNos), ship);
         log.info("处置出库 disposalNo={} kind={} warehouseNo={} supplierNo={} 柜={} 宝={}", d.getDisposalNo(), kind,
@@ -221,24 +235,33 @@ public class DisposalServiceImpl implements DisposalService {
      * SUPPLIER 去向（先同步供应商为外部目标）。库存服务拒绝即整单回滚，两本账不会一边有一边没有。
      */
     private void remoteOutbound(DisposalKind kind, String reason, String supplierNo, String supplierName, String warehouseNo,
-                                List<String> cabNos, List<String> pbNos, InvDisposal d) {
+                                List<String> cabNos, List<String> pbNos, InvDisposal d,
+                                ai.neargo.sharehub.inv.service.InventoryOperationJournal.Operation op) {
         ai.neargo.sharehub.inv.remote.InventoryApi api = remote.api();
         ai.neargo.sharehub.inv.remote.InventoryCalls.requireConfigured(api);
         ai.neargo.sharehub.inv.remote.InventoryCalls.run(() -> {
-            String loc = links.locationId(api, warehouseNo);
+            String loc = journal.reference(() -> links.locationId(api, warehouseNo));
             // 确保两种设备的物料已在库存服务登记（出库按序列号，不需要 itemId，但首次接入时要有物料）
-            if (!cabNos.isEmpty()) links.itemId(api, MovementRecorder.CABINET);
-            if (!pbNos.isEmpty()) links.itemId(api, MovementRecorder.POWERBANK);
+            if (!cabNos.isEmpty()) journal.reference(() -> links.itemId(api, MovementRecorder.CABINET));
+            if (!pbNos.isEmpty()) journal.reference(() -> links.itemId(api, MovementRecorder.POWERBANK));
             java.util.Map<String, String> targets = java.util.Map.of();
             if (kind == DisposalKind.RETURN_SUPPLIER) {
-                api.upsertTarget("SUPPLIER", supplierNo, supplierName, null);
+                journal.reference(() -> {
+                    api.upsertTarget("SUPPLIER", supplierNo, supplierName, null);
+                    return null;
+                });
                 targets = java.util.Map.of("SUPPLIER", supplierNo);
             }
             List<String> sns = new ArrayList<>(cabNos);
             sns.addAll(pbNos);
-            String out = api.createOutbound(loc, kind.name(), reason, targets, "处置出库 " + d.getDisposalNo() + "：" + d.getNote(),
-                    List.of(), sns, "dp-out-" + d.getDisposalNo());
-            api.postOutbound(out, "dp-out-post-" + d.getDisposalNo());
+            java.util.Map<String, String> t = targets;
+            String out = journal.step(op, "OUT", () -> api.createOutbound(loc, kind.name(), reason, t,
+                    "处置出库 " + d.getDisposalNo() + "：" + d.getNote(), List.of(), sns, journal.stepKey(op, "OUT")));
+            journal.step(op, "OUT_POST", () -> {
+                api.postOutbound(out, journal.stepKey(op, "OUT_POST"));
+                return out;
+            });
+            journal.complete(op);
             log.info("处置出库同步库存服务 disposalNo={} outNo={}", d.getDisposalNo(), out);
         });
     }
@@ -248,10 +271,14 @@ public class DisposalServiceImpl implements DisposalService {
 
     /** 独立进销存（V210）：setter 注入，构造参数已经很长。 */
     @org.springframework.beans.factory.annotation.Autowired
-    void setRemote(ai.neargo.sharehub.inv.remote.RemoteInventoryPort remote, ai.neargo.sharehub.inv.remote.InventoryLinks links) {
+    void setRemote(ai.neargo.sharehub.inv.remote.RemoteInventoryPort remote, ai.neargo.sharehub.inv.remote.InventoryLinks links,
+                   ai.neargo.sharehub.inv.service.InventoryOperationJournal journal) {
         this.remote = remote;
         this.links = links;
+        this.journal = journal;
     }
+
+    private ai.neargo.sharehub.inv.service.InventoryOperationJournal journal;
 
     private void insertItem(String disposalNo, String type, String no) {
         InvDisposalItem i = new InvDisposalItem();
