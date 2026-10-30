@@ -925,6 +925,23 @@ export interface DeviceBalance {
   available: number;
 }
 
+/** 可出库的柜（C01）：库存服务在库 ∩ 本地可出库（在库、未绑定、未出库、质检放行）。 */
+export interface IssueCandidate {
+  cabinetNo: string;
+  warehouseNo: string;
+  model: string | null;
+  vendorCode: string | null;
+}
+
+/** 某商家的待安装柜（C05）：库存服务里该商家已领取的 ∩ 本地已签收、未回仓、质检放行。 */
+export interface InstallCandidate {
+  cabinetNo: string;
+  model: string | null;
+  siteNo: string | null;
+  locationNo: string | null;
+  dispatchId: string;
+}
+
 /** 库存服务里在库的一个设备序列号（余额下钻）。 */
 export interface DeviceSerial {
   serialNo: string;

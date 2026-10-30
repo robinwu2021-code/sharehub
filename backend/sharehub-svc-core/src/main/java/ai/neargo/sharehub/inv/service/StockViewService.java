@@ -29,6 +29,13 @@ public interface StockViewService {
     ai.neargo.common.core.PageResult<ai.neargo.sharehub.inv.dto.StockDtos.DeviceSerial> deviceSerials(String warehouseNo, String itemType,
                                                                                                  Integer page, Integer size);
 
+    /** 可出库的柜（C01）：只列可见仓；warehouseNo 可空 = 全部可见仓。最多 2000 台。 */
+    java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.IssueCandidate> issueCandidates(String warehouseNo);
+
+    /** 某商家的待安装柜（C05），宿主内分页（库存服务出库池暂无分页，需求 #5）。 */
+    ai.neargo.common.core.PageResult<ai.neargo.sharehub.inv.dto.StockDtos.InstallCandidate> installationCandidates(String agentNo, String siteNo,
+                                                                                                         Integer page, Integer size);
+
     /** 阶段下钻（库存缺口 P2 #6）：某阶段 × 设备类型的设备清单（最多 2000 台，total 为全量），口径同 {@link #stages()}。 */
     ai.neargo.sharehub.inv.dto.StockDtos.StageItems stageItems(String stage, String itemType);
 

@@ -314,6 +314,38 @@ class InventoryServiceEngineTest extends ApiTestSupport {
         assertThat(topStatus(b)).as("同单另一台仍已领取").isEqualTo("CLAIMED");
     }
 
+    private static boolean hasCabinet(JsonNode rows, String c) {
+        for (JsonNode r : rows) if (c.equals(r.path("cabinetNo").asText())) return true;
+        return false;
+    }
+
+    @Test
+    @DisplayName("★ C01 可出库候选 = 库存服务在库 ∩ 本地可出库：只在本地在库的不算，质检没放行的不算")
+    void issueCandidatesFollowService() {
+        String ok = stocked(), failedQc = stocked();
+        jdbc.update("UPDATE dev_cabinet SET qc_status='FAILED' WHERE cabinet_no=?", failedQc);
+        String localOnly = "CABLO" + tag + (++seq);
+        post("/api/ops/cabinets", Map.of("cabinetNo", localOnly, "sn", localOnly, "vendorCode", "TEST", "slotTotal", 8), login("ADMIN")).okData();
+        jdbc.update("UPDATE dev_cabinet SET warehouse_no='WH002', qc_status='PASSED' WHERE cabinet_no=?", localOnly);
+        JsonNode rows = get("/api/ops/inventory/issue-candidates?warehouseNo=WH002", login("ADMIN")).okData();
+        assertThat(hasCabinet(rows, ok)).isTrue();
+        assertThat(hasCabinet(rows, failedQc)).as("质检没放行").isFalse();
+        assertThat(hasCabinet(rows, localOnly)).as("库存服务里没有它").isFalse();
+    }
+
+    @Test
+    @DisplayName("★ C05 待安装候选：库存服务里该商家已领取的 ∩ 本地已签收未回仓；别的商家查不到")
+    void installationCandidatesByMerchant() {
+        String c = stocked();
+        String[] m = merchant(), other = merchant();
+        String admin = login("ADMIN");
+        post("/api/ops/devices/issue", Map.of("agentNo", m[0], "cabinetNos", List.of(c)), admin).okData();
+        JsonNode page = get("/api/ops/inventory/installation-candidates?agentNo=" + m[0], admin).okData();
+        assertThat(hasCabinet(page.path("list"), c)).isTrue();
+        assertThat(page.path("list").get(0).path("dispatchId").asText()).isNotBlank();
+        assertThat(hasCabinet(get("/api/ops/inventory/installation-candidates?agentNo=" + other[0], admin).okData().path("list"), c)).isFalse();
+    }
+
     private static JsonNode stageRow(JsonNode rows, String stage) {
         for (JsonNode r : rows) if (stage.equals(r.path("stage").asText())) return r;
         throw new AssertionError("no stage " + stage);

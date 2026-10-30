@@ -1,7 +1,7 @@
 // 库存流水与盘点（S4）mock：演示按独立进销存引擎（盘点可用）。
 // 流水取 mock 履历里进出仓的行（同后端本地引擎口径）；盘点账面 = 该仓在库、未出库的柜机。
 import type {
-  InventoryEngine, DeviceBalance, DeviceSerial, StockStage, StockStageCode, StageItem, StageItems, IntakeItemType, StockPeriodRow, InventoryMigrationPlan, InventoryMigrationResult, MigrationCandidate, PageResult, StockCount, StockCountDetail, StockCountStatus, StockLedgerRow,
+  InventoryEngine, DeviceBalance, DeviceSerial, IssueCandidate, InstallCandidate, StockStage, StockStageCode, StageItem, StageItems, IntakeItemType, StockPeriodRow, InventoryMigrationPlan, InventoryMigrationResult, MigrationCandidate, PageResult, StockCount, StockCountDetail, StockCountStatus, StockLedgerRow,
 } from "../../types";
 import { fail, notFound } from "../../biz-error";
 import { cabinets, powerbanks, inventoryTransfers, transferItemsOf } from "./device";
@@ -147,6 +147,30 @@ function inStockSerials(warehouseNo: string, t: IntakeItemType): string[] {
   return t === "CABINET"
     ? cabinets.filter((c) => !c.archivedAt && c.warehouseNo === warehouseNo && CAB_STAGE.IN_STOCK!(c)).map((c) => c.cabinetNo)
     : powerbanks.filter((p) => !p.archivedAt && p.warehouseNo === warehouseNo && p.status === "IN_STOCK" && !p.cabinetNo).map((p) => p.powerbankNo);
+}
+
+/** 可出库的柜（同后端 C01；mock 以「在库」阶段为库存服务在库）。 */
+export function issueCandidates(q: { warehouseNo?: string } = {}): IssueCandidate[] {
+  ensurePoolSeed();
+  return cabinets.filter((c) => !c.archivedAt && CAB_STAGE.IN_STOCK!(c) && (!q.warehouseNo || c.warehouseNo === q.warehouseNo)
+    && (!c.qcStatus || c.qcStatus === "PASSED"))
+    .map((c) => ({ cabinetNo: c.cabinetNo, warehouseNo: c.warehouseNo!, model: c.model ?? null, vendorCode: c.vendorCode ?? null }))
+    .sort((a, b) => a.cabinetNo.localeCompare(b.cabinetNo));
+}
+
+/** 某商家的待安装柜（同后端 C05）。 */
+export function installationCandidates(q: { agentNo: string; siteNo?: string; page?: number; size?: number }): PageResult<InstallCandidate> {
+  if (!q.agentNo) fail("请先选择商家", "Select a merchant");
+  ensurePoolSeed();
+  const all = cabinets.filter((c) => !c.archivedAt && c.status === "IN_STOCK" && c.issuedAgentNo === q.agentNo && !!c.issueClaimedAt
+    && !c.warehouseNo && (!c.qcStatus || c.qcStatus === "PASSED") && (!c.locationNo || c.agentNo === q.agentNo)
+    && (!q.siteNo || c.issuedSiteNo === q.siteNo))
+    .map((c) => ({ cabinetNo: c.cabinetNo, model: c.model ?? null, siteNo: c.issuedSiteNo ?? null, locationNo: c.locationNo ?? null,
+      dispatchId: `DP-${c.cabinetNo}` }))
+    .sort((a, b) => a.cabinetNo.localeCompare(b.cabinetNo));
+  const page = q.page ?? 1;
+  const size = q.size ?? 50;
+  return { list: all.slice((page - 1) * size, page * size), total: all.length };
 }
 
 export function stages(): StockStage[] {

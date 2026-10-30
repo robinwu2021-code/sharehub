@@ -69,6 +69,17 @@ public final class StockDtos {
                                 long available) {
     }
 
+    /** 可出库的柜（对接明细 C01）：库存服务在库 ∩ 本地可出库（在库、未绑定、未出库、质检放行）。 */
+    public record IssueCandidate(String cabinetNo, String warehouseNo, String model, String vendorCode) {
+    }
+
+    /**
+     * 某商家的待安装柜（对接明细 C05）：库存服务出库池里该商家「已领取」的 ∩ 本地已出库给该商家、已签收、
+     * 未回仓、质检放行（未绑定，或已绑到该商家的点位）。
+     */
+    public record InstallCandidate(String cabinetNo, String model, String siteNo, String locationNo, String dispatchId) {
+    }
+
     /** 库存服务里在库的一个设备序列号（余额下钻）。 */
     public record DeviceSerial(String serialNo, String itemType, String warehouseNo) {
     }

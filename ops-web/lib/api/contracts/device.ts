@@ -126,6 +126,11 @@ export interface DeviceApi {
   /** 某仓在库的设备序列号（余额下钻）。 */
   listDeviceSerials(q: { warehouseNo: string; itemType?: IntakeItemType; page?: number; size?: number })
     : Promise<PageResult<import("../../types").DeviceSerial>>;
+  /** 可出库的柜（C01）：库存服务在库 ∩ 本地可出库；warehouseNo 空 = 全部可见仓。 */
+  listIssueCandidates(q?: { warehouseNo?: string }): Promise<import("../../types").IssueCandidate[]>;
+  /** 某商家的待安装柜（C05），建安装工单选设备用。 */
+  listInstallationCandidates(q: { agentNo: string; siteNo?: string; page?: number; size?: number })
+    : Promise<PageResult<import("../../types").InstallCandidate>>;
   /** 统一库存视图（S6）：按生命周期阶段的台数。 */
   getStockStages(): Promise<StockStage[]>;
   /** 阶段下钻（P2 #6）：口径同 getStockStages。 */

@@ -682,6 +682,80 @@ public class StockViewServiceImpl implements StockViewService {
         return new PageResult<>(all.subList(from, Math.min(from + s, all.size())), all.size());
     }
 
+    // —— 出库与安装候选（C01 / C05）——
+
+    private static final int CANDIDATES_MAX = 2000;
+
+    @Override
+    public List<StockDtos.IssueCandidate> issueCandidates(String warehouseNo) {
+        requireService();
+        String only = warehouseNo == null || warehouseNo.isBlank() ? null : warehouseNo.trim();
+        if (only != null) warehouses.requireVisible(only);
+        String item = links.get("item:" + InventoryLinks.CABINET);
+        if (item == null) return List.of();
+        InventoryApi api = remote.api();
+        // 库存服务说在库才算在库；本地状态只负责业务上的拦截（已绑、已出库、质检没放行）
+        Map<String, String> whOfSerial = new java.util.LinkedHashMap<>();
+        for (var w : warehouses.list()) {
+            if (w.archivedAt() != null || (only != null && !only.equals(w.warehouseNo())) || !isVisibleWarehouse(w.warehouseNo())) continue;
+            String loc = links.get("wh:" + w.warehouseNo());
+            if (loc == null) continue;
+            for (InventoryApi.InStock x : call(() -> api.serials(item, loc))) whOfSerial.put(x.serialNo(), w.warehouseNo());
+        }
+        List<StockDtos.IssueCandidate> out = new ArrayList<>();
+        for (List<String> chunk : chunks(new ArrayList<>(whOfSerial.keySet()))) {
+            for (DevCabinet c : cabinets.selectList(new LambdaQueryWrapper<DevCabinet>().in(DevCabinet::getCabinetNo, chunk)
+                    .eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name()).isNull(DevCabinet::getLocationNo)
+                    .isNull(DevCabinet::getIssuedAgentNo).isNull(DevCabinet::getArchivedAt)
+                    .and(q -> q.isNull(DevCabinet::getQcStatus).or().eq(DevCabinet::getQcStatus, ai.neargo.sharehub.dev.QcStatus.PASSED.name())))) {
+                out.add(new StockDtos.IssueCandidate(c.getCabinetNo(), whOfSerial.get(c.getCabinetNo()), c.getModel(), c.getVendorCode()));
+            }
+        }
+        out.sort(Comparator.comparing(StockDtos.IssueCandidate::cabinetNo));
+        return out.size() > CANDIDATES_MAX ? out.subList(0, CANDIDATES_MAX) : out;
+    }
+
+    @Override
+    public PageResult<StockDtos.InstallCandidate> installationCandidates(String agentNo, String siteNo, Integer page, Integer size) {
+        requireService();
+        if (agentNo == null || agentNo.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "agentNo");
+        String agent = agentNo.trim();
+        String site = siteNo == null || siteNo.isBlank() ? null : siteNo.trim();
+        int p = page == null || page < 1 ? 1 : page;
+        int s = size == null || size < 1 ? 50 : Math.min(size, 500);
+        String item = links.get("item:" + InventoryLinks.CABINET);
+        if (item == null) return new PageResult<>(List.of(), 0);
+        InventoryApi api = remote.api();
+        // 只认库存服务里该商家「已领取」的顶层出库记录：安装要先签收（待领取的还不能装）
+        Map<String, String> dispatchOf = new java.util.LinkedHashMap<>();
+        for (InventoryApi.DispatchView v : call(() -> api.dispatchPool(new InventoryApi.DispatchFilter(List.of("CLAIMED"), List.of(agent),
+                null, null, null, null, item)))) {
+            if (v.parentDispatchId() == null && v.serialNo() != null) dispatchOf.put(v.serialNo(), v.dispatchId());
+        }
+        List<StockDtos.InstallCandidate> all = new ArrayList<>();
+        // 本地数据范围照常生效（商家只看得到自己的柜）
+        for (List<String> chunk : chunks(new ArrayList<>(dispatchOf.keySet()))) {
+            for (DevCabinet c : cabinets.selectList(new LambdaQueryWrapper<DevCabinet>().in(DevCabinet::getCabinetNo, chunk)
+                    .eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name()).eq(DevCabinet::getIssuedAgentNo, agent)
+                    .isNotNull(DevCabinet::getIssueClaimedAt).isNull(DevCabinet::getWarehouseNo).isNull(DevCabinet::getArchivedAt)
+                    .and(q -> q.isNull(DevCabinet::getQcStatus).or().eq(DevCabinet::getQcStatus, ai.neargo.sharehub.dev.QcStatus.PASSED.name()))
+                    .and(q -> q.isNull(DevCabinet::getLocationNo).or().eq(DevCabinet::getAgentNo, agent)))) {
+                if (site != null && !site.equals(c.getIssuedSiteNo())) continue;
+                all.add(new StockDtos.InstallCandidate(c.getCabinetNo(), c.getModel(), c.getIssuedSiteNo(), c.getLocationNo(),
+                        dispatchOf.get(c.getCabinetNo())));
+            }
+        }
+        all.sort(Comparator.comparing(StockDtos.InstallCandidate::cabinetNo));
+        int from = Math.min((p - 1) * s, all.size());
+        return new PageResult<>(all.subList(from, Math.min(from + s, all.size())), all.size());
+    }
+
+    private static List<List<String>> chunks(List<String> all) {
+        List<List<String>> out = new ArrayList<>();
+        for (int i = 0; i < all.size(); i += 500) out.add(all.subList(i, Math.min(i + 500, all.size())));
+        return out;
+    }
+
     private static List<String> deviceTypes(String itemType) {
         if (itemType == null || itemType.isBlank()) return DEVICE_TYPES;
         String t = itemType.trim();

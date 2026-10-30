@@ -222,14 +222,14 @@ function IssueDrawer({ open, onClose, defaultAgent, onDone }: {
   const [agentNo, setAgentNo] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
   const agentsQ = useQuery({ queryKey: ["agents", "issuable"], queryFn: () => api.listAgents({ size: UNPAGED_SIZE }), enabled: open });
+  // 可出库候选（对接明细 C01）：库存服务在库 ∩ 本地可出库，由后端算好，不再拿设备台账自己筛
   const stockQ = useQuery({
-    queryKey: ["cabinets", "in-stock"],
-    queryFn: () => api.listCabinets({ status: "IN_STOCK", size: UNPAGED_SIZE }),
+    queryKey: ["issue-candidates"],
+    queryFn: () => api.listIssueCandidates(),
     enabled: open,
   });
   const issuable = (agentsQ.data?.list ?? []).filter((a: Agent) => a.status === "ENABLED" && !a.archivedAt);
-  const stock = useMemo(() => (stockQ.data?.list ?? []).filter((c) =>
-    !c.issuedAgentNo && !c.locationNo && !c.archivedAt && (!c.qcStatus || c.qcStatus === "PASSED")), [stockQ.data]);
+  const stock = stockQ.data ?? [];
   const chosen = issuable.find((a) => a.agentNo === (agentNo || defaultAgent));
   const notReady = chosen && (!agentCoreComplete(chosen) || !chosen.defaultSiteNo);
   const [ship, setShip] = useState<ShipInfo>({});
@@ -253,8 +253,9 @@ function IssueDrawer({ open, onClose, defaultAgent, onDone }: {
         </Select>
         {notReady && <div className="mt-1 txt-caption text-destructive-ink">该商家还没补齐位置与行业（没有默认站点），补齐后才能出库：去 <RefLink kind="agent" no={chosen!.agentNo} label="商家档案" /></div>}
       </Field>
-      <Field label={`仓里可出库的设备（在库 · 质检放行 · ${stock.length} 台）`}>
+      <Field label={`仓里可出库的设备（库存服务在库 · 质检放行 · ${stock.length} 台）`}>
         {stockQ.isLoading ? <span className="text-muted-foreground">加载中…</span>
+          : stockQ.isError ? <span className="text-destructive-ink">库存服务暂时取不到可出库设备，请稍后重试</span>
           : !stock.length ? <span className="text-muted-foreground">仓里没有可出库的设备</span>
             : (
               <div className="max-h-72 space-y-1 overflow-y-auto">

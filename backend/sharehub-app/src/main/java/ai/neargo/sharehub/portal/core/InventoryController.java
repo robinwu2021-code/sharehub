@@ -90,6 +90,22 @@ public class InventoryController {
         return stock.deviceBalances(warehouseNo, itemType);
     }
 
+    /** 可出库的柜（对接明细 C01）：库存服务在库 ∩ 本地可出库。 */
+    @GetMapping("/inventory/issue-candidates")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.IssueCandidate> issueCandidates(@RequestParam(required = false) String warehouseNo) {
+        return stock.issueCandidates(warehouseNo);
+    }
+
+    /** 某商家的待安装柜（对接明细 C05）：库存服务出库池该商家已领取的 ∩ 本地可安装。建安装工单选设备用。 */
+    @GetMapping("/inventory/installation-candidates")
+    @PreAuthorize("@perm.can('device:cabinet:read')")
+    public ai.neargo.common.core.PageResult<ai.neargo.sharehub.inv.dto.StockDtos.InstallCandidate> installationCandidates(
+            @RequestParam String agentNo, @RequestParam(required = false) String siteNo,
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
+        return stock.installationCandidates(agentNo, siteNo, page, size);
+    }
+
     /** 某仓在库的设备序列号（余额下钻）。 */
     @GetMapping("/inventory/serials")
     @PreAuthorize("@perm.can('device:inventory:read')")

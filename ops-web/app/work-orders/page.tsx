@@ -280,12 +280,16 @@ function WorkOrdersInner() {
   const installMerchants = useQuery({
     queryKey: ["issued-summary"], queryFn: () => api.issuedSummary(), enabled: !!woForm && creatingInstall,
   });
-  // 安装单必须先选商家，再查该商家的已出库设备。通用工单仍按设备台账选择。
+  // 通用工单按设备台账选机柜；安装单必须先选商家，再取该商家的待安装候选（对接明细 C05：库存服务已领取 ∩ 本地可安装）
   const cabinetOpts = useQuery({
-    queryKey: ["wo-cabinet-options", creatingInstall, installMerchant],
-    queryFn: () => api.listCabinets({ page: 1, size: UNPAGED_SIZE,
-      ...(creatingInstall ? { issuedAgentNo: installMerchant, pool: "ALL" as const, status: "IN_STOCK" } : {}) }),
-    enabled: !!woForm && (!creatingInstall || !!installMerchant),
+    queryKey: ["wo-cabinet-options"],
+    queryFn: () => api.listCabinets({ page: 1, size: UNPAGED_SIZE }),
+    enabled: !!woForm && !creatingInstall,
+  });
+  const installOpts = useQuery({
+    queryKey: ["installation-candidates", installMerchant],
+    queryFn: () => api.listInstallationCandidates({ agentNo: installMerchant, size: UNPAGED_SIZE }),
+    enabled: !!woForm && creatingInstall && !!installMerchant,
   });
   // 站点筛选的选项：站点表有界（以运营站点数为上界），一次取完；没有站点查看权限就不出这个筛选
   const canSites = allow("location:poi:read");
@@ -404,9 +408,10 @@ function WorkOrdersInner() {
   };
 
   const WO_FIELDS: FieldDef[] = useMemo(() => {
-    const cabs = (cabinetOpts.data?.list ?? []).filter((c) => !creatingInstall || (!c.archivedAt && !c.warehouseNo
-      && c.issuedAgentNo === installMerchant && c.issueClaimedAt && (c.qcStatus == null || c.qcStatus === "PASSED")
-      && (c.locationNo == null || c.agentNo === installMerchant)));
+    const cabOptions = creatingInstall
+      ? (installOpts.data?.list ?? []).map((c) => ({ value: c.cabinetNo, label: `${c.cabinetNo} · ${c.locationNo ?? "未绑定"}` }))
+      : (cabinetOpts.data?.list ?? []).map((c) => ({ value: c.cabinetNo, label: `${c.cabinetNo} · ${c.locationName}` }));
+    const optsLoading = creatingInstall ? installOpts.isLoading && !!installMerchant : cabinetOpts.isLoading;
     return [
       { key: "type", label: "工单类型", type: "select", options: WO_TYPE_OPTIONS, required: true, section: "基本信息" },
       ...(creatingInstall ? [{ key: "agentNo", label: "商家", type: "select" as const, required: true, section: "基本信息",
@@ -414,8 +419,11 @@ function WorkOrdersInner() {
         help: installMerchants.isError ? "商家列表加载失败，请关闭后重试" : "选择出库商家后，再选择待安装设备" }] : []),
       {
         key: "cabinetNo", label: creatingInstall ? "待安装设备" : "机柜号", type: "select", required: true, section: "基本信息",
-        options: [{ value: "", label: "请选择机柜" }, ...cabs.map((c) => ({ value: c.cabinetNo, label: `${c.cabinetNo} · ${c.locationName}` }))],
-        help: cabinetOpts.isLoading ? "机柜列表加载中…" : creatingInstall ? (!installMerchant ? "请先选择商家" : "仅显示该商家已签收、质检放行且未上线的已出库设备") : "与设备台账同一份数据",
+        options: [{ value: "", label: "请选择机柜" }, ...cabOptions],
+        help: optsLoading ? "机柜列表加载中…" : creatingInstall
+          ? (!installMerchant ? "请先选择商家" : installOpts.isError ? "库存服务暂时取不到待安装设备，请稍后重试"
+            : "该商家已签收、质检放行且未上线的已出库设备（以库存服务的领取记录为准）")
+          : "与设备台账同一份数据",
       },
       { key: "locationName", label: "站点", maxLength: 40, section: "基本信息", placeholder: "留空则按机柜自动带出", help: "仅在机柜刚移机、台账未同步时才需手填" },
       { key: "priority", label: "优先级", type: "select", options: PRIO_OPTIONS, required: true, section: "基本信息" },
@@ -427,7 +435,8 @@ function WorkOrdersInner() {
         disabledWhen: (v) => v.type !== "REMOVE",
         help: "留商家待安装：柜子撤下后留在同一商家名下，可再绑到它的其它站点点位；回仓：撤下后生成回仓调拨单，离开商家" },
     ];
-  }, [cabinetOpts.data, cabinetOpts.isLoading, creatingInstall, installMerchant, installMerchants.data, installMerchants.isError]);
+  }, [cabinetOpts.data, cabinetOpts.isLoading, installOpts.data, installOpts.isLoading, installOpts.isError, creatingInstall, installMerchant,
+    installMerchants.data, installMerchants.isError]);
 
   const saveSla = useMutation({
     mutationFn: (v: Partial<SlaRule>) => api.saveSlaRule(v),
