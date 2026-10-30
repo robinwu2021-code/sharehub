@@ -51,6 +51,9 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # inventory-event-pull · 拉取独立进销存事件并投影（inv.remote）· 声明 cron: 0 * * * * *
 * * * * * deploy flock -n /run/lock/powerbank-job-inventory-event-pull.lock curl -s -m 55 -X POST 'http://127.0.0.1:8082/internal/job/inventory-event-pull/trigger' -o /dev/null
 
+# inventory-operation-resolve · 查回结果不明的库存操作（inv.remote）· 声明 cron: 0 */5 * * * *
+*/5 * * * * deploy flock -n /run/lock/powerbank-job-inventory-operation-resolve.lock curl -s -m 270 -X POST 'http://127.0.0.1:8082/internal/job/inventory-operation-resolve/trigger' -o /dev/null
+
 # order-overdue-buyout · 超时扣款（触顶买断 / 到时限最高收费，按 rent.overdue.mode）（trade）· 声明 cron: 0 15 * * * *
 15 * * * * deploy flock -n /run/lock/powerbank-job-order-overdue-buyout.lock curl -s -m 900 -X POST 'http://127.0.0.1:8082/internal/job/order-overdue-buyout/trigger' -o /dev/null
 

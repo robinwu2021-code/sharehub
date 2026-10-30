@@ -19,6 +19,7 @@ import { Toolbar } from "@/components/ui/toolbar";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
+import { InventoryOperations } from "./inventory-operations";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { ShowArchivedToggle, archivedRowClass, ArchiveActions, archiveConfirm, unarchiveConfirm } from "@/components/archive";
@@ -255,6 +256,7 @@ export function InventorySettingsTab() {
       {!canWrite && <ReadOnlyNotice what="库存设置" perm="system:param:update" className="mb-3" />}
       <DataTable rowKey={(p: SysParam) => p.paramKey} columns={cols} rows={q.data?.list}
         loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="没有库存参数" />
+      <InventoryOperations />
     </div>
   );
 }

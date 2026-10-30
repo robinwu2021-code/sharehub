@@ -18853,6 +18853,130 @@
   },
   {
    "verb": "GET",
+   "path": "/api/ops/inventory/operations",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#operations",
+   "summary": "未完成的库存写操作（默认 PREPARED / NEEDS_REVIEW），带远端步骤状态；不含请求原文。",
+   "params": [
+    {
+     "in": "query",
+     "name": "phase",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "kind",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.common.core.PageResult<ai.neargo.sharehub.inv.dto.OperationDtos.Operation>",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.common.core.PageResult<ai.neargo.sharehub.inv.dto.OperationDtos.Operation>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/operations/{operationNo}/resolve",
+   "perm": "device:inventory:transfer",
+   "perms": [
+    "device:inventory:transfer"
+   ],
+   "handler": "InventoryController#resolveOperation",
+   "summary": "向库存服务查回结果不明的步骤（过在途窗口才下结论）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "operationNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.OperationDtos.Operation",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.OperationDtos.Operation",
+   "responseShape": [
+    {
+     "name": "operationNo",
+     "type": "String"
+    },
+    {
+     "name": "bizRef",
+     "type": "String"
+    },
+    {
+     "name": "engine",
+     "type": "String"
+    },
+    {
+     "name": "phase",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/operations/{operationNo}/retry",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#retryOperation",
+   "summary": "原样重试：只限原操作人且仍有原动作权限（服务内校验）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "operationNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.OperationDtos.Operation",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.OperationDtos.Operation",
+   "responseShape": [
+    {
+     "name": "operationNo",
+     "type": "String"
+    },
+    {
+     "name": "bizRef",
+     "type": "String"
+    },
+    {
+     "name": "engine",
+     "type": "String"
+    },
+    {
+     "name": "phase",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/ops/inventory/period-summary",
    "perm": "device:inventory:read",
    "perms": [
@@ -56600,10 +56724,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 632,
-  "records": 624,
-  "withPerm": 549,
+  "endpoints": 635,
+  "records": 627,
+  "withPerm": 552,
   "withBody": 258,
-  "shapedResponses": 490
+  "shapedResponses": 492
  }
 }

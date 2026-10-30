@@ -50,7 +50,9 @@ public class InventoryController {
                                ai.neargo.sharehub.inv.service.StockThresholdService thresholds,
                                ai.neargo.sharehub.inv.service.ShipmentService shipmentService,
                                ai.neargo.sharehub.inv.service.MaterialService materials,
-                               ai.neargo.common.security.rbac.PermChecker perm) {
+                               ai.neargo.common.security.rbac.PermChecker perm,
+                               ai.neargo.sharehub.inv.service.InventoryOperationService operations) {
+        this.operations = operations;
         this.materials = materials;
         this.perm = perm;
         this.shipmentService = shipmentService;
@@ -80,6 +82,33 @@ public class InventoryController {
     @PreAuthorize("@perm.can('device:inventory:read')")
     public java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockStage> stages() {
         return stock.stages();
+    }
+
+    // —— 执行异常（对接明细 F04 / F05）——
+
+    private final ai.neargo.sharehub.inv.service.InventoryOperationService operations;
+
+    /** 未完成的库存写操作（默认 PREPARED / NEEDS_REVIEW），带远端步骤状态；不含请求原文。 */
+    @GetMapping("/inventory/operations")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public ai.neargo.common.core.PageResult<ai.neargo.sharehub.inv.dto.OperationDtos.Operation> operations(
+            @RequestParam(required = false) String phase, @RequestParam(required = false) String kind,
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
+        return operations.page(phase, kind, page, size);
+    }
+
+    /** 向库存服务查回结果不明的步骤（过在途窗口才下结论）。 */
+    @PostMapping("/inventory/operations/{operationNo}/resolve")
+    @PreAuthorize("@perm.can('device:inventory:transfer')")
+    public ai.neargo.sharehub.inv.dto.OperationDtos.Operation resolveOperation(@PathVariable String operationNo) {
+        return operations.resolve(operationNo);
+    }
+
+    /** 原样重试：只限原操作人且仍有原动作权限（服务内校验）。 */
+    @PostMapping("/inventory/operations/{operationNo}/retry")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public ai.neargo.sharehub.inv.dto.OperationDtos.Operation retryOperation(@PathVariable String operationNo) {
+        return operations.retry(operationNo);
     }
 
     /** 设备库存余额（对接明细 B01）：库存服务按仓 × 设备类型的在手 / 占用 / 不可用 / 可用。 */

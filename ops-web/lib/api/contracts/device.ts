@@ -131,6 +131,13 @@ export interface DeviceApi {
   /** 某商家的待安装柜（C05），建安装工单选设备用。 */
   listInstallationCandidates(q: { agentNo: string; siteNo?: string; page?: number; size?: number })
     : Promise<PageResult<import("../../types").InstallCandidate>>;
+  /** 库存执行异常（F04）：默认未完成的（PREPARED / NEEDS_REVIEW）。 */
+  listInventoryOperations(q?: { phase?: string; kind?: string; page?: number; size?: number })
+    : Promise<PageResult<import("../../types").InventoryOperation>>;
+  /** 向库存服务查回结果不明的步骤（F05）。 */
+  resolveInventoryOperation(operationNo: string): Promise<import("../../types").InventoryOperation>;
+  /** 原样重试：只限原操作人。 */
+  retryInventoryOperation(operationNo: string): Promise<import("../../types").InventoryOperation>;
   /** 统一库存视图（S6）：按生命周期阶段的台数。 */
   getStockStages(): Promise<StockStage[]>;
   /** 阶段下钻（P2 #6）：口径同 getStockStages。 */

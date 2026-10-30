@@ -10,6 +10,7 @@ import * as mv from "../../mock/db/movement";
 import * as st from "../../mock/db/stock";
 import * as db from "../../mock/db";
 import type { DeviceApi } from "../contracts/device";
+import { notFound } from "../../biz-error";
 import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ } from "../query";
 import { wait } from "./_wait";
 import { currentAuth } from "../../auth";
@@ -92,6 +93,9 @@ export const deviceMock: DeviceApi = {
   listDeviceSerials: async (q) => wait(st.deviceSerials(q)),
   listIssueCandidates: async (q) => wait(st.issueCandidates(q)),
   listInstallationCandidates: async (q) => wait(st.installationCandidates(q)),
+  listInventoryOperations: async () => wait({ list: [], total: 0 }),
+  resolveInventoryOperation: async (no) => wait(notFound("库存操作", "Inventory operation", no)),
+  retryInventoryOperation: async (no) => wait(notFound("库存操作", "Inventory operation", no)),
   getStockStages: async () => wait(st.stages()),
   getStageItems: async (stage, itemType) => wait(st.stageItems(stage, itemType)),
   getInventoryMigrationPlan: async () => wait(st.migrationPlan()),

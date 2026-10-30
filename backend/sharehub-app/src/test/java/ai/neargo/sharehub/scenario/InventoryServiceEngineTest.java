@@ -354,6 +354,61 @@ class InventoryServiceEngineTest extends ApiTestSupport {
         assertThat(hasCabinet(get("/api/ops/inventory/installation-candidates?agentNo=" + other[0], admin).okData().path("list"), c)).isFalse();
     }
 
+    private String opOf(String requestKey) {
+        return jdbc.queryForObject("SELECT operation_no FROM inv_operation WHERE request_key=?", String.class, requestKey);
+    }
+
+    /** 把操作的步骤时间往前拨，越过在途窗口（真实场景是等几分钟）。 */
+    private void pastInFlight(String op) {
+        jdbc.update("UPDATE inv_operation_step SET updated_at = NOW(3) - INTERVAL 10 MINUTE WHERE operation_no=?", op);
+    }
+
+    @Test
+    @DisplayName("★★ F04/F05 出库丢响应 → 待复核；查回发现远端已过账 → 原人原样重试完成，只一张出库单；别人不能重试")
+    void resolveFindsRemoteDoneThenOriginalActorRetries() {
+        String c = stocked();
+        String[] m = merchant();
+        String admin = login("ADMIN");
+        String rk = "RK-F04-" + tag;
+        fake.loseNextOutboundPostResponse = true;
+        assertThat(post("/api/ops/devices/issue", Map.of("agentNo", m[0], "cabinetNos", List.of(c), "requestKey", rk), admin).status).isEqualTo(409);
+        String op = opOf(rk);
+        JsonNode listed = get("/api/ops/inventory/operations", admin).okData();
+        boolean found = false;
+        for (JsonNode o : listed.path("list")) if (op.equals(o.path("operationNo").asText())) found = true;
+        assertThat(found).as("执行异常列表里有它").isTrue();
+
+        pastInFlight(op);
+        JsonNode r = post("/api/ops/inventory/operations/" + op + "/resolve", Map.of(), admin).okData();
+        assertThat(r.path("phase").asText()).isEqualTo("NEEDS_REVIEW");
+        boolean postDone = false;
+        for (JsonNode st : r.path("steps")) if ("OUT_0_POST".equals(st.path("code").asText())) postDone = "COMPLETED".equals(st.path("status").asText());
+        assertThat(postDone).as("查回：远端已过账").isTrue();
+
+        assertThat(post("/api/ops/inventory/operations/" + op + "/retry", Map.of(), login("WAREHOUSE")).status).as("不是原操作人").isEqualTo(403);
+        JsonNode done = post("/api/ops/inventory/operations/" + op + "/retry", Map.of(), admin).okData();
+        assertThat(done.path("phase").asText()).isEqualTo("COMPLETED");
+        assertThat(fake.docs.values().stream().filter(d -> "OUT".equals(d.kind()) && d.serials().contains(c)).count()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT issued_agent_no FROM dev_cabinet WHERE cabinet_no=?", String.class, c)).isEqualTo(m[0]);
+    }
+
+    @Test
+    @DisplayName("★ F05 503 但远端其实没执行：过在途窗口查回查不到 → 记失败、操作 REJECTED（不再算未完成）")
+    void resolveNotExecutedBecomesRejected() {
+        String c = stocked();
+        String[] m = merchant();
+        String rk = "RK-F05-" + tag;
+        fake.failNext = new InventoryRemoteException(503, "inventory.unreachable", List.of(), "down", null);
+        assertThat(post("/api/ops/devices/issue", Map.of("agentNo", m[0], "cabinetNos", List.of(c), "requestKey", rk), login("ADMIN")).status).isEqualTo(409);
+        String op = opOf(rk);
+        assertThat(jdbc.queryForObject("SELECT phase FROM inv_operation WHERE operation_no=?", String.class, op)).isEqualTo("NEEDS_REVIEW");
+        JsonNode early = post("/api/ops/inventory/operations/" + op + "/resolve", Map.of(), login("ADMIN")).okData();
+        assertThat(early.path("phase").asText()).as("在途窗口内不下结论").isEqualTo("NEEDS_REVIEW");
+        pastInFlight(op);
+        JsonNode r = post("/api/ops/inventory/operations/" + op + "/resolve", Map.of(), login("ADMIN")).okData();
+        assertThat(r.path("phase").asText()).isEqualTo("REJECTED");
+    }
+
     private static JsonNode stageRow(JsonNode rows, String stage) {
         for (JsonNode r : rows) if (stage.equals(r.path("stage").asText())) return r;
         throw new AssertionError("no stage " + stage);

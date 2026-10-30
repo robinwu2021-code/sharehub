@@ -944,6 +944,32 @@ export interface InstallCandidate {
   dispatchId: string;
 }
 
+/** 库存执行异常（F04 / F05）。 */
+export type InventoryOperationPhase = "PREPARED" | "NEEDS_REVIEW" | "REJECTED" | "COMPLETED";
+/** 步骤状态：UNKNOWN 结果不明 · COMPLETED 远端已执行 · FAILED 远端没执行 · PENDING 未发出。 */
+export type InventoryOperationStepStatus = "UNKNOWN" | "COMPLETED" | "FAILED" | "PENDING";
+export interface InventoryOperationStep {
+  code: string;
+  status: InventoryOperationStepStatus;
+  remoteRef: string | null;
+  lastError: string | null;
+  updatedAt: string | null;
+}
+export interface InventoryOperation {
+  operationNo: string;
+  kind: string;
+  bizRef: string | null;
+  phase: InventoryOperationPhase;
+  attempts: number;
+  lastError: string | null;
+  createdBy: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  steps: InventoryOperationStep[];
+  /** 当前用户能原样重试（原操作人、仍有原动作权限）。 */
+  retryable: boolean;
+}
+
 /** 库存服务里在库的一个设备序列号（余额下钻）。 */
 export interface DeviceSerial {
   serialNo: string;
@@ -1053,8 +1079,10 @@ export interface StockCountLine {
   diffQty: number | null;
   /** 数量物料（trackingMode = QUANTITY）按 itemId 录实盘数（B15）；逐件的靠扫码。 */
   itemId?: string | null;
-  trackingMode?: "SERIAL" | "QUANTITY" | null;
+  trackingMode?: CountLineTracking | null;
 }
+/** 盘点行的跟踪方式：SERIAL 逐件扫码 · QUANTITY 按数量录入。 */
+export type CountLineTracking = "SERIAL" | "QUANTITY";
 
 export interface StockCountScan {
   serialNo: string;
