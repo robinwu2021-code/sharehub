@@ -178,7 +178,8 @@ class InventoryUnifiedApprovalTest extends ApiTestSupport {
     void internalVocabularyAlsoRejectsInvalidDirectDatabaseWrites(String column) {
         submit();
         org.assertj.core.api.Assertions.assertThatThrownBy(()->jdbc.update("UPDATE inv_count_review SET "+column+"='INVALID' WHERE count_no=?",count))
-                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+                // MySQL 报 3819（CHECK 违反），Spring 归不进 DataIntegrityViolation —— 按约束名断言
+                .isInstanceOf(org.springframework.dao.DataAccessException.class).hasMessageContaining("chk_count_review_");
     }
 
 }

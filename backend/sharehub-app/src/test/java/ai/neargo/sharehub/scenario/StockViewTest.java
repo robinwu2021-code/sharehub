@@ -101,15 +101,27 @@ class StockViewTest extends ApiTestSupport {
                     + "WHERE cabinet_no NOT IN (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)", inWh, out);
             jdbc.update("INSERT INTO inventory_sync_state (k, v) SELECT CONCAT('mig:POWERBANK:', powerbank_no), 'IN' FROM dev_powerbank "
                     + "ON DUPLICATE KEY UPDATE v = VALUES(v)");
+            // 共享测试库里别的用例留下的未完成操作会挡住迁移（F08），本段期间暂挂
+            jdbc.update("UPDATE inv_operation SET tenant_id='PARKED-MIG' WHERE tenant_id='MAIN' AND phase NOT IN ('COMPLETED','REJECTED')");
+            // 第一轮：已签收的那台领取生效但响应丢了 → 这台记失败
+            fake.loseNextClaimResponse = true;
             JsonNode r = post("/api/ops/inventory/migration", Map.of("limit", 50), admin).okData();
-            assertThat(r.path("failed").asInt()).as("%s", r).isZero();
-            assertThat(r.path("processed").asInt()).isEqualTo(2);
+            assertThat(r.path("processed").asInt()).as("%s", r).isEqualTo(1);
+            assertThat(r.path("failed").asInt()).isEqualTo(1);
+            // 重跑：固定键回放入库 / 出库，领取按原请求号查回 —— 不再建单、不重复领取
+            JsonNode again = post("/api/ops/inventory/migration", Map.of("limit", 50), admin).okData();
+            assertThat(again.path("failed").asInt()).as("%s", again).isZero();
+            assertThat(again.path("processed").asInt()).isEqualTo(1);
             assertThat(fake.stock).containsKey(inWh);
             assertThat(fake.dispatchesBySerial(out)).anyMatch(v -> "CLAIMED".equals(v.status()) && agent.equals(v.rootTargetRef()));
+            assertThat(fake.claims).as("只领了一次").hasSize(1);
+            String outNo = out;
+            assertThat(fake.docs.values().stream().filter(d -> "OUT".equals(d.kind()) && d.serials().contains(outNo)).count()).isEqualTo(1);
             assertThat(post("/api/ops/inventory/migration", Map.of("limit", 50), admin).okData().path("processed").asInt())
                     .as("重跑不重复").isZero();
         } finally {
             jdbc.update("DELETE FROM inventory_sync_state");
+            jdbc.update("UPDATE inv_operation SET tenant_id='MAIN' WHERE tenant_id='PARKED-MIG'");
             remote.useApi(http);
             // 借用的商家出库池不能留下这台无点位的柜：别的用例（数据范围）按「商家可见的柜必有点位」断言
             if (out != null) {

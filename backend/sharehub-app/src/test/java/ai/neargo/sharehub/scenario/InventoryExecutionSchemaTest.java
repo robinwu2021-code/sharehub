@@ -6,7 +6,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -111,6 +111,7 @@ class InventoryExecutionSchemaTest extends ApiTestSupport {
     @ParameterizedTest
     @MethodSource("invalidVocabularyWrites")
     void newExecutionTablesRejectValuesOutsideTheirDeclaredVocabulary(String sql) {
-        assertThatThrownBy(() -> jdbc.update(sql)).isInstanceOf(DataIntegrityViolationException.class);
+        // MySQL 报 3819（CHECK 违反），Spring 归不进 DataIntegrityViolation —— 按约束名断言
+        assertThatThrownBy(() -> jdbc.update(sql)).isInstanceOf(DataAccessException.class).hasMessageContaining("chk_");
     }
 }

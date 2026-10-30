@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
@@ -70,7 +71,7 @@ public class HttpInventoryApi implements InventoryApi {
 
     @Override
     public String upsertItem(String externalRef, ItemSpec spec) {
-        return call(HttpMethod.PUT, V1 + "/items/by-ref/" + externalRef, spec, key("item", externalRef)).path("itemId").asText();
+        return call(HttpMethod.PUT, V1 + "/items/by-ref/" + externalRef, spec, masterDataKey("item")).path("itemId").asText();
     }
 
     @Override
@@ -79,7 +80,7 @@ public class HttpInventoryApi implements InventoryApi {
         body.put("name", name);
         body.put("parentRef", parentRef);
         body.put("status", "ACTIVE");
-        call(HttpMethod.PUT, V1 + "/external-targets/" + type + "/" + ref, body, key("target", type + ":" + ref + ":" + name + ":" + parentRef));
+        call(HttpMethod.PUT, V1 + "/external-targets/" + type + "/" + ref, body, masterDataKey("target"));
     }
 
     @Override
@@ -346,8 +347,13 @@ public class HttpInventoryApi implements InventoryApi {
     }
 
     /** 主数据 upsert 的幂等键按内容定：同内容重放无害，内容变了换键。 */
-    private static String key(String kind, String content) {
-        return kind + "-" + Integer.toHexString(content.hashCode()) + "-" + content.length();
+    /**
+     * 主数据 upsert（物料、目标）是按 ref 的 PUT，重放无副作用，每次一个新键即可。
+     * 不能用按内容算的固定键：库存服务按请求体算指纹，它给请求体加字段（如 M9 给目标加 linkedOwner）后，
+     * 同一个固定键在命令保留期内会一直冲突（inventory.command.conflict），升级后商家就再也同步不上。
+     */
+    private static String masterDataKey(String kind) {
+        return kind + "-" + UUID.randomUUID();
     }
 
     private JsonNode call(HttpMethod method, String path, Object body, String idempotencyKey) {

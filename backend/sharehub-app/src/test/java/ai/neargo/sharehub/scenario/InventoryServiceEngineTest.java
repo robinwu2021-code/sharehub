@@ -437,6 +437,50 @@ class InventoryServiceEngineTest extends ApiTestSupport {
         assertThat(fake.stock).containsKey(c);
     }
 
+    /** 新柜经入库单进指定仓（同 stocked，仓可选）。 */
+    private String stockedIn(String warehouseNo) {
+        String c = "CABR" + tag + (++seq);
+        post("/api/ops/cabinets", Map.of("cabinetNo", c, "sn", c, "vendorCode", "TEST", "slotTotal", 8), login("ADMIN")).okData();
+        jdbc.update("UPDATE dev_cabinet SET warehouse_no = NULL WHERE cabinet_no = ?", c);
+        String wh = login("WAREHOUSE");
+        String no = post("/api/ops/inventory/intakes", Map.of("warehouseNo", warehouseNo, "cabinetNos", List.of(c)), wh)
+                .okData().path("intake").path("intakeNo").asText();
+        post("/api/ops/inventory/intakes/" + no + "/items/CABINET/" + c + "/qc", Map.of("powerOn", true, "slotsOk", true), wh).okData();
+        post("/api/ops/inventory/intakes/" + no + "/inbound", Map.of("items", List.of(Map.of("itemType", "CABINET", "itemNo", c))), wh).okData();
+        return c;
+    }
+
+    private static String diffKind(JsonNode report, String itemNo) {
+        for (JsonNode d : report.path("diffs")) if (itemNo.equals(d.path("itemNo").asText())) return d.path("kind").asText();
+        return null;
+    }
+
+    @Test
+    @DisplayName("★ F07 对账：一致的不报；本地独有 / 库存服务多出 / 签收状态不同 —— 只报差异，不改任何一边")
+    void reconciliationReportsDifferences() {
+        String admin = login("ADMIN");
+        String wh = post("/api/ops/inventory/warehouses", Map.of("name", "对账仓" + tag), admin).okData().path("warehouseNo").asText();
+        String same = stockedIn(wh), movedLocally = stockedIn(wh);
+        jdbc.update("UPDATE dev_cabinet SET warehouse_no='WH003' WHERE cabinet_no=?", movedLocally);
+        String localOnly = "CABLR" + tag + (++seq);
+        post("/api/ops/cabinets", Map.of("cabinetNo", localOnly, "sn", localOnly, "vendorCode", "TEST", "slotTotal", 8), admin).okData();
+        jdbc.update("UPDATE dev_cabinet SET warehouse_no=?, qc_status='PASSED' WHERE cabinet_no=?", wh, localOnly);
+
+        JsonNode r = get("/api/ops/inventory/reconciliation?warehouseNo=" + wh, admin).okData();
+        assertThat(diffKind(r, same)).as("一致的不报").isNull();
+        assertThat(diffKind(r, localOnly)).isEqualTo("MISSING_REMOTE");
+        assertThat(diffKind(r, movedLocally)).isEqualTo("EXTRA_REMOTE");
+        assertThat(fake.stock).as("对账不改库存服务").containsKey(movedLocally);
+
+        String issued = stockedIn(wh);
+        String[] m = merchant();
+        post("/api/ops/devices/issue", Map.of("agentNo", m[0], "cabinetNos", List.of(issued)), admin).okData();
+        assertThat(diffKind(get("/api/ops/inventory/reconciliation?agentNo=" + m[0], admin).okData(), issued)).isNull();
+        jdbc.update("UPDATE dev_cabinet SET issue_claimed_at=NULL WHERE cabinet_no=?", issued);
+        JsonNode afterUnclaim = get("/api/ops/inventory/reconciliation?agentNo=" + m[0], admin).okData();
+        assertThat(diffKind(afterUnclaim, issued)).as("%s", afterUnclaim).isEqualTo("CLAIM_STATE");
+    }
+
     private static JsonNode stageRow(JsonNode rows, String stage) {
         for (JsonNode r : rows) if (stage.equals(r.path("stage").asText())) return r;
         throw new AssertionError("no stage " + stage);

@@ -138,6 +138,8 @@ export interface DeviceApi {
   resolveInventoryOperation(operationNo: string): Promise<import("../../types").InventoryOperation>;
   /** 原样重试：只限原操作人。 */
   retryInventoryOperation(operationNo: string): Promise<import("../../types").InventoryOperation>;
+  /** 库存对账（F07）：给仓库只核在仓、给商家只核出库池；只报差异。 */
+  runInventoryReconciliation(q?: { warehouseNo?: string; agentNo?: string }): Promise<import("../../types").InventoryReconReport>;
   /** 统一库存视图（S6）：按生命周期阶段的台数。 */
   getStockStages(): Promise<StockStage[]>;
   /** 阶段下钻（P2 #6）：口径同 getStockStages。 */

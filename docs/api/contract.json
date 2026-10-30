@@ -16340,6 +16340,10 @@
     {
      "name": "trackingNo",
      "type": "String"
+    },
+    {
+     "name": "requestKey",
+     "type": "String"
     }
    ]
   },
@@ -19009,6 +19013,83 @@
    "returnContainer": null,
    "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockPeriodRow>",
    "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/reconciliation",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#reconciliation",
+   "summary": "库存对账（对接明细 F07）：本地业务 vs 库存服务，只报差异与处置建议，不改任何一边。",
+   "params": [
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "agentNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.ReconDtos.Report",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.ReconDtos.Report",
+   "responseShape": [
+    {
+     "name": "asOf",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "inWarehouseChecked",
+     "type": "int"
+    },
+    {
+     "name": "poolChecked",
+     "type": "int"
+    },
+    {
+     "name": "total",
+     "type": "int"
+    },
+    {
+     "name": "diffs",
+     "type": "List<Diff>",
+     "fields": [
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      },
+      {
+       "name": "local",
+       "type": "String"
+      },
+      {
+       "name": "remote",
+       "type": "String"
+      },
+      {
+       "name": "hint",
+       "type": "String"
+      }
+     ]
+    }
+   ],
    "requestShape": null
   },
   {
@@ -56724,10 +56805,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 635,
-  "records": 627,
-  "withPerm": 552,
+  "endpoints": 636,
+  "records": 629,
+  "withPerm": 553,
   "withBody": 258,
-  "shapedResponses": 492
+  "shapedResponses": 493
  }
 }

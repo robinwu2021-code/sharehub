@@ -51,8 +51,10 @@ public class InventoryController {
                                ai.neargo.sharehub.inv.service.ShipmentService shipmentService,
                                ai.neargo.sharehub.inv.service.MaterialService materials,
                                ai.neargo.common.security.rbac.PermChecker perm,
-                               ai.neargo.sharehub.inv.service.InventoryOperationService operations) {
+                               ai.neargo.sharehub.inv.service.InventoryOperationService operations,
+                               ai.neargo.sharehub.inv.service.InventoryReconService recon) {
         this.operations = operations;
+        this.recon = recon;
         this.materials = materials;
         this.perm = perm;
         this.shipmentService = shipmentService;
@@ -87,6 +89,15 @@ public class InventoryController {
     // —— 执行异常（对接明细 F04 / F05）——
 
     private final ai.neargo.sharehub.inv.service.InventoryOperationService operations;
+    private final ai.neargo.sharehub.inv.service.InventoryReconService recon;
+
+    /** 库存对账（对接明细 F07）：本地业务 vs 库存服务，只报差异与处置建议，不改任何一边。 */
+    @GetMapping("/inventory/reconciliation")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public ai.neargo.sharehub.inv.dto.ReconDtos.Report reconciliation(@RequestParam(required = false) String warehouseNo,
+                                                                      @RequestParam(required = false) String agentNo) {
+        return recon.run(warehouseNo, agentNo);
+    }
 
     /** 未完成的库存写操作（默认 PREPARED / NEEDS_REVIEW），带远端步骤状态；不含请求原文。 */
     @GetMapping("/inventory/operations")

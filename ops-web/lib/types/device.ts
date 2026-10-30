@@ -972,6 +972,26 @@ export interface InventoryOperation {
   retryable: boolean;
 }
 
+/** 对账差异类别（F07）。 */
+export type InventoryReconDiffKind = "MISSING_REMOTE" | "WRONG_LOCATION" | "EXTRA_REMOTE" | "POOL_MISSING" | "POOL_EXTRA" | "POOL_MERCHANT" | "CLAIM_STATE";
+export interface InventoryReconDiff {
+  kind: InventoryReconDiffKind;
+  itemType: IntakeItemType | null;
+  itemNo: string;
+  local: string;
+  remote: string;
+  /** 处置建议：对账只报差异，不改任何一边。 */
+  hint: string;
+}
+export interface InventoryReconReport {
+  asOf: string;
+  inWarehouseChecked: number;
+  poolChecked: number;
+  /** 全量差异数；diffs 最多 500 条。 */
+  total: number;
+  diffs: InventoryReconDiff[];
+}
+
 /** 库存服务里在库的一个设备序列号（余额下钻）。 */
 export interface DeviceSerial {
   serialNo: string;

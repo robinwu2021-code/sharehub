@@ -96,6 +96,7 @@ export const deviceMock: DeviceApi = {
   listInventoryOperations: async () => wait({ list: [], total: 0 }),
   resolveInventoryOperation: async (no) => wait(notFound("库存操作", "Inventory operation", no)),
   retryInventoryOperation: async (no) => wait(notFound("库存操作", "Inventory operation", no)),
+  runInventoryReconciliation: async () => wait({ asOf: new Date().toISOString(), inWarehouseChecked: 0, poolChecked: 0, total: 0, diffs: [] }),
   getStockStages: async () => wait(st.stages()),
   getStageItems: async (stage, itemType) => wait(st.stageItems(stage, itemType)),
   getInventoryMigrationPlan: async () => wait(st.migrationPlan()),

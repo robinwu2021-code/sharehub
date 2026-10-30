@@ -121,6 +121,7 @@ export const deviceHttp: DeviceApi = {
   listInventoryOperations: (q) => client.get("/api/ops/inventory/operations", q),
   resolveInventoryOperation: (no) => client.post(`/api/ops/inventory/operations/${no}/resolve`, {}),
   retryInventoryOperation: (no) => client.post(`/api/ops/inventory/operations/${no}/retry`, {}),
+  runInventoryReconciliation: (q) => client.get("/api/ops/inventory/reconciliation", q),
   getStockStages: () => client.get("/api/ops/inventory/stages"),
   getStageItems: (stage, itemType) => client.get("/api/ops/inventory/stage-items", { stage, itemType }),
   getInventoryMigrationPlan: () => client.get("/api/ops/inventory/migration"),

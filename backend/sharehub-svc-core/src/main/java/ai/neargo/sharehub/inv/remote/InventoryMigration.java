@@ -21,7 +21,6 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * 存量迁移（S7，D §2.8）：把本地设备表里的库存账推到独立进销存，切换前跑完。
@@ -48,6 +47,13 @@ public class InventoryMigration {
     private final PowerbankMapper powerbanks;
     private final QcRecordMapper qcRecords;
     private final WarehouseDirectory warehouses;
+
+    private ai.neargo.sharehub.inv.service.InventoryOperationJournal journal;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setJournal(ai.neargo.sharehub.inv.service.InventoryOperationJournal journal) {
+        this.journal = journal;
+    }
 
     public InventoryMigration(RemoteInventoryPort remote, InventoryLinks links, CabinetMapper cabinets, PowerbankMapper powerbanks,
                               QcRecordMapper qcRecords, WarehouseDirectory warehouses) {
@@ -91,6 +97,9 @@ public class InventoryMigration {
     /** 迁移最多 limit 台（每台独立：一台失败不影响别的，失败的下次重跑接着做）。 */
     public InventoryMigrationResult run(int limit) {
         if (!remote.api().configured()) throw BizException.conflict("error.inventory.not_configured");
+        // 有未完成的库存操作时不迁（对接明细 F08）：它们可能正改着同一批设备，先在执行异常里处理完
+        long pending = journal == null ? 0 : journal.unfinished();
+        if (pending > 0) throw BizException.conflict("error.inventory.migration_pending", pending);
         InventoryApi api = remote.api();
         int processed = 0, remaining = 0;
         List<MigrationFailure> failures = new ArrayList<>();
@@ -110,20 +119,25 @@ public class InventoryMigration {
                     // 存量是期初，不是采购（记成 PURCHASE 会让切换当期采购量虚增；对接方案 §4.2）
                     String doc = api.createInbound(links.locationId(api, wh), "OPENING", "MIGRATION", "MIGRATION", List.of(), "存量迁移",
                             List.of(new InventoryApi.InboundLine(links.itemId(api, c.itemType()), null, null,
-                                    List.of(new InventoryApi.Serial(c.itemNo(), gateRef(c.itemNo()), null)))), key());
-                    api.postInbound(doc, key());
+                                    List.of(new InventoryApi.Serial(c.itemNo(), gateRef(c.itemNo()), null)))), key("in", c));
+                    api.postInbound(doc, key("in-post", c));
                     links.put(markKey(c), "IN");
                 }
                 if ("OUT".equals(c.kind())) {
                     Map<String, String> t = links.targets(api, c.agentNo(), c.siteNo(), operator());
                     String wh = c.warehouseNo() != null ? c.warehouseNo() : warehouses.defaultReturnWarehouse();
-                    String doc = api.createOutbound(links.locationId(api, wh), "ISSUE", t, "存量迁移", List.of(c.itemNo()), key());
-                    api.postOutbound(doc, key());
+                    String doc = api.createOutbound(links.locationId(api, wh), "ISSUE", t, "存量迁移", List.of(c.itemNo()), key("out", c));
+                    api.postOutbound(doc, key("out-post", c));
                     if (c.claimed()) {
-                        String id = api.dispatchesBySerial(c.itemNo()).stream()
-                                .filter(v -> v.parentDispatchId() == null && "AVAILABLE".equals(v.status()))
-                                .map(InventoryApi.DispatchView::dispatchId).findFirst().orElseThrow();
-                        links.put("claim:" + c.itemNo(), api.claim(List.of(id), c.itemNo(), key()).claimNo());
+                        // 上一轮领取了但没记上（丢响应）：按原请求号查回，不按当前状态重算（那时它已是 CLAIMED，找不到可领的）
+                        String claimKey = key("claim", c);
+                        String claimNo = api.claimByRequest(claimKey).map(InventoryApi.Claim::claimNo).orElseGet(() -> {
+                            String id = api.dispatchesBySerial(c.itemNo()).stream()
+                                    .filter(v -> v.parentDispatchId() == null && "AVAILABLE".equals(v.status()))
+                                    .map(InventoryApi.DispatchView::dispatchId).findFirst().orElseThrow();
+                            return api.claim(List.of(id), c.itemNo(), claimKey).claimNo();
+                        });
+                        links.put("claim:" + c.itemNo(), claimNo);
                     }
                     links.put(markKey(c), "OUT");
                 }
@@ -193,8 +207,13 @@ public class InventoryMigration {
         return "mig:" + c.itemType() + ":" + c.itemNo();
     }
 
-    private static String key() {
-        return "mig-" + UUID.randomUUID();
+    /**
+     * 幂等键按设备与步骤固定（对接明细 F08）：重跑时库存服务按同键回放原结果 —— 远端已过账而本地没记上标记的，
+     * 重跑接着往下走，不会再建一张单被拒「已在库」。≤ 64 字符。
+     */
+    private static String key(String step, MigrationCandidate c) {
+        String k = "mig-" + step + "-" + c.itemType().charAt(0) + "-" + c.itemNo();
+        return k.length() > 64 ? k.substring(0, 64) : k;
     }
 
     private static String operator() {
