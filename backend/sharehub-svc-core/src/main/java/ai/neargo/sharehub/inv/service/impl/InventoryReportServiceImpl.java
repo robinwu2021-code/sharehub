@@ -70,7 +70,8 @@ public class InventoryReportServiceImpl implements InventoryReportService {
         for (StockThreshold x : th.values()) {
             StockPeriodRow p = period.remove(x.warehouseNo() + ":" + x.itemType());
             rows.add(new WarehouseRow(x.warehouseNo(), x.warehouseName(), x.itemType(), p == null ? 0 : p.opening(), p == null ? 0 : p.inQty(),
-                    p == null ? 0 : p.outQty(), p == null ? x.available() : p.closing(), x.available(), x.minQty(), x.low()));
+                    p == null ? 0 : p.outQty(), p == null ? (x.available() == null ? null : (long) x.available()) : Long.valueOf(p.closing()),
+                    x.available(), x.minQty(), x.low()));
         }
         // 期间里有流水、但仓已归档的：照样列出（没有安全库存）
         for (StockPeriodRow p : period.values()) {

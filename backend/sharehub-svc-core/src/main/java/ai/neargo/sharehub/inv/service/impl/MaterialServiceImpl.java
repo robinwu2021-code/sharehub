@@ -116,6 +116,8 @@ public class MaterialServiceImpl implements MaterialService {
         m.setTenantId("MAIN");
         apply(m, r);
         materials.insert(m);
+        // 新建即同步成库存服务物料（对接明细 A02）。映射独立提交：本地回滚了也无害，按物料号 upsert 可重放
+        if (service()) journal.reference(() -> call(() -> syncItem(m)));
         log.info("物料新建 materialNo={} name={} tracking={}", m.getMaterialNo(), m.getName(), m.getTrackingMode());
         return vo(m);
     }
@@ -556,7 +558,7 @@ public class MaterialServiceImpl implements MaterialService {
     }
 
     private boolean service() {
-        return "SERVICE".equalsIgnoreCase(params.textOf("inv.engine", "LOCAL"));
+        return ai.neargo.sharehub.inv.port.InventoryEngineRouter.isService(params);
     }
 
     private void requireService() {

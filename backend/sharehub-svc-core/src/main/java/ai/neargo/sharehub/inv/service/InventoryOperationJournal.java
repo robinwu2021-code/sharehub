@@ -98,8 +98,16 @@ public class InventoryOperationJournal {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override public void afterCompletion(int status) {
                     if (status == STATUS_COMMITTED) return;
-                    durable.executeWithoutResult(tx -> jdbc.update("UPDATE inv_operation SET phase='NEEDS_REVIEW',attempts=attempts+1,last_error=? WHERE operation_no=? AND phase<>'COMPLETED'",
-                            "Business transaction rolled back; retry the original request key and payload", op.operationNo()));
+                    // 一步远端都没登记（步骤在发请求前先落 UNKNOWN）= 发请求前就被拒，没有可查回的，记终态 REJECTED；
+                    // 发出过才是 NEEDS_REVIEW。两种都可以用同键原样重提
+                    durable.executeWithoutResult(tx -> {
+                        boolean sent = jdbc.queryForObject("SELECT COUNT(*) FROM inv_operation_step WHERE operation_no=?", Integer.class,
+                                op.operationNo()) > 0;
+                        jdbc.update("UPDATE inv_operation SET phase=?,attempts=attempts+1,last_error=? WHERE operation_no=? AND phase<>'COMPLETED'",
+                                sent ? "NEEDS_REVIEW" : "REJECTED",
+                                sent ? "Business transaction rolled back; retry the original request key and payload"
+                                        : "Rejected before any inventory-service request; nothing to recover", op.operationNo());
+                    });
                 }
             });
         }
@@ -142,10 +150,20 @@ public class InventoryOperationJournal {
     /** 未完成操作仍依赖这些主数据；不能归档或改写后让原请求无法恢复。路径只由领域服务常量传入。 */
     public void requireMasterIdle(String no, String... paths) {
         for (String path : paths) {
-            Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM inv_operation WHERE tenant_id=? AND kind='MATERIAL_DOC' AND phase<>'COMPLETED' AND JSON_CONTAINS(JSON_EXTRACT(payload,?),JSON_QUOTE(?))", Integer.class,
+            Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM inv_operation WHERE tenant_id=? AND kind='MATERIAL_DOC' AND phase NOT IN ('COMPLETED','REJECTED') AND JSON_CONTAINS(JSON_EXTRACT(payload,?),JSON_QUOTE(?))", Integer.class,
                     SecurityUtils.tenantId(), path, no);
             if (count != null && count > 0) throw BizException.conflict("error.inventory.master_pending", no);
         }
+    }
+
+    /**
+     * 未完成的库存操作数（待查回、待复核；发请求前就被拒的 REJECTED 不算）。
+     * 切换引擎前须为 0：在途操作按其固定的引擎恢复，切走就恢复不了。
+     */
+    public long unfinished() {
+        Long n = jdbc.queryForObject("SELECT COUNT(*) FROM inv_operation WHERE tenant_id=? AND phase NOT IN ('COMPLETED','REJECTED')", Long.class,
+                SecurityUtils.tenantId());
+        return n == null ? 0 : n;
     }
 
     public boolean attempted(Operation op, String code) {

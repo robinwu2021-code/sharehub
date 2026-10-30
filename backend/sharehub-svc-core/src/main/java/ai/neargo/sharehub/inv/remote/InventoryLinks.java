@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.inv.remote;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.api.platform.dto.AgentBrief;
 import ai.neargo.sharehub.api.platform.dto.EmployeeBrief;
 import ai.neargo.sharehub.api.platform.dto.SiteBrief;
@@ -81,15 +82,32 @@ public class InventoryLinks {
         return id;
     }
 
-    /** 本地仓号 → 库存服务 locationId：先按名称认领已有仓，没有再建。 */
+    /**
+     * 本地仓号 → 库存服务 locationId。映射一旦记下就固定（仓库改名不影响）。
+     *
+     * <p>还没映射时才按名称认领，且只认<b>唯一</b>一个「同名、启用、没被别的本地仓占用」的库位 ——
+     * 库存服务的仓没有本系统编码（已列入宿主接口需求），按名称认领一旦认错就是两个仓串一本账。
+     * 有歧义就拒绝，由人在库存服务侧处理；一个都没有才新建（幂等键按仓号，重试不重复建）。
+     */
     public String locationId(InventoryApi api, String warehouseNo) {
+        String id = get("wh:" + warehouseNo);
+        if (id != null) return id;
+        return locationId(api, warehouseNo, warehouses.list().stream().filter(w -> w.warehouseNo().equals(warehouseNo))
+                .map(WarehouseItem::name).findFirst().orElse(warehouseNo));
+    }
+
+    /** 同上，名称由调用方给 —— 新建仓时本地行还没提交，独立事务里按仓号查不到名称。 */
+    public String locationId(InventoryApi api, String warehouseNo, String name) {
         String k = "wh:" + warehouseNo;
         String id = get(k);
         if (id != null) return id;
-        String name = warehouses.list().stream().filter(w -> w.warehouseNo().equals(warehouseNo)).map(WarehouseItem::name)
-                .findFirst().orElse(warehouseNo);
-        id = api.warehouses().stream().filter(w -> name.equals(w.name())).map(InventoryApi.Warehouse::locationId).findFirst()
-                .orElseGet(() -> api.createWarehouse(name, "wh-" + warehouseNo));
+        java.util.Set<String> taken = new java.util.HashSet<>();
+        listByPrefix("wh:").forEach(x -> taken.add(x.getV()));
+        List<String> candidates = api.warehouses().stream()
+                .filter(w -> name.equals(w.name()) && !"DISABLED".equals(w.status()) && !taken.contains(w.locationId()))
+                .map(InventoryApi.Warehouse::locationId).toList();
+        if (candidates.size() > 1) throw BizException.conflict("error.inventory.warehouse_ambiguous", name, candidates.size());
+        id = candidates.isEmpty() ? api.createWarehouse(name, "wh-" + warehouseNo) : candidates.getFirst();
         put(k, id);
         return id;
     }

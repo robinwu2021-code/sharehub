@@ -164,6 +164,7 @@ const LINK: StatusMap<"OK" | "DOWN" | "UNCONFIGURED"> = {
   OK: { label: "连接正常", tone: "success" }, DOWN: { label: "不可达", tone: "danger" }, UNCONFIGURED: { label: "未配置", tone: "warning" },
 };
 const MODE_LABEL = { STATIC: "固定地址", DISCOVERY: "服务发现" } as const;
+const PENDING: StatusMap<"PENDING"> = { PENDING: { label: "待查回", tone: "warning" } };
 
 /** 库存引擎与库存服务连通性（M0 0.3）：LOCAL 下不探测。 */
 function EngineStatus({ engine }: { engine: InventoryEngine | undefined }) {
@@ -179,6 +180,14 @@ function EngineStatus({ engine }: { engine: InventoryEngine | undefined }) {
           <StatusBadge map={LINK} value={link} />
           {engine.endpointMode && <span className="txt-caption text-muted-foreground">寻址：{MODE_LABEL[engine.endpointMode]}</span>}
           {link === "DOWN" && engine.failure && <span className="font-mono txt-caption text-destructive-ink">{engine.failure}</span>}
+        </>
+      )}
+      {!!engine.pendingOperations && (
+        <>
+          <span className="text-muted-foreground">未完成操作</span>
+          <StatusBadge map={PENDING} value="PENDING" />
+          <span className="tabular-nums">{engine.pendingOperations}</span>
+          <span className="txt-caption text-muted-foreground">处理完才能切换引擎</span>
         </>
       )}
     </div>
@@ -265,7 +274,7 @@ function ThresholdDrawer({ warehouse, canWrite, onClose }: { warehouse: Warehous
   });
   const cols: Column<StockThreshold>[] = [
     { header: "设备", className: "whitespace-nowrap", cell: (t) => TYPE_LABEL[t.itemType] },
-    { header: "可用", className: "text-right tabular-nums whitespace-nowrap", cell: (t) => t.available },
+    { header: "可用", className: "text-right tabular-nums whitespace-nowrap", cell: (t) => t.available ?? "-" },
     { header: "下限", className: "w-32", cell: (t) => (canWrite
       ? <Input type="number" min={0} aria-label={`${TYPE_LABEL[t.itemType]}下限`} value={draft[t.itemType] ?? String(t.minQty)}
           onChange={(e) => setDraft({ ...draft, [t.itemType]: e.target.value })} />

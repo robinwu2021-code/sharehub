@@ -13,7 +13,7 @@ import { ME } from "../../flow/mock-db";
 const counts: (StockCount & { scanned: string[]; review?: import("../../types").StockCountReview })[] = [];
 let seq = 0;
 
-export const engine = (): InventoryEngine => ({ engine: "SERVICE", configured: true, endpointMode: "STATIC", reachable: true, failure: null });
+export const engine = (): InventoryEngine => ({ engine: "SERVICE", configured: true, endpointMode: "STATIC", reachable: true, failure: null, pendingOperations: 0 });
 
 export function listStockLedger(q: { warehouseNo?: string; itemType?: string; keyword?: string; page?: number; size?: number } = {})
   : PageResult<StockLedgerRow> {

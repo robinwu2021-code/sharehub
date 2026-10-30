@@ -166,7 +166,8 @@ export interface StockThreshold {
   warehouseName: string;
   itemType: IntakeItemType;
   minQty: number;
-  available: number;
+  /** 空 = 库存服务此刻查不到（不当 0，也不判低）。 */
+  available: number | null;
   low: boolean;
 }
 export interface StockThresholdReq {
@@ -879,6 +880,8 @@ export interface InventoryEngine {
   reachable?: boolean | null;
   /** 不可达时库存服务侧错误码（如 inventory.unreachable）。 */
   failure?: string | null;
+  /** 未完成（待查回 / 待复核）的库存操作数；不为 0 时不能切换引擎。 */
+  pendingOperations?: number;
 }
 export type InventoryEndpointMode = "STATIC" | "DISCOVERY";
 

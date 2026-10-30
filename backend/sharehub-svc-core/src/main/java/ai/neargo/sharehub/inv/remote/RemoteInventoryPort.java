@@ -58,6 +58,18 @@ public class RemoteInventoryPort implements InventoryPort {
         this.api = api;
     }
 
+    /** 远端写入的恢复日志：调用前记意图与步骤，本地回滚后按同一键续做（对接明细 §9.3）。 */
+    private ai.neargo.sharehub.inv.service.InventoryOperationJournal journal;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setJournal(ai.neargo.sharehub.inv.service.InventoryOperationJournal journal) {
+        this.journal = journal;
+    }
+
+    /** 入库意图（用 record 而不是 Map：日志按内容哈希判「原样重试」，字段顺序必须稳定）。 */
+    record InboundIntent(String intakeNo, String itemType, String itemNo, String warehouseNo, String qcNo, String purpose) {
+    }
+
     /** 场景测试换成内存 Fake（S1.2）。 */
     public void useApi(InventoryApi api) {
         this.api = api;
@@ -77,14 +89,28 @@ public class RemoteInventoryPort implements InventoryPort {
     public void inbound(String itemType, String itemNo, String warehouseNo, String qcNo, String intakeNo) {
         local.inbound(itemType, itemNo, warehouseNo, qcNo, intakeNo);
         InvIntake h = intakes.selectOne(new LambdaQueryWrapper<InvIntake>().eq(InvIntake::getIntakeNo, intakeNo).last("limit 1"));
-        String purpose = h != null && "RETURN".equals(h.getKind()) ? "RETURN" : "PURCHASE";
+        String purpose = inboundPurpose(h == null ? null : h.getKind());
         remote(() -> {
-            String doc = api.createInbound(links.locationId(api, warehouseNo), purpose, intakeNo, "到仓待检 " + intakeNo,
-                    List.of(new InventoryApi.InboundLine(links.itemId(api, itemType), null, null,
-                            List.of(new InventoryApi.Serial(itemNo, qcNo, null)))), key("in", intakeNo + ":" + itemNo));
-            api.postInbound(doc, key("in-post", doc));
+            // 稳定键：一张入库单上的一台设备只入一次库（对接明细 A10）。本地回滚后原样重试按同一键续做 ——
+            // 已完成的步骤不再发，结果不明的按原幂等键重放（库存服务同键同体返回原结果），不会多建一张入库单
+            var op = journal.lock("INTAKE_INBOUND", intakeNo + ":" + itemNo,
+                    journal.payload(new InboundIntent(intakeNo, itemType, itemNo, warehouseNo, qcNo, purpose)), "SERVICE", "II");
+            if ("COMPLETED".equals(op.phase())) return null;
+            String loc = journal.reference(() -> links.locationId(api, warehouseNo));
+            String item = journal.reference(() -> links.itemId(api, itemType));
+            String doc = journal.step(op, "IN_CREATE", () -> api.createInbound(loc, purpose, intakeNo, "到仓待检 " + intakeNo,
+                    List.of(new InventoryApi.InboundLine(item, null, null, List.of(new InventoryApi.Serial(itemNo, qcNo, null)))),
+                    journal.stepKey(op, "IN_CREATE")));
+            journal.step(op, "IN_POST", () -> {
+                api.postInbound(doc, journal.stepKey(op, "IN_POST"));
+                return doc;
+            });
             // 回仓的设备撤机时已解绑、签收进仓时已离开出库池 —— 业务侧关联此刻已解除，当场确认解冻
-            if ("RETURN".equals(purpose)) api.businessClearance(doc, key("in-clear", doc));
+            if ("RETURN".equals(purpose)) journal.step(op, "IN_CLEAR", () -> {
+                api.businessClearance(doc, journal.stepKey(op, "IN_CLEAR"));
+                return doc;
+            });
+            journal.complete(op);
             return doc;
         });
     }
@@ -200,6 +226,13 @@ public class RemoteInventoryPort implements InventoryPort {
     }
 
     // —— 内部 ——
+
+    /** 入库单类型 → 库存服务入库用途：期初建账是 OPENING（对接明细 A07），撤机回仓是 RETURN，其余到货是 PURCHASE。 */
+    static String inboundPurpose(String intakeKind) {
+        if ("OPENING".equals(intakeKind)) return "OPENING";
+        if ("RETURN".equals(intakeKind)) return "RETURN";
+        return "PURCHASE";
+    }
 
     private void claimRemote(List<String> cabinetNos) {
         List<String> ids = new ArrayList<>();

@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.sys.service.impl;
 
+import ai.neargo.sharehub.api.platform.port.SysParamWriteGuard;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import ai.neargo.sharehub.platform.sys.SysCtx;
 import ai.neargo.sharehub.platform.sys.dto.SysDtos.SysParamEntry;
@@ -11,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.jdbc.core.JdbcTemplate;
 import ai.neargo.sharehub.platform.sys.port.LocalBizZone;
 
+import java.util.List;
+
 /**
  * 系统参数实现。
  *
@@ -20,8 +23,12 @@ import ai.neargo.sharehub.platform.sys.port.LocalBizZone;
 @Service
 public class SysParamServiceImpl extends AbstractCrudService<SysParam, SysParamEntry> implements SysParamService {
 
-    public SysParamServiceImpl(SysParamMapper mapper, JdbcTemplate jdbc) {
+    /** 各领域对自己参数的切换规则（如库存引擎），见 {@link SysParamWriteGuard}。 */
+    private final List<SysParamWriteGuard> guards;
+
+    public SysParamServiceImpl(SysParamMapper mapper, JdbcTemplate jdbc, List<SysParamWriteGuard> guards) {
         super(mapper, jdbc);
+        this.guards = guards == null ? List.of() : guards;
     }
 
     /**
@@ -40,6 +47,11 @@ public class SysParamServiceImpl extends AbstractCrudService<SysParam, SysParamE
             lockDictionary(body, current);
             if (current != null) {
                 body.setValue(validated(current, body.getValue()));
+                if (!java.util.Objects.equals(current.getValue(), body.getValue())) {
+                    for (SysParamWriteGuard g : guards) {
+                        if (g.handles(body.getParamKey())) g.check(body.getParamKey(), current.getValue(), body.getValue());
+                    }
+                }
                 // 每个参数的取值变化都进审计改前改后：半年后要答得出「当时服务费是多少、谁改的」
                 ai.neargo.sharehub.audit.AuditChanges.record(
                         current.getLabel() == null ? current.getParamKey() : current.getLabel(), current.getValue(), body.getValue());

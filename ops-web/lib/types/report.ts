@@ -217,8 +217,9 @@ export interface InventoryReportRow {
   opening: number;
   inQty: number;
   outQty: number;
-  closing: number;
-  available: number;
+  /** 空 = 库存服务此刻查不到当前可用数。 */
+  closing: number | null;
+  available: number | null;
   minQty: number;
   low: boolean;
 }

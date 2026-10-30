@@ -55,7 +55,10 @@ import java.util.UUID;
 public class StockViewServiceImpl implements StockViewService {
 
     private static final Logger log = LoggerFactory.getLogger(StockViewServiceImpl.class);
-    private static final int REMOTE_LEDGER_WINDOW = 500;
+    /** 库存服务流水每次最多返回的条数（inventory-svc SerialServiceImpl.MAX_PAGE）。 */
+    static final int REMOTE_LEDGER_PAGE = 500;
+    /** 一次查询最多读这么多条流水；再多请按仓库、物料或单号筛选。 */
+    static final int REMOTE_LEDGER_MAX = 10_000;
 
     private final ai.neargo.sharehub.inv.service.CountReviewService reviews;
     private final SysParamPort params;
@@ -369,11 +372,18 @@ public class StockViewServiceImpl implements StockViewService {
     }
 
     private boolean service() {
-        return "SERVICE".equalsIgnoreCase(params.textOf("inv.engine", "LOCAL"));
+        return ai.neargo.sharehub.inv.port.InventoryEngineRouter.isService(params);
     }
 
     /** 寻址方式（展示用）：setter 注入，构造参数已经很长。 */
     private ai.neargo.sharehub.inv.remote.InventoryEndpoint endpoint;
+
+    private ai.neargo.sharehub.inv.service.InventoryOperationJournal journal;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setJournal(ai.neargo.sharehub.inv.service.InventoryOperationJournal journal) {
+        this.journal = journal;
+    }
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     void setEndpoint(ai.neargo.sharehub.inv.remote.InventoryEndpoint endpoint) {
@@ -383,16 +393,17 @@ public class StockViewServiceImpl implements StockViewService {
     @Override
     public InventoryEngine engine() {
         String mode = endpoint == null ? null : endpoint.mode();
-        if (!service()) return new InventoryEngine("LOCAL", true, mode, null, null);
+        long pending = journal == null ? 0 : journal.unfinished();
+        if (!service()) return new InventoryEngine("LOCAL", true, mode, null, null, pending);
         InventoryApi api = remote.api();
-        if (!api.configured()) return new InventoryEngine("SERVICE", false, mode, null, null);
+        if (!api.configured()) return new InventoryEngine("SERVICE", false, mode, null, null, pending);
         // 现探一次：读仓库列表（最轻的只读接口）。页面每次打开都会问，恢复后自然变回「正常」
         try {
             api.warehouses();
-            return new InventoryEngine("SERVICE", true, mode, true, null);
+            return new InventoryEngine("SERVICE", true, mode, true, null, pending);
         } catch (InventoryRemoteException e) {
             log.warn("库存服务连通性探测失败 code={} status={}：检查 sharehub.inventory.* 与库存服务健康", e.code, e.status);
-            return new InventoryEngine("SERVICE", true, mode, false, e.code);
+            return new InventoryEngine("SERVICE", true, mode, false, e.code, pending);
         }
     }
 
@@ -410,20 +421,44 @@ public class StockViewServiceImpl implements StockViewService {
         }
         if (visible != null && visible.isEmpty()) return new PageResult<>(List.of(), 0);
         InventoryApi api = remote.api();
+        Map<String, String> whOf = new HashMap<>();
+        Map<String, String> typeOf = new HashMap<>();
         List<StockLedgerRow> all = call(() -> {
             String item = itemType == null || itemType.isBlank() ? null : links.itemId(api, itemType.trim());
             String doc = keyword == null || keyword.isBlank() ? null : keyword.trim();
             List<String> requested = warehouseNo == null || warehouseNo.isBlank() ? visible : List.of(warehouseNo.trim());
-            if (requested == null) return api.ledger(item, null, doc, null, REMOTE_LEDGER_WINDOW);
-            return requested.stream().flatMap(no -> api.ledger(item, links.locationId(api, no), doc, null, REMOTE_LEDGER_WINDOW).stream()).toList();
+            if (requested == null) return fullLedger(api, item, null, doc);
+            List<InventoryApi.LedgerEntry> out = new ArrayList<>();
+            for (String no : requested) out.addAll(fullLedger(api, item, links.locationId(api, no), doc));
+            return out;
         })
-                .stream().map(e -> new StockLedgerRow("S" + e.id(), links.warehouseNoOf(e.locationId()), links.itemTypeOf(e.itemId()), null,
+                .stream().map(e -> new StockLedgerRow("S" + e.id(), whOf.computeIfAbsent(e.locationId(), links::warehouseNoOf),
+                        typeOf.computeIfAbsent(e.itemId(), links::itemTypeOf), null,
                         e.docKind(), e.docNo(), e.qtyDelta() == null ? 0 : e.qtyDelta().intValue(), e.occurredAt(), e.operator()))
                 .filter(r -> visible == null || visible.contains(r.warehouseNo()))
                 .sorted(Comparator.comparing(StockLedgerRow::occurredAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
         int from = Math.min((p - 1) * s, all.size());
         return new PageResult<>(all.subList(from, Math.min(from + s, all.size())), all.size());
+    }
+
+    /**
+     * 库存服务流水只能按 id 升序、afterId 往后翻（每次最多 {@link #REMOTE_LEDGER_PAGE} 条），而页面要「最新在前」，
+     * 所以按游标读全（对接明细 B04：原先只取最近一窗、超出的静默丢了）。超过上限就明确报错让用户加筛选，
+     * 不返回半截账。倒序 + 总数已列入宿主接口需求。
+     */
+    static List<InventoryApi.LedgerEntry> fullLedger(InventoryApi api, String itemId, String locationId, String docNo) {
+        List<InventoryApi.LedgerEntry> out = new ArrayList<>();
+        Long after = null;
+        while (true) {
+            List<InventoryApi.LedgerEntry> batch = api.ledger(itemId, locationId, docNo, after, REMOTE_LEDGER_PAGE);
+            out.addAll(batch);
+            if (out.size() > REMOTE_LEDGER_MAX) throw BizException.conflict("error.inventory.ledger_too_large", REMOTE_LEDGER_MAX);
+            if (batch.size() < REMOTE_LEDGER_PAGE) return out;
+            Long last = batch.getLast().id();
+            if (last == null || (after != null && last <= after)) return out;   // 对方没按游标前进：不再循环
+            after = last;
+        }
     }
 
     private static String ledgerWarehouse(DeviceMovement m, String selected, List<String> visible) {

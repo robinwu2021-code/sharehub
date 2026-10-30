@@ -135,6 +135,13 @@ class MaterialServiceTest extends ApiTestSupport {
     }
 
     @Test
+    @DisplayName("物料新建即同步成库存服务物料（A02），不等第一次出入库")
+    void createSyncsToService() {
+        String mat = material(login("ADMIN"), "新建即同步", "QUANTITY");
+        assertThat(fake.items).as("按物料号 upsert").containsKey(mat);
+    }
+
+    @Test
     @DisplayName("内置物料只读、不进物料单据；LOCAL 引擎下物料单据与物料库存明确拒绝")
     void builtinAndLocal() {
         String token = login("ADMIN");

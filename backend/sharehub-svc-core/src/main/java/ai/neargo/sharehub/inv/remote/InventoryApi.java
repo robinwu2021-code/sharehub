@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 独立进销存（ai-shop backend/inventory，ADR-046）的 HTTP 契约 —— 只含 ShareHub 用到的部分（S1.1）。
@@ -32,6 +33,12 @@ public interface InventoryApi {
     }
 
     String createWarehouse(String name, String idempotencyKey);
+
+    /** 改仓库名称 / 区域（regionRef 可空）。 */
+    void updateWarehouse(String locationId, String name, String regionRef, String idempotencyKey);
+
+    /** 停用仓库：库存服务拒绝有库存的仓。 */
+    void disableWarehouse(String locationId, String idempotencyKey);
 
     // —— 入库 ——
 
@@ -88,8 +95,27 @@ public interface InventoryApi {
                         String status, String parentDispatchId, String rootTargetType, String rootTargetRef, int resourceVersion) {
     }
 
+    /** 出库池查询条件，各项都可空（空 = 不限）；列表项之间是「或」。 */
+    record DispatchFilter(List<String> statuses, List<String> rootTargetRefs, String targetType, List<String> targetRefs,
+                          String outboundNo, String serialNo, String itemId) {
+        public static DispatchFilter bySerial(String serialNo) {
+            return new DispatchFilter(null, null, null, null, null, serialNo, null);
+        }
+    }
+
+    /** 出库池多条件查询（按商家、状态、出库单、序列号、物料）。 */
+    List<DispatchView> dispatchPool(DispatchFilter filter);
+
     /** 按序列号查出库池记录（任何状态）。 */
-    List<DispatchView> dispatchesBySerial(String serialNo);
+    default List<DispatchView> dispatchesBySerial(String serialNo) {
+        return dispatchPool(DispatchFilter.bySerial(serialNo));
+    }
+
+    record InTransit(String rootTargetType, String rootTargetRef, String itemId, BigDecimal qty) {
+    }
+
+    /** 已出库未退回的数量，按去向与物料汇总。这是出库池的「在途」，不是仓间调拨在途。 */
+    List<InTransit> inTransit();
 
     record Claim(String claimNo, List<String> dispatchIds) {
     }
@@ -117,6 +143,10 @@ public interface InventoryApi {
     record CountScan(String serialNo, String verdict) {
     }
 
+    /**
+     * 盘点单。status 用宿主词表：OPEN / SUBMITTED / APPROVED / POSTED / CANCELLED ——
+     * 库存服务的 COUNTING、VOIDED 在 {@link HttpInventoryApi} 里换成 OPEN、CANCELLED，调用方与页面只认宿主词表。
+     */
     record CountView(String countNo, String locationId, String status, int contentVersion, Integer approvedVersion, String submittedBy,
                      String reviewer, List<CountLine> lines, List<CountScan> exceptions, List<String> missingSerials) {
     }
@@ -140,12 +170,47 @@ public interface InventoryApi {
 
     void cancelCount(String countNo, String idempotencyKey);
 
+    /** 数量物料实盘：录入（或改）某物料的实盘数，只能在盘点单 OPEN 时。 */
+    void countLine(String countNo, String itemId, int countedQty, String idempotencyKey);
+
     record PeriodRow(String locationId, String itemId, BigDecimal opening, Map<String, BigDecimal> inByReason,
                      Map<String, BigDecimal> outByReason, BigDecimal closing) {
     }
 
     /** 期间汇总（S6）：期初、按原因的入 / 出、期末。 */
     List<PeriodRow> periodSummary(LocalDateTime from, LocalDateTime to, String locationId);
+
+    // —— 单据详情与查回（恢复用）——
+
+    record DocLine(int lineNo, String itemId, BigDecimal qty, String gateRef, String parentSerialNo) {
+    }
+
+    record DocSerial(int lineNo, String itemId, String serialNo, String parentSerialNo, String gateRef) {
+    }
+
+    record DocTarget(String type, String ref, String nameSnapshot) {
+    }
+
+    record Document(String docNo, String kind, String status, String purpose, String locationId, BigDecimal totalQty,
+                    Integer profileVersion, List<DocLine> lines, List<DocSerial> serials, List<DocTarget> targets) {
+    }
+
+    Document inbound(String docNo);
+
+    Document outbound(String docNo);
+
+    /** 库存服务记下的写命令：resultBody 是当时的响应 JSON。 */
+    record StoredCommand(String commandType, String resultBody, LocalDateTime createdAt) {
+    }
+
+    /**
+     * 按幂等键（requestId）查写命令结果。库存服务没有这条记录时为空 ——
+     * 空只说明「此刻没有已提交的结果」，原请求可能仍在途，不能据此判定没执行，由调用方按命令协议处理。
+     */
+    Optional<StoredCommand> command(String requestId);
+
+    /** 按领取请求的幂等键查领取结果；为空的含义同 {@link #command}。 */
+    Optional<Claim> claimByRequest(String requestId);
 
     // —— 事件 ——
 

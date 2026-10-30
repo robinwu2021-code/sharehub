@@ -91,6 +91,110 @@ class InventoryServiceEngineTest extends ApiTestSupport {
         return c;
     }
 
+    /** 库存服务里含这台设备的入库单。 */
+    private List<InventoryFake.Doc> inboundsOf(String serial) {
+        return fake.docs.values().stream().filter(d -> "IN".equals(d.kind())
+                && d.lines().stream().anyMatch(l -> l.serials() != null && l.serials().stream().anyMatch(x -> serial.equals(x.serialNo())))).toList();
+    }
+
+    @Test
+    @DisplayName("A07 期初建账入库在库存服务里是 OPENING（原先记成 PURCHASE）")
+    void openingIntakeUsesOpeningPurpose() {
+        String c = "CABO" + tag + (++seq);
+        post("/api/ops/cabinets", Map.of("cabinetNo", c, "sn", c, "vendorCode", "TEST", "slotTotal", 8), login("ADMIN")).okData();
+        jdbc.update("UPDATE dev_cabinet SET warehouse_no = NULL WHERE cabinet_no = ?", c);
+        post("/api/ops/inventory/intakes", Map.of("kind", "OPENING", "warehouseNo", "WH002", "cabinetNos", List.of(c)), login("WAREHOUSE")).okData();
+        assertThat(inboundsOf(c)).singleElement().satisfies(d -> assertThat(d.purpose()).isEqualTo("OPENING"));
+        assertThat(fake.stock).containsKey(c);
+    }
+
+    @Test
+    @DisplayName("★★ A10 入库过账后响应丢失：本地回滚、操作待复核；原样重试续做，库存服务只有一张入库单")
+    void inboundLostResponseResumesWithoutDuplicate() {
+        String c = "CABL" + tag + (++seq);
+        post("/api/ops/cabinets", Map.of("cabinetNo", c, "sn", c, "vendorCode", "TEST", "slotTotal", 8), login("ADMIN")).okData();
+        jdbc.update("UPDATE dev_cabinet SET warehouse_no = NULL WHERE cabinet_no = ?", c);
+        String wh = login("WAREHOUSE");
+        String no = post("/api/ops/inventory/intakes", Map.of("warehouseNo", "WH002", "cabinetNos", List.of(c)), wh)
+                .okData().path("intake").path("intakeNo").asText();
+        post("/api/ops/inventory/intakes/" + no + "/items/CABINET/" + c + "/qc", Map.of("powerOn", true, "slotsOk", true), wh).okData();
+        Map<String, Object> body = Map.of("items", List.of(Map.of("itemType", "CABINET", "itemNo", c)));
+
+        fake.loseNextInboundPostResponse = true;
+        assertThat(post("/api/ops/inventory/intakes/" + no + "/inbound", body, wh).status).isEqualTo(409);
+        assertThat(fake.stock).as("库存服务其实已过账").containsKey(c);
+        assertThat(jdbc.queryForObject("SELECT warehouse_no FROM dev_cabinet WHERE cabinet_no=?", String.class, c)).as("本地已回滚").isNull();
+        assertThat(jdbc.queryForObject("SELECT phase FROM inv_operation WHERE kind='INTAKE_INBOUND' AND request_key=?", String.class, no + ":" + c))
+                .isEqualTo("NEEDS_REVIEW");
+
+        post("/api/ops/inventory/intakes/" + no + "/inbound", body, wh).okData();
+        assertThat(jdbc.queryForObject("SELECT warehouse_no FROM dev_cabinet WHERE cabinet_no=?", String.class, c)).isEqualTo("WH002");
+        assertThat(inboundsOf(c)).as("没有多建一张入库单").hasSize(1);
+        assertThat(jdbc.queryForObject("SELECT phase FROM inv_operation WHERE kind='INTAKE_INBOUND' AND request_key=?", String.class, no + ":" + c))
+                .isEqualTo("COMPLETED");
+    }
+
+    /** 造 n 条流水的库存服务（只覆盖流水），按真实服务的游标规则返回。 */
+    private InventoryFake ledgerOf(int n) {
+        return new InventoryFake() {
+            @Override
+            public List<LedgerEntry> ledger(String itemId, String locationId, String docNo, Long afterId, int limit) {
+                long from = afterId == null ? 0 : afterId;
+                return java.util.stream.LongStream.rangeClosed(from + 1, Math.min(n, from + limit))
+                        .mapToObj(i -> new LedgerEntry(i, "ITM", "LOC-X", "IN", "IN-" + i, 1, null, java.math.BigDecimal.ONE, null,
+                                java.time.LocalDateTime.now().minusSeconds(n - i), "fake")).toList();
+            }
+        };
+    }
+
+    @Test
+    @DisplayName("★ B04 流水按游标读全：1200 条翻得到底，不再只取最近 500；超过上限明确报错、不给半截账")
+    void ledgerReadsAllPagesAndRefusesHuge() {
+        String admin = login("ADMIN");
+        remote.useApi(ledgerOf(1200));
+        jdbc.update("REPLACE INTO inventory_sync_state (k, v) VALUES ('wh:WH001', 'LOC-X')");
+        JsonNode first = get("/api/ops/inventory/ledger?warehouseNo=WH001&page=1&size=200", admin).okData();
+        assertThat(first.path("total").asInt()).isEqualTo(1200);
+        assertThat(first.path("list").get(0).path("docNo").asText()).as("最新在前").isEqualTo("IN-1200");
+        JsonNode last = get("/api/ops/inventory/ledger?warehouseNo=WH001&page=6&size=200", admin).okData();
+        assertThat(last.path("list").get(199).path("docNo").asText()).as("最早的一条也在").isEqualTo("IN-1");
+
+        remote.useApi(ledgerOf(10_600));
+        assertThat(get("/api/ops/inventory/ledger?warehouseNo=WH001&page=1&size=20", admin).status).isEqualTo(409);
+    }
+
+    @Test
+    @DisplayName("★ B06 安全库存可用数取库存服务；服务查不到时可用为空、不判低（不当 0 误报）")
+    void safetyStockUsesRemoteAndUnknownIsNotLow() {
+        stocked();
+        String admin = login("ADMIN");
+        post("/api/ops/inventory/stock-thresholds", Map.of("warehouseNo", "WH002", "itemType", "CABINET", "minQty", 5), admin).okData();
+        try {
+            JsonNode row = cabinetRow(get("/api/ops/inventory/stock-thresholds?warehouseNo=WH002", admin).okData());
+            assertThat(row.path("available").asInt()).as("库存服务里 WH002 只有这一台").isEqualTo(1);
+            assertThat(row.path("low").asBoolean()).isTrue();
+
+            InventoryFake down = new InventoryFake() {
+                @Override
+                public List<Balance> balances(String locationId, String itemId) {
+                    throw new InventoryRemoteException(503, "inventory.unreachable", List.of(), "down", null);
+                }
+            };
+            remote.useApi(down);
+            JsonNode unknown = cabinetRow(get("/api/ops/inventory/stock-thresholds?warehouseNo=WH002", admin).okData());
+            assertThat(unknown.path("available").isNull()).as("不知道就是不知道").isTrue();
+            assertThat(unknown.path("low").asBoolean()).isFalse();
+        } finally {
+            remote.useApi(fake);
+            post("/api/ops/inventory/stock-thresholds", Map.of("warehouseNo", "WH002", "itemType", "CABINET", "minQty", 0), admin).okData();
+        }
+    }
+
+    private static JsonNode cabinetRow(JsonNode rows) {
+        for (JsonNode r : rows) if ("CABINET".equals(r.path("itemType").asText())) return r;
+        throw new AssertionError("no CABINET row: " + rows);
+    }
+
     private String pool(String c) {
         return fake.dispatchesBySerial(c).stream().filter(v -> v.parentDispatchId() == null).reduce((a, b) -> b).map(v -> v.status()).orElse(null);
     }

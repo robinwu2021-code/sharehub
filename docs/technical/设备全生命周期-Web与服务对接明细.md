@@ -75,16 +75,16 @@ Web（用户令牌）
 
 | ID/节点与操作 | Web 功能/方法 | Web→Controller API | Controller→本地执行链 | 目标落点/远端 API | 状态与改造 |
 |---|---|---|---|---|---|
-| A01 仓库查询/维护 | 仓库；`listWarehouses/createWarehouse/updateWarehouse/archiveWarehouse/unarchiveWarehouse` | GET/POST `O/inventory/warehouses`；POST `/{warehouseNo}`、`/archive`、`/unarchive` | `InventoryController` → `WarehouseDirectory.list` / `WarehouseAdminServiceImpl` | **微服务**；GET/POST `I/warehouses`；已核远端 PATCH `I/warehouses/{locationId}`、POST `/{locationId}/disable`，宿主客户端待封装，恢复启用合同 V | M 当前本地建档、按名称映射；P 改稳定编码映射及远端权威，不能将 POST 本地仓库宣称已完成远端维护 |
+| A01 仓库查询/维护 | 仓库；`listWarehouses/createWarehouse/updateWarehouse/archiveWarehouse/unarchiveWarehouse` | GET/POST `O/inventory/warehouses`；POST `/{warehouseNo}`、`/archive`、`/unarchive` | `InventoryController` → `WarehouseDirectory.list` / `WarehouseAdminServiceImpl` | **微服务**；GET/POST `I/warehouses`；已核远端 PATCH `I/warehouses/{locationId}`、POST `/{locationId}/disable`，宿主客户端待封装，恢复启用合同 V | **T2 已做（2026-10-30）**：新建即建远端仓并固定映射；改名同步；归档查远端余额并停用远端仓；远端停用后拒绝取消归档；禁止启用仓同名；认领只认唯一候选。**待远端**：仓库稳定编码、重新启用（需求 #3） |
 | A02 物料型号准备 | 物料；`listMaterials/createMaterial/updateMaterial/archiveMaterial/unarchiveMaterial` | GET/POST `O/inventory/materials`；POST `/{materialNo}`、`/archive`、`/unarchive` | `InventoryController` → `MaterialServiceImpl` → `InventoryLinks/InventoryApi` | **微服务**；PUT `I/items/by-ref/{ref}`；查询/停用能力 V | M 现有本地主数据、部分远端同步；P 调整库存属性归属。设备型号不能只用 CABINET/POWERBANK 两个通用物料代替全部型号 |
 | A03 供应商 | 供应商；`listSuppliers/createSupplier/updateSupplier/archiveSupplier/unarchiveSupplier` | GET/POST `O/inventory/suppliers`；POST `/{supplierNo}`、`/archive`、`/unarchive` | `InventoryController` → `SupplierServiceImpl` | **协作**；退货目标可 PUT `I/external-targets/SUPPLIER/{ref}`；完整供应商合同 V | M 本地；P 明确采购与库存供应商映射，不能把 external-target 当完整采购供应商能力 |
 | A04 采购开单/查询/修改 | 采购单；拟 `listPurchases/createPurchase/getPurchase/updatePurchase` | **P** GET/POST `O/inventory/purchases`；GET/POST `/{purchaseNo}` | **P** `InventoryController` → 采购业务 Service（名称待实现确认） | **本地采购业务**；不增加库存，无已核完整远端采购合同 | P 仅有工作区 V213 结构草案，不能标为采购 API 已实现；不要求预建设备 |
 | A05 分批收货 | 采购单→收货；拟 `receivePurchase` | **P** POST `O/inventory/purchases/{purchaseNo}/receipts` | **P** 采购 Service 校验余量 → 库存接入 Service 持久化意图 → `InventoryApi` | **协作，库存远端**；POST `I/inbounds` → POST `I/inbounds/{no}/post`，PURCHASE | P 关联采购行、来源唯一号、仓库、实收 SN；实收待检计实存/不可用的语义须与远端 V 核定 |
 | A06 非采购到货登记 | 入库单；`listIntakes/getIntake/createIntake` | GET/POST `O/inventory/intakes`；GET `/{intakeNo}` | `InventoryController` → `IntakeServiceImpl.page/get/create` | **微服务**；库存 SN 建档与实收应进入远端入库协议 | M 当前登记与待检本地持有、实际入库才远调；P 改从远端 SN/入库单衔接，不要求先手工创建本地设备 |
-| A07 期初登记 | 入库单 OPENING；`createIntake` | POST `O/inventory/intakes`，`kind=OPENING` | `InventoryController` → `IntakeServiceImpl.create` → `InventoryPort.inbound` | **微服务**；POST `I/inbounds` + `/post`，目标 purpose=OPENING | M 现有 RemoteInventoryPort 按 RETURN/否则 PURCHASE 选用途，需改造，不能把本地 OPENING 等同远端已正确使用 OPENING |
+| A07 期初登记 | 入库单 OPENING；`createIntake` | POST `O/inventory/intakes`，`kind=OPENING` | `InventoryController` → `IntakeServiceImpl.create` → `InventoryPort.inbound` | **微服务**；POST `I/inbounds` + `/post`，目标 purpose=OPENING | **T2 已修（2026-10-30）**：期初入库远端用途为 OPENING |
 | A08 质检任务与检测结果 | 入库单逐件质检；`inspectIntakeItem` | POST `O/inventory/intakes/{intakeNo}/items/{itemType}/{itemNo}/qc` | `InventoryController` → `IntakeServiceImpl.inspect` → `QcServiceImpl` | **目标微服务主导**；仓内任务/模板/证据/结论接口 **V**；本地仅设备检测执行 | M 当前本地质检；P 收口。未核到的 `/qc-*` 路径不在本文伪造 |
 | A09 设备详情旧质检入口 | 详情质检；`inspectCabinet/inspectPowerbank/listQcRecords` | POST `O/devices/{cabinetNo}/qc`、`O/powerbanks/{powerbankNo}/qc`；GET `O/qc-records?itemNo=` | `AssetOpsController` → `QcServiceImpl.inspectCabinet/inspectPowerbank/records` | 仓内动作改走 A08 **微服务**；现场检测继续 **本地** | M；P 按设备是否在仓/任务类型分流，禁止成为绕过仓内质检的写入口 |
-| A10 入库确认/放行 | 入库单；`inboundIntake` | POST `O/inventory/intakes/{intakeNo}/inbound` | `InventoryController` → `IntakeServiceImpl.inbound` → `InventoryPort` → `RemoteInventoryPort.inbound` | **微服务**；POST `I/inbounds`、`/{no}/post`；已有协议用 gateRef | M 有 SERVICE 路径，但目前在质检后计入；P 区分“实收计存”与“质检放行”，不得两个节点重复加库存 |
+| A10 入库确认/放行 | 入库单；`inboundIntake` | POST `O/inventory/intakes/{intakeNo}/inbound` | `InventoryController` → `IntakeServiceImpl.inbound` → `InventoryPort` → `RemoteInventoryPort.inbound` | **微服务**；POST `I/inbounds`、`/{no}/post`；已有协议用 gateRef | **T2 部分（2026-10-30）**：入库接恢复日志（键 = 入库单号:设备号，稳定步骤键，丢响应可续做不重复建单）。**待远端**：实收计存与质检放行分开（需求 #1） |
 | A11 不合格退货/报废 | 入库单；`disposeIntake` | POST `O/inventory/intakes/{intakeNo}/dispose` | `InventoryController` → `IntakeServiceImpl.dispose` | **协作**；已计库存的须远端 RETURN_SUPPLIER/SCRAP 出库；未实收入账拒收不扣库存 | M 本地处置分支；P 统一审核、远端单据和处理恢复，不能仅改设备退役状态 |
 
 关键输入：采购行号、来源收货号、`warehouseNo/itemId/model/SN`、`receivedAt`、`requestKey`；目标不要求 `cabinetNo` 或 `powerbankNo` 已在本地创建。SN 与设备通信号分开存，不能假定两者总是相同。
@@ -96,9 +96,9 @@ Web（用户令牌）
 | B01 设备库存余额 | 库存余额；当前 `listCabinets/listPowerbanks` | GET `O/cabinets`、`O/powerbanks` | `OpsController` → `CabinetService`；`DeviceController` → `PowerbankService`；Web 汇总 | **微服务**；GET `I/balances`、`I/serials` | M 当前不是远端库存账；**P** GET `O/inventory/balances`、`O/inventory/serials` → `InventoryController` → 库存查询适配 → `InventoryApi`，页面替换数据源 |
 | B02 生命周期数量/下钻 | 生命周期视图；`getStockStages/getStageItems` | GET `O/inventory/stages`、`O/inventory/stage-items` | `InventoryController` → `StockViewServiceImpl.stages/stageItems` | **协作聚合**；仓内段取远端 balances/serials，仓外段取本地设备/订单/工单 | M 当前主要本地投影；P 不用 RENTED/在线数替代仓内账，响应标明来源及同步时间 |
 | B03 物料库存 | 物料库存；`listMaterialBalances` | GET `O/inventory/material-balances` | `InventoryController` → `MaterialServiceImpl.balances` → `InventoryApi.balances/serials` | **微服务**；GET `I/balances`、`I/serials` | M 已有 SERVICE 适配；保持远端权威，补范围、分页/批量能力核验 |
-| B04 库存流水 | 库存流水；`listStockLedger` | GET `O/inventory/ledger` | `InventoryController` → `StockViewServiceImpl.ledger` | **微服务**；GET `I/ledger`，按 afterId 继续读取 | M 有远端路径，但当前远端窗口 500；P 完整游标分页，不得把窗口截断当完整账 |
+| B04 库存流水 | 库存流水；`listStockLedger` | GET `O/inventory/ledger` | `InventoryController` → `StockViewServiceImpl.ledger` | **微服务**；GET `I/ledger`，按 afterId 继续读取 | **T2 已做（2026-10-30）**：按游标读全后倒序分页，超 1 万条明确报错要求筛选。**待远端**：倒序与总数（需求 #11） |
 | B05 期间汇总 | 库存报表；`getStockPeriodSummary` | GET `O/inventory/period-summary` | `InventoryController` → `StockViewServiceImpl.periodSummary` | **微服务**；GET `I/reports/period-summary` | M 已有 SERVICE；目标不采用本地履历倒推替代权威库存报表 |
-| B06 安全库存/预警 | 库存设置；`listStockThresholds/saveStockThreshold/saveMaterialMinQty` | GET/POST `O/inventory/stock-thresholds`；POST `O/inventory/material-thresholds` | `InventoryController` → `StockThresholdServiceImpl` / `MaterialServiceImpl.saveMinQty`；告警经 `LocalInventoryState` | **本地预警配置＋远端库存查询**；GET `I/balances/serials` | M；目标下限可以本地业务配置，判定数量必须来自远端，不能报服务不可用为库存为零 |
+| B06 安全库存/预警 | 库存设置；`listStockThresholds/saveStockThreshold/saveMaterialMinQty` | GET/POST `O/inventory/stock-thresholds`；POST `O/inventory/material-thresholds` | `InventoryController` → `StockThresholdServiceImpl` / `MaterialServiceImpl.saveMinQty`；告警经 `LocalInventoryState` | **本地预警配置＋远端库存查询**；GET `I/balances/serials` | **T2 已做（2026-10-30）**：设备可用数取远端余额；查不到为空、不判低、报表显示「-」 |
 | B07 调拨建单/明细 | 调拨；`list/get/saveInventoryTransfer/setTransferItems` | GET/POST `O/inventory-transfers`；GET/POST `/{transferNo}`；POST `/{transferNo}/items` | `InventoryController` → `InventoryTransferServiceImpl`；`AssetOpsController` → `TransferOpsServiceImpl.setItems` | **微服务目标**；当前宿主适配用 TRANSFER_OUT/TRANSFER_IN 组合，独立调拨单合同 V | M 本地调拨单；P 可保留流程引用，库存单据/在途不能本地独立承诺 |
 | B08 调拨发货 | 调拨→发货；`shipTransfer` | POST `O/inventory-transfers/{transferNo}/ship` | `AssetOpsController` → `TransferOpsServiceImpl.ship` → `InventoryPort.transferShip` | **微服务**；POST `I/outbounds`（TRANSFER_OUT）→ `/{no}/post` | M；P 固定源仓授权、持久化步骤/远端单号/原幂等键，超时不能重新发货 |
 | B09 调拨实收 | 调拨→签收；`receiveTransfer` | POST `O/inventory-transfers/{transferNo}/receive` | `AssetOpsController` → `TransferOpsServiceImpl.receive` → `InventoryPort.transferReceive` | **微服务**；POST `I/inbounds`（TRANSFER_IN）→ `/{no}/post`，仅实收 SN | M；P 目标仓授权，缺件保留在途差异。不能把“发货没有映射”直接解释为从未远端执行 |
@@ -175,7 +175,7 @@ Web（用户令牌）
 | F06 事件拉取/投影/确认 | 系统任务 `inventory-event-pull`；可手动触发 | POST `/internal/job/inventory-event-pull/trigger` → Job → `InventoryEventPuller` → GET `I/events?afterSeq=&limit=`、POST `I/event-acks` | M inbox 去重；P FAILED 重试、资源版本防旧事件覆盖、完整库存/交接投影，失败事件不能被当 DONE 跳过 |
 | F07 对账 | **P** 库存设置/执行异常→对账报告 | **P** 对账入口路径待与现有报告统一；本地映射/业务关联 vs `I/balances`、`I/serials`、`I/dispatch-pool` | **协作查询**；只报差异及生成处置任务，不自动用本地覆盖远端 |
 | F08 存量迁移 | 仓库页；`getInventoryMigrationPlan/runInventoryMigration` | GET/POST `O/inventory/migration` → `InventoryController` → `InventoryMigration` → 远端入库/出库/领取 | M 迁移工具；P 核对期初用途、稳定键、非零数据、在途和未结操作，不把采购入库当全部历史迁移用途 |
-| F09 服务状态/默认执行端 | 库存设置；`getInventoryEngine` | GET `O/inventory/engine` → `InventoryController` → `StockViewServiceImpl.engine`；系统参数写入复用系统设置 | M 当前可 LOCAL/SERVICE，默认 LOCAL；**P 库存默认 SERVICE**，取消普通运营随意切账。显示“未配置/不可达/待查回”，不得自动降级本地库存 |
+| F09 服务状态/默认执行端 | 库存设置；`getInventoryEngine` | GET `O/inventory/engine` → `InventoryController` → `StockViewServiceImpl.engine`；系统参数写入复用系统设置 | **T1 已做（2026-10-30）**：默认 SERVICE（参数缺失或为空时；存量值不由代码改，切流时点待定）；切换受控（`InventoryEngineGuard`：有未完成库存操作两向都拒、切 SERVICE 须库存服务可达）；状态显示未配置 / 不可达 / 未完成操作数；无自动降级本地。**未做**：专用切账权限码（待定） |
 
 审核和库存服务是两个外部能力：库存服务调用仍必须经 powerbank 后端；统一审核页面目前已有直接访问 OpsKit 反代的路径，不应为了画一条统一箭头而错误声称所有流程页面也经过库存 Controller。
 
@@ -240,18 +240,18 @@ Web（用户令牌）
 | API 分组 | 远端 HTTP API | 远端 Controller | 远端领域 Service | 宿主接入情况 |
 |---|---|---|---|---|
 | 物料 | PUT `/items/by-ref/{externalRef}`；GET `/items` | `ItemController` | `HostCatalogService` | 已封装 upsert；列表待对齐 |
-| 仓库 | GET/POST `/warehouses`；PATCH `/{locationId}`；POST `/{locationId}/disable` | `WarehouseController` | `LocationService`、`WarehouseService` | GET/POST 已封装；编辑/停用未封装 |
+| 仓库 | GET/POST `/warehouses`；PATCH `/{locationId}`；POST `/{locationId}/disable` | `WarehouseController` | `LocationService`、`WarehouseService` | 全部已封装（编辑 / 停用为阶段 0 新增，宿主业务尚未调用） |
 | 外部目标 | PUT `/external-targets/{type}/{ref}`；GET `/external-targets` | `ExternalTargetController` | `ExternalTargetService` | upsert 已封装；目标商家来自本地授权业务 |
-| 入库 | POST `/inbounds`；PATCH `/inbounds/{no}`；GET `/inbounds/{no}`；POST `/inbounds/{no}/post`、`/cancel`、`/business-clearance` | `InboundController` | `HostInboundService`、`DocumentQueryService` | 创建/过账/业务确认已封装；详情/追加/作废待封装 |
-| 出库 | POST `/outbounds`；PATCH `/outbounds/{no}`；GET `/outbounds/{no}`；POST `/outbounds/{no}/post`、`/cancel` | `OutboundController` | `HostOutboundService`、`DocumentQueryService` | 创建/过账已封装；详情/追加/作废待封装 |
-| 交接候选/在途 | GET `/dispatch-pool`；GET `/in-transit` | `DispatchController` | `DispatchService` | 仅按 SN 候选已封装；商家/状态多条件及远端在途待封装；此在途语义须与仓间在途分清 |
-| 领取/查回/释放 | POST `/dispatch-pool/claims`；GET `/dispatch-pool/claims/by-request/{requestId}`；POST `/dispatch-pool/claims/{claimNo}/release` | `DispatchController` | `DispatchService` | claim/release 已封装；按请求查回待封装；release 为整单 |
+| 入库 | POST `/inbounds`；PATCH `/inbounds/{no}`；GET `/inbounds/{no}`；POST `/inbounds/{no}/post`、`/cancel`、`/business-clearance` | `InboundController` | `HostInboundService`、`DocumentQueryService` | 创建/过账/业务确认/详情已封装（详情为阶段 0 新增）；追加/作废待封装 |
+| 出库 | POST `/outbounds`；PATCH `/outbounds/{no}`；GET `/outbounds/{no}`；POST `/outbounds/{no}/post`、`/cancel` | `OutboundController` | `HostOutboundService`、`DocumentQueryService` | 创建/过账/详情已封装（详情为阶段 0 新增）；追加/作废待封装 |
+| 交接候选/在途 | GET `/dispatch-pool`；GET `/in-transit` | `DispatchController` | `DispatchService` | 多条件查询与在途已封装（阶段 0）；此在途是出库池在途，须与仓间在途分清 |
+| 领取/查回/释放 | POST `/dispatch-pool/claims`；GET `/dispatch-pool/claims/by-request/{requestId}`；POST `/dispatch-pool/claims/{claimNo}/release` | `DispatchController` | `DispatchService` | claim/release/按请求查回已封装（查回为阶段 0 新增）；release 为整单 |
 | 交接调整/撤销 | POST `/dispatch-pool/{dispatchId}/redirect`、`/revoke` | `DispatchController` | `DispatchService` | 已封装，但宿主需修正补偿边界和退仓误用 |
-| 盘点 | POST `/counts`；GET `/counts/{no}`；POST `/counts/{no}/scans`；PUT `/counts/{no}/lines/{itemId}`；POST `/counts/{no}/submit`、`/approve`、`/reject`、`/post`、`/cancel` | `CountController` | `HostCountService` | 除数量实盘行外主要动作已封装；approve/reject 由统一审核回执驱动，不开放页面旁路 |
+| 盘点 | POST `/counts`；GET `/counts/{no}`；POST `/counts/{no}/scans`；PUT `/counts/{no}/lines/{itemId}`；POST `/counts/{no}/submit`、`/approve`、`/reject`、`/post`、`/cancel` | `CountController` | `HostCountService` | 全部已封装（数量实盘行为阶段 0 新增）；状态词表在宿主侧换算 COUNTING→OPEN、VOIDED→CANCELLED；approve/reject 由统一审核回执驱动，不开放页面旁路 |
 | 余额 | GET `/balances` | `StockController` | `BalanceQueryService` | 已封装；设备库存页尚需改取远端 |
 | 序列号/流水 | GET `/serials`；GET `/ledger` | `SerialController` | `SerialService` | 已封装；不能把本地设备号无映射地当库存 SN |
 | 期间汇总 | GET `/reports/period-summary` | `ReportController` | `PeriodSummaryService` | 已封装 |
-| 命令结果 | GET `/commands/{requestId}` | `CommandController` | `CommandService` | 宿主待封装，用于超时/丢响应查回；写动作通过 CommandService 记录幂等结果 |
+| 命令结果 | GET `/commands/{requestId}` | `CommandController` | `CommandService` | 已封装（阶段 0），用于超时/丢响应查回；requestId 即写请求的 Idempotency-Key，按调用方隔离 |
 | 事件与确认 | GET `/events`；POST `/event-acks` | `EventController` | `EventFeedService` | 已封装；宿主失败重放/版本投影待补 |
 
 仓内质检完整接口、完整采购订单、SN 仓间调拨专用合同及供应商暂时返修仍为 V，不将商城内部 Controller 或数据库直连当作独立服务公开 API。

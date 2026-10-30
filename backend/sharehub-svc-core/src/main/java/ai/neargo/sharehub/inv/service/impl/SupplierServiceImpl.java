@@ -12,6 +12,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,6 +53,29 @@ public class SupplierServiceImpl implements SupplierService {
         return new PageResult<>(p.getRecords().stream().map(SupplierServiceImpl::view).toList(), p.getTotal());
     }
 
+    /**
+     * 供应商在库存服务里是外部去向 SUPPLIER（退供应商出库用）。主数据仍在本地（采购业务归本地，对接明细 A03）；
+     * 新建、改名即同步过去，不等第一次退货。只在 SERVICE 引擎下。
+     */
+    private ai.neargo.sharehub.inv.remote.RemoteInventoryPort remote;
+    private ai.neargo.sharehub.api.platform.port.SysParamPort params;
+
+    @Autowired
+    void setInventory(ai.neargo.sharehub.inv.remote.RemoteInventoryPort remote, ai.neargo.sharehub.api.platform.port.SysParamPort params) {
+        this.remote = remote;
+        this.params = params;
+    }
+
+    private void syncTarget(InvSupplier s) {
+        if (params == null || !ai.neargo.sharehub.inv.port.InventoryEngineRouter.isService(params)) return;
+        var api = remote.api();
+        ai.neargo.sharehub.inv.remote.InventoryCalls.requireConfigured(api);
+        journal.reference(() -> {
+            ai.neargo.sharehub.inv.remote.InventoryCalls.run(() -> api.upsertTarget("SUPPLIER", s.getSupplierNo(), s.getName(), null));
+            return null;
+        });
+    }
+
     @Override
     @Transactional
     public Supplier create(SupplierReq req) {
@@ -59,6 +83,7 @@ public class SupplierServiceImpl implements SupplierService {
         s.setSupplierNo(IdGenerator.next("SP"));
         apply(s, req);
         suppliers.insert(s);
+        syncTarget(s);
         log.info("供应商新建 supplierNo={} name={}", s.getSupplierNo(), s.getName());
         return view(s);
     }
@@ -75,6 +100,7 @@ public class SupplierServiceImpl implements SupplierService {
                 .set(InvSupplier::getContactName, s.getContactName())
                 .set(InvSupplier::getPhone, s.getPhone()).set(InvSupplier::getEmail, s.getEmail())
                 .set(InvSupplier::getAddress, s.getAddress()).set(InvSupplier::getNote, s.getNote()));
+        syncTarget(s);
         return view(s);
     }
 

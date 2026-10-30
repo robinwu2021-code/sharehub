@@ -26,8 +26,21 @@ public class InventoryEngineRouter implements InventoryPort {
         this.params = params;
     }
 
+    /** 系统参数键。 */
+    public static final String ENGINE_KEY = "inv.engine";
+    /**
+     * 参数缺失或为空时的引擎：独立进销存（对接明细 F09，库存默认 SERVICE）。
+     * 已有库里的值不由代码改 —— 切流是受控操作，见 {@link InventoryEngineGuard}。
+     */
+    public static final String DEFAULT_ENGINE = "SERVICE";
+
+    /** 当前是否独立进销存引擎。各处判断引擎只用这一个，免得默认值各写各的。 */
+    public static boolean isService(SysParamPort params) {
+        return "SERVICE".equalsIgnoreCase(params.textOf(ENGINE_KEY, DEFAULT_ENGINE));
+    }
+
     private InventoryPort current() {
-        return "SERVICE".equalsIgnoreCase(params.textOf("inv.engine", "LOCAL")) ? remote : local;
+        return isService(params) ? remote : local;
     }
 
     @Override

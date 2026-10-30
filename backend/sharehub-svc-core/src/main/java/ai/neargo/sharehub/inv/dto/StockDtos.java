@@ -13,8 +13,10 @@ public final class StockDtos {
     /**
      * 库存引擎与连通性（开发计划 M0 0.3）。endpointMode：STATIC 固定地址 / DISCOVERY 服务发现；
      * reachable：SERVICE 且已配置时现探一次（读仓库列表），LOCAL 或未配置为 null；failure：不可达时对方错误码。
+     * pendingOperations：未完成（待查回 / 待复核）的库存操作数，任何引擎都报 —— 不为 0 时不能切换引擎（F09）。
      */
-    public record InventoryEngine(String engine, boolean configured, String endpointMode, Boolean reachable, String failure) {
+    public record InventoryEngine(String engine, boolean configured, String endpointMode, Boolean reachable, String failure,
+                                  long pendingOperations) {
     }
 
     /** 一条库存流水：qtyDelta 进仓 +、出仓 −；docKind 本地是履历事件、进销存是单据类型。 */

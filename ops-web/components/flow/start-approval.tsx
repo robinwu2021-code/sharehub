@@ -34,6 +34,9 @@ export function StartApprovalDrawer({ open, onOpenChange }: { open: boolean; onO
   const tpl = useQuery({ queryKey: [...FLOW_KEY, "template", code], queryFn: () => flow.template(code), enabled: open && !!code });
   const tplFields: TemplateFormField[] = tpl.data?.fields ?? [];
 
+  /**
+   * @form-none 发起审批提交到 OpsKit（POST /workspaces/{ws}/instances，lib/flow/client.ts），不是 ShareHub 后端；字段随流程模板动态生成，由 OpsKit 按模板校验（422 逐条回报）。
+   */
   const fields: FieldDef[] = [
     { key: "tpl", label: t("start.template"), type: "select", required: true,
       help: code && tpl.data && !tplFields.length ? t("start.noForm") : undefined,

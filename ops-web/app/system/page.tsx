@@ -118,6 +118,9 @@ const PARAM_FIELDS: FieldDef[] = [
  * 字典化参数（V191）的表单：取值控件按类型渲染（枚举 → 下拉、开关 → 开/关、数字带范围说明），
  * 说明与分组归迁移维护、这里只读；hint 写在取值下方。没有字典的参数仍是自由文本。
  * 校验以后端为准（按字典拒非法值）—— 这里只是让管理员一眼看到能填什么。
+ *
+ * @form POST /api/platform/sys-params
+ * @form POST /api/platform/sys-params/{paramKey}
  */
 function paramFieldsFor(p: Partial<SysParam> | null): FieldDef[] {
   if (!p?.paramKey || !p.valueType || p.valueType === "TEXT" && !p.pattern) return PARAM_FIELDS;

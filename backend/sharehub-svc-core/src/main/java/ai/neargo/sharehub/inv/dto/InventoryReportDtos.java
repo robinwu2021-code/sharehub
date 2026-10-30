@@ -19,8 +19,9 @@ public final class InventoryReportDtos {
                                   Map<String, Long> disposals, List<PurchaseRow> purchases) {
     }
 
+    /** closing / available 为空 = 库存服务此刻查不到当前可用数（期间里没有流水时期末取当前可用）。 */
     public record WarehouseRow(String warehouseNo, String warehouseName, String itemType, long opening, long inQty, long outQty,
-                               long closing, int available, int minQty, boolean low) {
+                               Long closing, Integer available, int minQty, boolean low) {
     }
 
     public record PurchaseRow(String currency, long qty, BigDecimal amount) {

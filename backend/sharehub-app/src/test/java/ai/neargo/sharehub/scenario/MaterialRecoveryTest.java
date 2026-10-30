@@ -70,6 +70,23 @@ class MaterialRecoveryTest extends ApiTestSupport {
     }
 
     @Test
+    void rejectedBeforeAnyRemoteRequestIsTerminalNotPending() {
+        // 在手为 0 还要领用：本地预检就拒，一个远端请求都没发 —— 没有可查回的，不能算「未完成」挡住切引擎
+        Map<String, Object> body = Map.of("requestKey", tag + "-over", "purpose", "REQUISITION", "warehouseNo", "WH002", "woNo", "WO-" + tag,
+                "note", tag, "lines", List.of(Map.of("materialNo", material, "qty", 5)));
+        assertThat(post("/api/ops/inventory/material-docs", body, token).status).isEqualTo(409);
+        String op = jdbc.queryForObject("SELECT operation_no FROM inv_operation WHERE request_key=?", String.class, tag + "-over");
+        assertThat(jdbc.queryForObject("SELECT phase FROM inv_operation WHERE operation_no=?", String.class, op)).isEqualTo("REJECTED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inv_operation_step WHERE operation_no=?", Integer.class, op)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inv_operation WHERE operation_no=? AND phase NOT IN ('COMPLETED','REJECTED')",
+                Integer.class, op)).as("不计入未完成").isZero();
+        // 补足库存后，同键原样重提照常执行
+        post("/api/ops/inventory/material-docs", opening(10), token).okData();
+        assertThat(post("/api/ops/inventory/material-docs", body, token).status).isEqualTo(200);
+        assertThat(jdbc.queryForObject("SELECT phase FROM inv_operation WHERE operation_no=?", String.class, op)).isEqualTo("COMPLETED");
+    }
+
+    @Test
     void failedTransferInboundResumesOriginalOperationDespiteEngineSwitch() {
         post("/api/ops/inventory/material-docs", opening(10), token).okData();
         final InventoryFake original = fake;

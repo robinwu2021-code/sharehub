@@ -59,7 +59,7 @@ public class InventoryEventPuller {
 
     /** 拉到没有新事件为止（每轮最多 20 页，防止一次跑太久）。引擎不是 SERVICE 或未配置时跳过。 */
     public Result pullOnce() {
-        if (!"SERVICE".equalsIgnoreCase(params.textOf("inv.engine", "LOCAL")) || !remote.api().configured()) {
+        if (!ai.neargo.sharehub.inv.port.InventoryEngineRouter.isService(params) || !remote.api().configured()) {
             return new Result(0, 0, 0, 0);
         }
         int pulled = 0, processed = 0, dup = 0, failed = 0;

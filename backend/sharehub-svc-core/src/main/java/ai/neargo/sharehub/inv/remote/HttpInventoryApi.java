@@ -7,18 +7,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.http.HttpClient;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * {@link InventoryApi} 的 HTTP 实现（S1.1）。鉴权：{@code Authorization: Bearer appKey:appSecret}（租户由凭证决定，
@@ -51,9 +54,10 @@ public class HttpInventoryApi implements InventoryApi {
         this.endpoint = endpoint;
         this.appKey = appKey;
         this.appSecret = appSecret;
-        SimpleClientHttpRequestFactory f = new SimpleClientHttpRequestFactory();
-        f.setConnectTimeout((int) connectTimeout.toMillis());
-        f.setReadTimeout((int) readTimeout.toMillis());
+        // JDK HttpClient：仓库编辑要 PATCH，HttpURLConnection 不支持；固定 HTTP/1.1，免得对明文地址做 h2c 升级协商
+        HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(connectTimeout).build();
+        JdkClientHttpRequestFactory f = new JdkClientHttpRequestFactory(client);
+        f.setReadTimeout(readTimeout);
         this.http = RestClient.builder().requestFactory(f).build();
     }
 
@@ -86,6 +90,19 @@ public class HttpInventoryApi implements InventoryApi {
     @Override
     public String createWarehouse(String name, String idempotencyKey) {
         return call(HttpMethod.POST, V1 + "/warehouses", Map.of("name", name), idempotencyKey).path("locationId").asText();
+    }
+
+    @Override
+    public void updateWarehouse(String locationId, String name, String regionRef, String idempotencyKey) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", name);
+        body.put("regionRef", regionRef);
+        call(HttpMethod.PATCH, V1 + "/warehouses/" + locationId, body, idempotencyKey);
+    }
+
+    @Override
+    public void disableWarehouse(String locationId, String idempotencyKey) {
+        call(HttpMethod.POST, V1 + "/warehouses/" + locationId + "/disable", Map.of(), idempotencyKey);
     }
 
     // —— 入库 ——
@@ -150,9 +167,21 @@ public class HttpInventoryApi implements InventoryApi {
     }
 
     @Override
-    public List<DispatchView> dispatchesBySerial(String serialNo) {
-        String path = UriComponentsBuilder.fromPath(V1 + "/dispatch-pool").queryParam("serialNo", serialNo).build().toUriString();
-        return read(call(HttpMethod.GET, path, null, null), new TypeReference<>() { });
+    public List<DispatchView> dispatchPool(DispatchFilter f) {
+        UriComponentsBuilder b = UriComponentsBuilder.fromPath(V1 + "/dispatch-pool");
+        if (f.statuses() != null) f.statuses().forEach(v -> b.queryParam("status", v));
+        if (f.rootTargetRefs() != null) f.rootTargetRefs().forEach(v -> b.queryParam("rootTargetRef", v));
+        if (f.targetType() != null) b.queryParam("targetType", f.targetType());
+        if (f.targetRefs() != null) f.targetRefs().forEach(v -> b.queryParam("targetRef", v));
+        if (f.outboundNo() != null) b.queryParam("outboundNo", f.outboundNo());
+        if (f.serialNo() != null) b.queryParam("serialNo", f.serialNo());
+        if (f.itemId() != null) b.queryParam("itemId", f.itemId());
+        return read(call(HttpMethod.GET, b.encode().build().toUriString(), null, null), new TypeReference<>() { });
+    }
+
+    @Override
+    public List<InTransit> inTransit() {
+        return read(call(HttpMethod.GET, V1 + "/in-transit", null, null), new TypeReference<>() { });
     }
 
     @Override
@@ -203,8 +232,14 @@ public class HttpInventoryApi implements InventoryApi {
 
     @Override
     public CountView count(String countNo) {
-        return read(call(HttpMethod.GET, V1 + "/counts/" + countNo, null, null), new TypeReference<>() { });
+        CountView v = read(call(HttpMethod.GET, V1 + "/counts/" + countNo, null, null), new TypeReference<>() { });
+        String st = REMOTE_COUNT_STATUS.getOrDefault(v.status(), v.status());
+        return st.equals(v.status()) ? v : new CountView(v.countNo(), v.locationId(), st, v.contentVersion(), v.approvedVersion(),
+                v.submittedBy(), v.reviewer(), v.lines(), v.exceptions(), v.missingSerials());
     }
+
+    /** 库存服务盘点状态 → 宿主词表（其余同名）。 */
+    private static final Map<String, String> REMOTE_COUNT_STATUS = Map.of("COUNTING", "OPEN", "VOIDED", "CANCELLED");
 
     @Override
     public List<CountScan> scanCount(String countNo, List<String> serialNos, String idempotencyKey) {
@@ -237,6 +272,11 @@ public class HttpInventoryApi implements InventoryApi {
         call(HttpMethod.POST, V1 + "/counts/" + countNo + "/cancel", Map.of(), idempotencyKey);
     }
 
+    @Override
+    public void countLine(String countNo, String itemId, int countedQty, String idempotencyKey) {
+        call(HttpMethod.PUT, V1 + "/counts/" + countNo + "/lines/" + itemId, Map.of("countedQty", countedQty), idempotencyKey);
+    }
+
     private static Map<String, Object> noteBody(String note) {
         Map<String, Object> m = new HashMap<>();
         m.put("note", note);
@@ -265,7 +305,40 @@ public class HttpInventoryApi implements InventoryApi {
         call(HttpMethod.POST, V1 + "/event-acks", Map.of("seq", seq), "ack-" + seq);
     }
 
+    // —— 单据详情与查回 ——
+
+    @Override
+    public Document inbound(String docNo) {
+        return read(call(HttpMethod.GET, V1 + "/inbounds/" + docNo, null, null), new TypeReference<>() { });
+    }
+
+    @Override
+    public Document outbound(String docNo) {
+        return read(call(HttpMethod.GET, V1 + "/outbounds/" + docNo, null, null), new TypeReference<>() { });
+    }
+
+    @Override
+    public Optional<StoredCommand> command(String requestId) {
+        return absentIfNotFound(() -> read(call(HttpMethod.GET, V1 + "/commands/" + requestId, null, null), new TypeReference<>() { }));
+    }
+
+    @Override
+    public Optional<Claim> claimByRequest(String requestId) {
+        return absentIfNotFound(() -> read(call(HttpMethod.GET, V1 + "/dispatch-pool/claims/by-request/" + requestId, null, null),
+                new TypeReference<>() { }));
+    }
+
     // —— 内部 ——
+
+    /** 查回类接口：库存服务明确答「没有这条」（404 inventory.not_found）才算空，其他错误照常抛。 */
+    private static <T> Optional<T> absentIfNotFound(Supplier<T> lookup) {
+        try {
+            return Optional.of(lookup.get());
+        } catch (InventoryRemoteException e) {
+            if (e.status == 404 && "inventory.not_found".equals(e.code)) return Optional.empty();
+            throw e;
+        }
+    }
 
     /** 主数据 upsert 的幂等键按内容定：同内容重放无害，内容变了换键。 */
     private static String key(String kind, String content) {

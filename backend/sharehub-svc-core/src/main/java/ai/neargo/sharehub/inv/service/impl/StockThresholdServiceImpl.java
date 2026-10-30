@@ -1,5 +1,13 @@
 package ai.neargo.sharehub.inv.service.impl;
 
+import ai.neargo.sharehub.api.platform.port.SysParamPort;
+import ai.neargo.sharehub.inv.port.InventoryEngineRouter;
+import ai.neargo.sharehub.inv.remote.InventoryApi;
+import ai.neargo.sharehub.inv.remote.InventoryLinks;
+import ai.neargo.sharehub.inv.remote.InventoryRemoteException;
+import ai.neargo.sharehub.inv.remote.RemoteInventoryPort;
+import org.springframework.beans.factory.annotation.Autowired;
+import java.math.BigDecimal;
 import ai.neargo.common.data.scope.DataScopeContext;
 import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.dev.CabinetStatus;
@@ -105,11 +113,47 @@ public class StockThresholdServiceImpl implements StockThresholdService {
     }
 
     private StockThreshold row(WarehouseItem w, String type, int min) {
-        int available = available(w.warehouseNo(), type);
-        return new StockThreshold(w.warehouseNo(), w.name(), type, min, available, min > 0 && available < min);
+        // 显式装箱：三元里一边 Integer 一边 int 会整体拆箱，库存服务查不到（null）时就是空指针
+        Integer available = service() ? remoteAvailable(w.warehouseNo(), type) : Integer.valueOf(localAvailable(w.warehouseNo(), type));
+        return new StockThreshold(w.warehouseNo(), w.name(), type, min, available, min > 0 && available != null && available < min);
     }
 
-    private int available(String warehouseNo, String type) {
+    /** 独立进销存引擎：库存服务按仓、按设备类型取可用数（对接明细 B06）。 */
+    private RemoteInventoryPort remote;
+    private InventoryLinks links;
+    private SysParamPort params;
+
+    @Autowired
+    void setInventory(RemoteInventoryPort remote, InventoryLinks links, SysParamPort params) {
+        this.remote = remote;
+        this.links = links;
+        this.params = params;
+    }
+
+    private boolean service() {
+        return params != null && InventoryEngineRouter.isService(params);
+    }
+
+    /**
+     * 库存服务里的可用数。查不到返回 null —— 告警每分钟判一次，服务一时不可用就当「不知道」、不报低，
+     * 而不是当 0 报一屏误告警。仓还没映射过 = 库存服务里没有这个仓的账，可用为 0。
+     */
+    private Integer remoteAvailable(String warehouseNo, String type) {
+        String loc = links.get("wh:" + warehouseNo);
+        if (loc == null) return 0;
+        try {
+            InventoryApi api = remote.api();
+            String item = links.get("item:" + type);
+            if (item == null) return 0;
+            return api.balances(loc, item).stream().map(InventoryApi.Balance::available).filter(q -> q != null)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add).intValue();
+        } catch (InventoryRemoteException e) {
+            log.warn("安全库存取数跳过：库存服务不可用 warehouseNo={} itemType={} code={}，下一轮重试", warehouseNo, type, e.code);
+            return null;
+        }
+    }
+
+    private int localAvailable(String warehouseNo, String type) {
         long n = MovementRecorder.CABINET.equals(type)
                 ? cabinets.selectCount(new LambdaQueryWrapper<DevCabinet>().eq(DevCabinet::getWarehouseNo, warehouseNo)
                 .eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name()).isNull(DevCabinet::getLocationNo)

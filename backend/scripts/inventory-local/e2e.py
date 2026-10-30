@@ -36,6 +36,9 @@ def sh(method, path, body=None, token=None):
 def inv(path):
     return req("GET", INV + path, None, {"Authorization": f"Bearer {CRED['appKey']}:{CRED['appSecret']}"})[1]
 
+def inv_status(path):
+    return req("GET", INV + path, None, {"Authorization": f"Bearer {CRED['appKey']}:{CRED['appSecret']}"})
+
 def check(name, ok, detail=""):
     results.append((name, bool(ok), detail))
     print(("✓ " if ok else "✗ ") + name + ("" if ok else f"  —— {detail}"))
@@ -54,6 +57,18 @@ try:
     admin, wh, bd = login("ADMIN"), login("WAREHOUSE"), login("BD")
     st, eng, _ = sh("GET", "/api/ops/inventory/engine", token=admin)
     check("引擎 = SERVICE、凭证已配、库存服务可达", eng["engine"] == "SERVICE" and eng["configured"] and eng["reachable"] is True, eng)
+
+    # 0. 契约探测（只读，阶段 0 封装的接口）：查不到的号返回库存服务自己的 not_found，说明路由在；未知路由是另一种 404
+    for path, what in (("/commands/E2E-NONE-" + tag, "命令查回"), ("/dispatch-pool/claims/by-request/E2E-NONE-" + tag, "领取查回"),
+                       ("/inbounds/E2E-NONE", "入库单详情"), ("/outbounds/E2E-NONE", "出库单详情")):
+        st, b = inv_status(path)
+        check(f"契约：{what}接口存在", st == 404 and isinstance(b, dict) and b.get("code") == "inventory.not_found", (st, b))
+    st, b = inv_status("/dispatch-pool?status=AVAILABLE&status=CLAIMED&rootTargetRef=E2E-NONE")
+    check("契约：出库池多条件查询", st == 200 and b == [], (st, b))
+    st, b = inv_status("/in-transit")
+    check("契约：出库在途汇总", st == 200 and isinstance(b, list), (st, b))
+    st, b = inv_status("/definitely-not-a-route")
+    check("契约：未知路由与 not_found 可区分", st == 404 and (not isinstance(b, dict) or b.get("code") != "inventory.not_found"), (st, b))
 
     # 1. 入库：到货登记 → 质检 → 入库 → 库存服务在 WH001 对应位置有这个序列号
     cab = "CABE2E" + tag
@@ -119,24 +134,23 @@ try:
     st, led, raw = sh("GET", "/api/ops/inventory/ledger?warehouseNo=WH001&size=50", token=wh)
     check("流水：经 BFF 读到库存服务流水", st == 200 and led["total"] > 0, raw)
 
-    # 7. 盘点：开单 → 扫码 → 仓管提交 → 管理员复核（复核人须不同）→ 过账
+    # 7. 盘点：开单 → 扫码 → 提交。复核与过账只走统一审批（OpsKit，CountReviewService），运营接口上不能直接复核；
+    #    本机没配 OpsKit 时提交给出明确的 409，不改库存服务。最后作废，免得盘点单一直冻结这个仓
     st, c, raw = sh("POST", "/api/ops/inventory/counts", {"warehouseNo": "WH001"}, wh)
     check("盘点：开单", st == 200, raw)
     cn = c["count"]["countNo"]
+    check("盘点：库存服务的盘点中显示为 OPEN", c["count"]["status"] == "OPEN", c["count"])
     st, c, raw = sh("POST", f"/api/ops/inventory/counts/{cn}/scans", {"serialNos": [cab]}, wh)
     check("盘点：扫码", st == 200, raw)
     st, c, raw = sh("POST", f"/api/ops/inventory/counts/{cn}/submit", {}, wh)
-    check("盘点：提交", st == 200, raw)
-    st, c, raw = sh("POST", f"/api/ops/inventory/counts/{cn}/approve", {}, wh)
-    check("盘点：提交人自己复核被拒（reviewerMustDiffer）", st == 409, (st, raw))
-    if LIVE:  # 只有一个账号，复核做不了：作废，免得盘点单一直占着仓
-        st, c, raw = sh("POST", f"/api/ops/inventory/counts/{cn}/cancel", {}, admin)
-        check("盘点：作废", st == 200, raw)
-    else:
+    if st == 200:
+        check("盘点：提交进统一审批", True)
         st, c, raw = sh("POST", f"/api/ops/inventory/counts/{cn}/approve", {}, admin)
-        check("盘点：另一人复核通过", st == 200, raw)
-        st, c, raw = sh("POST", f"/api/ops/inventory/counts/{cn}/post", {}, admin)
-        check("盘点：过账", st == 200 and c and c["count"]["status"] == "POSTED", raw)
+        check("盘点：运营接口不能绕过统一审批直接复核", st == 409, (st, raw))
+    else:
+        check("盘点：未配统一审批时提交被拒且原因明确", st == 409 and "审批" in json.dumps(raw, ensure_ascii=False), (st, raw))
+        st, c, raw = sh("POST", f"/api/ops/inventory/counts/{cn}/cancel", {}, wh)
+        check("盘点：作废（解除仓库冻结）", st == 200 and c["count"]["status"] == "CANCELLED", raw)
 
     # 8. 撤机回仓：出库（已领取）→ 绑定 → 投放 → 撤机完工（回仓）→ 回仓调拨发货 / 签收 → 回仓待检 → 复检 → RETURN 入库 + 业务确认
     cab2 = "CABRET" + tag

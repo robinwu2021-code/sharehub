@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -45,6 +46,11 @@ public class InventoryFake implements InventoryApi {
     public boolean loseNextInboundPostResponse;
     public boolean loseNextOutboundPostResponse;
     private final Map<String, String> documentRequests = new HashMap<>();
+    /** 幂等键 → 库存服务记下的写命令（查回用，同远端 GET /commands/{requestId}）。 */
+    public final Map<String, StoredCommand> commands = new HashMap<>();
+    private final Map<String, Claim> claimRequests = new HashMap<>();
+    /** 「countNo|itemId」→ 数量物料实盘数。 */
+    public final Map<String, Integer> countedQty = new HashMap<>();
     private final AtomicLong seq = new AtomicLong();
 
     public record Doc(String kind, String locationId, String purpose, List<InboundLine> lines, List<String> serials,
@@ -66,6 +72,10 @@ public class InventoryFake implements InventoryApi {
             failNext = null;
             throw e;
         }
+    }
+
+    private void remember(String requestId, String type, String resultBody) {
+        if (requestId != null) commands.putIfAbsent(requestId, new StoredCommand(type, resultBody, LocalDateTime.now()));
     }
 
     private static InventoryRemoteException err(int status, String code, String... args) {
@@ -98,6 +108,22 @@ public class InventoryFake implements InventoryApi {
     }
 
     @Override
+    public void updateWarehouse(String locationId, String name, String regionRef, String idempotencyKey) {
+        Warehouse w = warehouses.get(locationId);
+        if (w == null) throw err(404, "inventory.not_found", "warehouse");
+        warehouses.put(locationId, new Warehouse(locationId, name, regionRef, w.status()));
+    }
+
+    @Override
+    public void disableWarehouse(String locationId, String idempotencyKey) {
+        Warehouse w = warehouses.get(locationId);
+        if (w == null) throw err(404, "inventory.not_found", "warehouse");
+        boolean qtyLeft = qty.entrySet().stream().anyMatch(e -> e.getKey().startsWith(locationId + "|") && e.getValue().signum() > 0);
+        if (stock.containsValue(locationId) || qtyLeft) throw err(409, "inventory.conflict", locationId + ":has_stock");
+        warehouses.put(locationId, new Warehouse(locationId, w.name(), w.regionRef(), "DISABLED"));
+    }
+
+    @Override
     public String createInbound(String locationId, String purpose, String sourceRef, String remark, List<InboundLine> lines,
                                 String idempotencyKey) {
         if (documentRequests.containsKey(idempotencyKey)) return documentRequests.get(idempotencyKey);
@@ -109,6 +135,7 @@ public class InventoryFake implements InventoryApi {
         String no = "IN-" + UUID.randomUUID().toString().substring(0, 8);
         docs.put(no, new Doc("IN", locationId, purpose, lines, List.of(), Map.of(), new boolean[]{false}));
         documentRequests.put(idempotencyKey, no);
+        remember(idempotencyKey, "inbound.create", "{\"docNo\":\"" + no + "\"}");
         return no;
     }
 
@@ -141,6 +168,7 @@ public class InventoryFake implements InventoryApi {
             }
         }
         d.posted()[0] = true;
+        remember(idempotencyKey, "inbound.post", "{\"docNo\":\"" + docNo + "\"}");
         emit("InboundPosted", docNo, "{\"purpose\":\"" + d.purpose() + "\"}");
         if (loseNextInboundPostResponse) {
             loseNextInboundPostResponse = false;
@@ -169,6 +197,7 @@ public class InventoryFake implements InventoryApi {
         docs.put(no, new Doc("OUT", locationId, purpose, List.of(), serialNos == null ? List.of() : serialNos, t, new boolean[]{false},
                 reasonCode, lines == null ? List.of() : lines));
         documentRequests.put(idempotencyKey, no);
+        remember(idempotencyKey, "outbound.create", "{\"docNo\":\"" + no + "\"}");
         return no;
     }
 
@@ -182,6 +211,7 @@ public class InventoryFake implements InventoryApi {
         for (var e : need.entrySet())
             if (qty.getOrDefault(e.getKey(), BigDecimal.ZERO).compareTo(e.getValue()) < 0) throw err(409, "inventory.stock.insufficient", e.getKey());
         need.forEach((k, v) -> qty.merge(k, v.negate(), BigDecimal::add));
+        remember(idempotencyKey, "outbound.post", "{\"docNo\":\"" + docNo + "\"}");
         if (!"ISSUE".equals(d.purpose())) {
             d.serials().forEach(stock::remove);
             d.posted()[0] = true;
@@ -225,17 +255,37 @@ public class InventoryFake implements InventoryApi {
     }
 
     @Override
-    public List<DispatchView> dispatchesBySerial(String serialNo) {
-        return pool.values().stream().filter(v -> serialNo.equals(v.serialNo())).toList();
+    public List<DispatchView> dispatchPool(DispatchFilter f) {
+        return pool.values().stream()
+                .filter(v -> f.statuses() == null || f.statuses().contains(v.status()))
+                .filter(v -> f.rootTargetRefs() == null || f.rootTargetRefs().contains(v.rootTargetRef()))
+                .filter(v -> f.outboundNo() == null || f.outboundNo().equals(v.outboundNo()))
+                .filter(v -> f.serialNo() == null || f.serialNo().equals(v.serialNo()))
+                .filter(v -> f.itemId() == null || f.itemId().equals(v.itemId()))
+                .toList();
+    }
+
+    @Override
+    public List<InTransit> inTransit() {
+        Map<String, BigDecimal> sum = new LinkedHashMap<>();
+        pool.values().stream().filter(v -> "AVAILABLE".equals(v.status()) || "CLAIMED".equals(v.status()))
+                .forEach(v -> sum.merge(v.rootTargetType() + "|" + v.rootTargetRef() + "|" + v.itemId(), v.qty(), BigDecimal::add));
+        return sum.entrySet().stream().map(e -> {
+            String[] k = e.getKey().split("\\|", -1);
+            return new InTransit(k[0], k[1], k[2], e.getValue());
+        }).toList();
     }
 
     @Override
     public Claim claim(List<String> dispatchIds, String businessRef, String idempotencyKey) {
+        if (idempotencyKey != null && claimRequests.containsKey(idempotencyKey)) return claimRequests.get(idempotencyKey);
         maybeFail();
         for (String id : dispatchIds) if (!"AVAILABLE".equals(pool.get(id).status())) throw err(409, "inventory.dispatch.not_available", id);
         dispatchIds.forEach(id -> pool.put(id, with(pool.get(id), "CLAIMED")));
         Claim c = new Claim("CL-" + UUID.randomUUID().toString().substring(0, 8), List.copyOf(dispatchIds));
         claims.put(c.claimNo(), c);
+        if (idempotencyKey != null) claimRequests.put(idempotencyKey, c);
+        remember(idempotencyKey, "dispatch.claim", "{\"claimNo\":\"" + c.claimNo() + "\"}");
         dispatchIds.forEach(id -> emit("DispatchClaimed", id, payload(pool.get(id))));
         return c;
     }
@@ -284,7 +334,8 @@ public class InventoryFake implements InventoryApi {
             out.add(new LedgerEntry(++id, items.get("CABINET"), d.locationId(), d.kind(), "doc", 1, null, BigDecimal.valueOf(n), null,
                     LocalDateTime.now(), "fake"));
         }
-        return out;
+        // 同真实服务：按 id 升序、afterId 之后、每次最多 limit 条
+        return out.stream().filter(e -> afterId == null || e.id() > afterId).limit(limit).toList();
     }
 
     @Override
@@ -350,6 +401,64 @@ public class InventoryFake implements InventoryApi {
         Object[] c = counts.get(countNo);
         if ("POSTED".equals(c[1])) throw err(409, "inventory.conflict", countNo);
         c[1] = "CANCELLED";
+    }
+
+    @Override
+    public void countLine(String countNo, String itemId, int countedQty, String idempotencyKey) {
+        Object[] c = counts.get(countNo);
+        if (c == null) throw err(404, "inventory.not_found", countNo);
+        if (!"OPEN".equals(c[1])) throw err(409, "inventory.conflict", countNo + ":" + c[1]);
+        if (countedQty < 0) throw err(400, "inventory.bad_request", "countedQty");
+        this.countedQty.put(countNo + "|" + itemId, countedQty);
+    }
+
+    // —— 单据详情与查回 ——
+
+    private Document document(String docNo, String kind) {
+        Doc d = docs.get(docNo);
+        if (d == null || !kind.equals(d.kind())) throw err(404, "inventory.not_found", "IN".equals(kind) ? "inbound" : "outbound");
+        List<DocLine> lines = new ArrayList<>();
+        List<DocSerial> serials = new ArrayList<>();
+        BigDecimal total = BigDecimal.ZERO;
+        int n = 0;
+        for (InboundLine l : d.lines()) {
+            n++;
+            List<Serial> ss = l.serials() == null ? List.of() : l.serials();
+            BigDecimal q = ss.isEmpty() ? BigDecimal.valueOf(l.qty()) : BigDecimal.valueOf(ss.size());
+            lines.add(new DocLine(n, l.itemId(), q, l.gateRef(), null));
+            for (Serial s : ss) serials.add(new DocSerial(n, l.itemId(), s.serialNo(), s.parentSerialNo(), s.gateRef()));
+            total = total.add(q);
+        }
+        for (OutboundLine l : d.outLines()) {
+            lines.add(new DocLine(++n, l.itemId(), BigDecimal.valueOf(l.qty()), null, l.parentSerialNo()));
+            total = total.add(BigDecimal.valueOf(l.qty()));
+        }
+        for (String sn : d.serials()) {
+            serials.add(new DocSerial(0, serialItem.get(sn), sn, null, null));
+            total = total.add(BigDecimal.ONE);
+        }
+        List<DocTarget> ts = d.targets().entrySet().stream().map(e -> new DocTarget(e.getKey(), e.getValue(), null)).toList();
+        return new Document(docNo, kind, d.posted()[0] ? "POSTED" : "DRAFT", d.purpose(), d.locationId(), total, 1, lines, serials, ts);
+    }
+
+    @Override
+    public Document inbound(String docNo) {
+        return document(docNo, "IN");
+    }
+
+    @Override
+    public Document outbound(String docNo) {
+        return document(docNo, "OUT");
+    }
+
+    @Override
+    public Optional<StoredCommand> command(String requestId) {
+        return Optional.ofNullable(commands.get(requestId));
+    }
+
+    @Override
+    public Optional<Claim> claimByRequest(String requestId) {
+        return Optional.ofNullable(claimRequests.get(requestId));
     }
 
     @Override

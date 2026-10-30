@@ -45,8 +45,8 @@ export function InventoryReportTab() {
     { header: "期初", className: "text-right tabular-nums", cell: (x) => x.opening },
     { header: "入", className: "text-right tabular-nums", cell: (x) => x.inQty },
     { header: "出", className: "text-right tabular-nums", cell: (x) => x.outQty },
-    { header: "期末", className: "text-right tabular-nums", cell: (x) => x.closing },
-    { header: "当前可用", className: "text-right tabular-nums", cell: (x) => x.available },
+    { header: "期末", className: "text-right tabular-nums", cell: (x) => x.closing ?? "-" },
+    { header: "当前可用", className: "text-right tabular-nums", cell: (x) => x.available ?? "-" },
     { header: "安全库存", className: "text-right tabular-nums", cell: (x) => x.minQty || "-" },
     { header: "", className: "whitespace-nowrap", cell: (x) => (x.low ? <StatusBadge map={LOW_MARK} value="LOW" /> : null) },
   ];
@@ -63,8 +63,8 @@ export function InventoryReportTab() {
     { header: "期初", value: (x) => x.opening },
     { header: "入", value: (x) => x.inQty },
     { header: "出", value: (x) => x.outQty },
-    { header: "期末", value: (x) => x.closing },
-    { header: "当前可用", value: (x) => x.available },
+    { header: "期末", value: (x) => x.closing ?? "" },
+    { header: "当前可用", value: (x) => x.available ?? "" },
     { header: "安全库存", value: (x) => x.minQty },
   ], r?.rows ?? []);
 
