@@ -33,6 +33,7 @@ import java.util.function.Supplier;
  *   <li>出库调整 = 重定向（已领取的先释放、改完再领取）；</li>
  *   <li>出库池退回 = 释放 + 撤回（库存服务自动冲回原仓）；</li>
  *   <li>待检入库 = PURCHASE / RETURN 入库，质检记录号即 gateRef；RETURN 过账后即做业务确认（撤机时已解绑）。</li>
+ *   <li>仓到仓调拨 = 发货 TRANSFER_OUT、签收 TRANSFER_IN（实收的件，gateRef = XFER-调拨单号-设备号）。</li>
  * </ul>
  */
 @Component
@@ -161,6 +162,41 @@ public class RemoteInventoryPort implements InventoryPort {
             return null;
         });
         return out;
+    }
+
+    @Override
+    @Transactional
+    public void transferShip(String transferNo, String itemType, String fromWarehouseNo, List<String> itemNos) {
+        if (fromWarehouseNo == null || fromWarehouseNo.isBlank() || itemNos.isEmpty()) return;
+        remote(() -> {
+            String doc = api.createOutbound(links.locationId(api, fromWarehouseNo), "TRANSFER_OUT", Map.of(), "调拨发货 " + transferNo,
+                    itemNos, key("xfer-out", transferNo));
+            api.postOutbound(doc, key("xfer-out-post", doc));
+            // 签收时据此判断「发货时库存服务有没有调出」
+            links.put("xfer:" + transferNo, doc);
+            return doc;
+        });
+    }
+
+    @Override
+    @Transactional
+    public void transferReceive(String transferNo, String itemType, String fromWarehouseNo, String toWarehouseNo, List<String> itemNos) {
+        if (toWarehouseNo == null || toWarehouseNo.isBlank() || itemNos.isEmpty()) return;
+        boolean fromWarehouse = fromWarehouseNo != null && !fromWarehouseNo.isBlank();
+        if (fromWarehouse && links.get("xfer:" + transferNo) == null) {
+            // 切引擎前发出的单：库存服务里这批还在调出仓，再调入会撞「已在库」。不拦签收，账由盘点纠正
+            log.warn("调拨发货时引擎还是 LOCAL，库存服务没有调出 transferNo={} from={} to={} items={}：本次签收不同步，请对两仓盘点纠正",
+                    transferNo, fromWarehouseNo, toWarehouseNo, itemNos);
+            return;
+        }
+        remote(() -> {
+            List<InventoryApi.Serial> serials = itemNos.stream()
+                    .map(no -> new InventoryApi.Serial(no, "XFER-" + transferNo + "-" + no, null)).toList();
+            String doc = api.createInbound(links.locationId(api, toWarehouseNo), "TRANSFER_IN", transferNo, "调拨签收 " + transferNo,
+                    List.of(new InventoryApi.InboundLine(links.itemId(api, itemType), null, null, serials)), key("xfer-in", transferNo));
+            api.postInbound(doc, key("xfer-in-post", doc));
+            return doc;
+        });
     }
 
     // —— 内部 ——

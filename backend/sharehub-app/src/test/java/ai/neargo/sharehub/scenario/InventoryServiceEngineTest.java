@@ -130,6 +130,59 @@ class InventoryServiceEngineTest extends ApiTestSupport {
                 .containsEntry("issued_agent_no", null).containsEntry("warehouse_no", "WH002");
     }
 
+    private String transfer(String admin, List<String> cabs) {
+        String t = post("/api/ops/inventory-transfers", Map.of("fromType", "WAREHOUSE", "fromRef", "WH002", "toType", "WAREHOUSE",
+                "toRef", "WH003", "itemType", "CABINET"), admin).okData().path("transferNo").asText();
+        post("/api/ops/inventory-transfers/" + t + "/items", Map.of("itemNos", cabs), admin).okData();
+        return t;
+    }
+
+    private String loc(String warehouseNo) {
+        return jdbc.queryForObject("SELECT v FROM inventory_sync_state WHERE k = ?", String.class, "wh:" + warehouseNo);
+    }
+
+    @Test
+    @DisplayName("★★ 仓到仓调拨：发货在库存服务调出，签收按实收调入目的仓；少收的留在已调出（与资产差异同口径）")
+    void warehouse_transfer_syncs() {
+        String a = stocked(), b = stocked();
+        String admin = login("ADMIN");
+        String t = transfer(admin, List.of(a, b));
+        post("/api/ops/inventory-transfers/" + t + "/ship", Map.of(), admin).okData();
+        assertThat(fake.stock).doesNotContainKeys(a, b);
+
+        post("/api/ops/inventory-transfers/" + t + "/receive", Map.of("receivedNos", List.of(a)), admin).okData();
+        assertThat(fake.stock).containsEntry(a, loc("WH003")).doesNotContainKey(b);
+        assertThat(fake.gates.get(a)).contains("XFER-" + t + "-" + a);
+        assertThat(jdbc.queryForObject("SELECT warehouse_no FROM dev_cabinet WHERE cabinet_no=?", String.class, a)).isEqualTo("WH003");
+    }
+
+    @Test
+    @DisplayName("★ 调拨：库存服务拒绝调出 → 409，本地仍是草稿、柜子还在调出仓")
+    void transfer_rejection_rolls_back() {
+        String c = stocked();
+        String admin = login("ADMIN");
+        String t = transfer(admin, List.of(c));
+        fake.failNext = new InventoryRemoteException(409, "inventory.serial.conflict", List.of(c), "conflict", null);
+        Resp r = post("/api/ops/inventory-transfers/" + t + "/ship", Map.of(), admin);
+        assertThat(r.status).isEqualTo(409);
+        assertThat(jdbc.queryForObject("SELECT status FROM inv_transfer WHERE transfer_no=?", String.class, t)).isEqualTo("DRAFT");
+        assertThat(fake.stock).containsEntry(c, loc("WH002"));
+    }
+
+    @Test
+    @DisplayName("★ 切引擎前发出的调拨：签收不同步（库存服务没有调出记录），不拦签收")
+    void transfer_shipped_under_local() {
+        String c = stocked();
+        String admin = login("ADMIN");
+        String t = transfer(admin, List.of(c));
+        jdbc.update("UPDATE sys_param SET value='LOCAL' WHERE param_key='inv.engine'");
+        post("/api/ops/inventory-transfers/" + t + "/ship", Map.of(), admin).okData();
+        jdbc.update("UPDATE sys_param SET value='SERVICE' WHERE param_key='inv.engine'");
+        post("/api/ops/inventory-transfers/" + t + "/receive", Map.of("receivedNos", List.of(c)), admin).okData();
+        assertThat(fake.stock).as("账由盘点纠正").containsEntry(c, loc("WH002"));
+        assertThat(jdbc.queryForObject("SELECT warehouse_no FROM dev_cabinet WHERE cabinet_no=?", String.class, c)).isEqualTo("WH003");
+    }
+
     @Test
     @DisplayName("★ 事件：库存服务侧重定向拉齐本地出库池归属；重复投递只处理一次")
     void events_project_and_dedupe() {

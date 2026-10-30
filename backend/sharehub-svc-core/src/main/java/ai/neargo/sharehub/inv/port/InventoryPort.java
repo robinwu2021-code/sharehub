@@ -32,4 +32,15 @@ public interface InventoryPort {
 
     /** 出库池退回仓库。 */
     List<Cabinet> returnToWarehouse(List<String> cabinetNos, String warehouseNo, String reason);
+
+    /**
+     * 调拨发货：从仓调出（调出方不是仓 = 不在库存账上，不记）。本地投影由调拨作业自己写，这里只记账。
+     */
+    void transferShip(String transferNo, String itemType, String fromWarehouseNo, List<String> itemNos);
+
+    /**
+     * 调拨签收：实收的调入目的仓（目的不是仓 = 不进库存账，不记）。少收的留在「已调出」，与本地资产差异同口径。
+     * 撤机回仓不走这里：签收先进到仓待检，复检合格由 {@link #inbound} 入库。
+     */
+    void transferReceive(String transferNo, String itemType, String fromWarehouseNo, String toWarehouseNo, List<String> itemNos);
 }

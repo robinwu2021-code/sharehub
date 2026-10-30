@@ -75,6 +75,15 @@ public class LocalInventoryPort implements InventoryPort {
         return pool.redirect(cabinetNos, agentNo, siteNo, receiverNo, reason);
     }
 
+    /** 本地的库存账就是设备表的所在仓，调拨作业签收时已写，这里无事可做。 */
+    @Override
+    public void transferShip(String transferNo, String itemType, String fromWarehouseNo, List<String> itemNos) {
+    }
+
+    @Override
+    public void transferReceive(String transferNo, String itemType, String fromWarehouseNo, String toWarehouseNo, List<String> itemNos) {
+    }
+
     @Override
     public List<Cabinet> returnToWarehouse(List<String> cabinetNos, String warehouseNo, String reason) {
         return pool.returnToWarehouse(cabinetNos, warehouseNo, reason);

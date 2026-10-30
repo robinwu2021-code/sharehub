@@ -244,6 +244,28 @@ try:
     st, _, raw = sh("POST", f"/api/ops/inventory/materials/{mat}/archive", {}, admin)
     check("物料：有库存不能归档", st == 409, raw)
 
+    # 13. 仓到仓调拨：发货在库存服务调出、签收调入目的仓（少收的留在已调出）
+    xa, xb = "CABXFA" + tag, "CABXFB" + tag
+    for x in (xa, xb):
+        sh("POST", "/api/ops/cabinets", {"cabinetNo": x, "sn": x, "vendorCode": "TEST", "slotTotal": 8}, admin)
+        sql(f"UPDATE test_sharehub.dev_cabinet SET warehouse_no=NULL WHERE cabinet_no='{x}'")
+    st, ik, raw = sh("POST", "/api/ops/inventory/intakes", {"warehouseNo": "WH001", "sourceRef": "DN-XF-" + tag, "cabinetNos": [xa, xb]}, wh)
+    no = ik["intake"]["intakeNo"]
+    for x in (xa, xb):
+        sh("POST", f"/api/ops/inventory/intakes/{no}/items/CABINET/{x}/qc", {"powerOn": True, "slotsOk": True}, wh)
+    sh("POST", f"/api/ops/inventory/intakes/{no}/inbound", {"items": [{"itemType": "CABINET", "itemNo": x} for x in (xa, xb)]}, wh)
+    st, t, raw = sh("POST", "/api/ops/inventory-transfers", {"fromType": "WAREHOUSE", "fromRef": "WH001", "toType": "WAREHOUSE",
+        "toRef": "WH002", "itemType": "CABINET"}, wh)
+    xno = t["transferNo"]
+    sh("POST", f"/api/ops/inventory-transfers/{xno}/items", {"itemNos": [xa, xb]}, wh)
+    st, d, raw = sh("POST", f"/api/ops/inventory-transfers/{xno}/ship", {}, wh)
+    out1 = {x.get("serialNo") for x in inv(f"/serials?locationId={loc}")}
+    check("调拨：发货后库存服务调出仓没有这两台", st == 200 and xa not in out1 and xb not in out1, raw)
+    st, d, raw = sh("POST", f"/api/ops/inventory-transfers/{xno}/receive", {"receivedNos": [xa]}, wh)
+    loc_x = sql("SELECT v FROM test_sharehub.inventory_sync_state WHERE k='wh:WH002'")
+    in2 = {x.get("serialNo") for x in inv(f"/serials?locationId={loc_x}")}
+    check("调拨：签收后实收的在目的仓、少收的不在", st == 200 and xa in in2 and xb not in in2, raw)
+
     # 12. 处置出库在 SERVICE 引擎下：报废同步库存服务（SCRAP 带原因码）
     scrap = "CABSCR" + tag
     sh("POST", "/api/ops/cabinets", {"cabinetNo": scrap, "sn": scrap, "vendorCode": "TEST", "slotTotal": 8}, admin)

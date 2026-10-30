@@ -59,4 +59,14 @@ public class InventoryEngineRouter implements InventoryPort {
     public List<Cabinet> returnToWarehouse(List<String> cabinetNos, String warehouseNo, String reason) {
         return current().returnToWarehouse(cabinetNos, warehouseNo, reason);
     }
+
+    @Override
+    public void transferShip(String transferNo, String itemType, String fromWarehouseNo, List<String> itemNos) {
+        current().transferShip(transferNo, itemType, fromWarehouseNo, itemNos);
+    }
+
+    @Override
+    public void transferReceive(String transferNo, String itemType, String fromWarehouseNo, String toWarehouseNo, List<String> itemNos) {
+        current().transferReceive(transferNo, itemType, fromWarehouseNo, toWarehouseNo, itemNos);
+    }
 }
