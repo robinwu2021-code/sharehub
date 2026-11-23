@@ -34,7 +34,7 @@
     },
     {
       "name": "opskit-local",
-      "runtimeExecutable": "opskit/scripts/dev-run.sh",
+      "runtimeExecutable": "../opskit/scripts/dev-run.sh",
       "runtimeArgs": [],
       "port": 8090
     },

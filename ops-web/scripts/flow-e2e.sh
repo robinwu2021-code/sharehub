@@ -5,6 +5,7 @@
 #   ops-web/scripts/flow-e2e.sh --only S2,I-ar        # 只跑某些（按 id 前缀）
 #   OPSKIT=http://localhost:8090 OPSKIT_WS=ext:T001 OPSKIT_ACCOUNT=acc_1 ops-web/scripts/flow-e2e.sh
 #                                                     # 对真实 OpsKit 跑（夹具读 fixtures.opskit.json）
+#   OpsKit 已拆为独立仓库，默认在本仓库同级目录 ../opskit；别处用 OPSKIT_HOME=/path/to/opskit 指定
 #
 # 为什么要副本：dev server 与 build 共用 .next，同时跑会互相污染（CLAUDE.md 坑 3）；
 # 副本在 .e2e/flow-e2e-<模式>/，软链 node_modules，turbopack.root 指仓库根（否则不认软链）。
@@ -33,7 +34,9 @@ if [[ "$MODE" == opskit ]]; then
   export NEXT_PUBLIC_FLOW_API=http NEXT_PUBLIC_OPSKIT_WS="${OPSKIT_WS:?要设 OPSKIT_WS}" NEXT_PUBLIC_OPSKIT_ACCOUNT="${OPSKIT_ACCOUNT:-}"
   # 夹具与令牌现生成（单号每次重启服务都会变；含令牌，放 .e2e/ 不进仓库）
   mkdir -p .e2e
-  python3 - "$(opskit/scripts/dev-token.sh fixtures)" "$(opskit/scripts/dev-token.sh viewer)" "$(opskit/scripts/dev-token.sh admin)" "$(opskit/scripts/dev-token.sh seed)" > .e2e/fixtures.opskit.json <<'PY'
+  TOKEN="${OPSKIT_HOME:-$ROOT/../opskit}/scripts/dev-token.sh"
+  [[ -x "$TOKEN" ]] || { echo "找不到 $TOKEN（OpsKit 独立仓库）；用 OPSKIT_HOME 指定" >&2; exit 1; }
+  python3 - "$("$TOKEN" fixtures)" "$("$TOKEN" viewer)" "$("$TOKEN" admin)" "$("$TOKEN" seed)" > .e2e/fixtures.opskit.json <<'PY'
 import json, sys
 fx = json.loads(sys.argv[1]); fx["viewerToken"] = sys.argv[2].strip(); fx["adminToken"] = sys.argv[3].strip()
 # fixtures 子命令还没带工单号（9-28 为空串）：从种子清单补，不改后端脚本
