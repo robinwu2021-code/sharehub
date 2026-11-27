@@ -151,9 +151,24 @@ public class InventoryReconServiceImpl implements InventoryReconService {
                         "查最近的签收 / 调整：在执行异常里查回没完成的领取"));
             }
         });
-        pool.forEach((no, v) -> {
-            if (!issued.containsKey(no)) diffs.add(new Diff("POOL_EXTRA", CABINET, no, "未出库", "出库池 " + v.status() + "（商家 " + v.rootTargetRef() + "）",
-                    "本地已撤销 / 退回而库存服务没跟上：在执行异常里查回；确认后在库存服务撤回"));
-        });
+        // 出库池有、本地不在「已出库待装」的：已绑定点位的柜是领取后装上去了，库存服务停在 CLAIMED 是正常终态
+        List<String> rest = pool.keySet().stream().filter(no -> !issued.containsKey(no)).toList();
+        Map<String, DevCabinet> installed = new HashMap<>();
+        if (!rest.isEmpty()) {
+            for (DevCabinet c : cabinets.selectList(new LambdaQueryWrapper<DevCabinet>().in(DevCabinet::getCabinetNo, rest)
+                    .isNotNull(DevCabinet::getLocationNo).isNull(DevCabinet::getArchivedAt))) {
+                installed.put(c.getCabinetNo(), c);
+            }
+        }
+        for (String no : rest) {
+            InventoryApi.DispatchView v = pool.get(no);
+            if (installed.containsKey(no)) {
+                if (!"CLAIMED".equals(v.status())) diffs.add(new Diff("CLAIM_STATE", CABINET, no, "已安装（点位 " + installed.get(no).getLocationNo() + "）",
+                        "待领取", "安装时的领取没同步：在执行异常里查回没完成的领取"));
+            } else {
+                diffs.add(new Diff("POOL_EXTRA", CABINET, no, "未出库", "出库池 " + v.status() + "（商家 " + v.rootTargetRef() + "）",
+                        "本地已撤销 / 退回而库存服务没跟上：在执行异常里查回；确认后在库存服务撤回"));
+            }
+        }
     }
 }

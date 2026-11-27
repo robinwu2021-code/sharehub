@@ -479,6 +479,12 @@ class InventoryServiceEngineTest extends ApiTestSupport {
         jdbc.update("UPDATE dev_cabinet SET issue_claimed_at=NULL WHERE cabinet_no=?", issued);
         JsonNode afterUnclaim = get("/api/ops/inventory/reconciliation?agentNo=" + m[0], admin).okData();
         assertThat(diffKind(afterUnclaim, issued)).as("%s", afterUnclaim).isEqualTo("CLAIM_STATE");
+
+        // 领取后装到点位：本地离开「已出库待装」，库存服务停在 CLAIMED —— 正常终态，不是「出库池多出」
+        jdbc.update("UPDATE dev_cabinet SET status=?, location_no='LOC-RECON', issued_agent_no=NULL, warehouse_no=NULL WHERE cabinet_no=?",
+                ai.neargo.sharehub.dev.CabinetStatus.DEPLOYED.name(), issued);
+        JsonNode afterInstall = get("/api/ops/inventory/reconciliation", admin).okData();
+        assertThat(diffKind(afterInstall, issued)).as("%s", afterInstall).isNull();
     }
 
     private static JsonNode stageRow(JsonNode rows, String stage) {
