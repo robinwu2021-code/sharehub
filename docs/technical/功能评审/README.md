@@ -18,13 +18,13 @@
 | S7 | [S7-异常收费与售后](S7-异常收费与售后.md) | 23 | 6 | — | 13 | 4 |
 | S8 | [S8-开票](S8-开票.md) | 24 | 9 | 6 | 13 | 2 |
 | S9 | [S9-监控告警工单客服](S9-监控告警工单客服.md) | 32 | 5 | — | 19 | 8 |
-| S10 | [S10-资产流转与撤场](S10-资产流转与撤场.md) | 24 | 5 | — | 14 | 5 |
+| S10 | [S10-资产流转与撤场](S10-资产流转与撤场.md) | 24 | 5 | — | 15 | 4 |
 | S11 | [S11-分钱](S11-分钱.md) | 30 | 8 | 1 | 15 | 7 |
 | S12 | [S12-账务与对账](S12-账务与对账.md) | 17 | 6 | 2 | 8 | 3 |
 | S13 | [S13-经营分析与报表](S13-经营分析与报表.md) | 26 | 4 | — | 14 | 8 |
 | S14 | [S14-用户运营与营销](S14-用户运营与营销.md) | 29 | 6 | — | 15 | 8 |
 | S15 | [S15-系统配置与基础资料](S15-系统配置与基础资料.md) | 22 | 1 | — | 14 | 7 |
-| **合计** | | **423** | **100** | 23 | **221** | **102** |
+| **合计** | | **423** | **100** | 23 | **222** | **101** |
 
 ## 二、P0 清单
 
@@ -141,7 +141,7 @@
 | 模块 | P0 | P1 | P2 | 合计 | 约人天 | 其中 P0 人天 |
 |---|---:|---:|---:|---:|---:|---:|
 | `sharehub-svc-platform` | 24 | 72 | 37 | 133 | 120 | 24 |
-| `sharehub-svc-core` | 35 | 63 | 23 | 121 | 126 | 44 |
+| `sharehub-svc-core` | 35 | 64 | 22 | 121 | 126 | 44 |
 | `sharehub-svc-ops` | 4 | 13 | 5 | 22 | 20 | 5 |
 | `sharehub-svc-finance` | 22 | 30 | 7 | 59 | 84 | 52 |
 | `sharehub-svc-report 🆕` | 4 | 11 | 5 | 20 | 32 | 12 |
@@ -150,7 +150,7 @@
 | `sharehub-common` | 2 | 4 | 1 | 7 | 14 | 4 |
 | `sharehub-app` | 0 | 4 | 2 | 6 | 4 | 0 |
 | `跨模块` | 4 | 18 | 17 | 39 | 42 | 10 |
-| **合计** | 100 | 221 | 102 | 423 | **477** | **168** |
+| **合计** | 100 | 222 | 101 | 423 | **477** | **168** |
 
 ## 四、依赖关系
 
@@ -166,6 +166,7 @@
 | [OPT-S0-13](S0-平台底座.md) | P1 | 5 | 其余 45 张按 §二.6 分桶登记，每张配正反用例 |
 | [OPT-S0-01](S0-平台底座.md) | P1 | 4 | 会话表只存 SHA-256、revoked_at 软撤销、按主体索引 |
 | [OPT-S0-22](S0-平台底座.md) | P0 | 4 | 事件必须在事务内发布 |
+| [OPT-S5-29](S5-设备上线与归属.md) | P0 | 4 | 从出库池绑定（U1、U2，一期主流程） |
 | [OPT-S5-27](S5-设备上线与归属.md) | P0 | 4 | /internal/\*\* 全前缀验服务凭证 |
 | [OPT-S7-09](S7-异常收费与售后.md) | P0 | 4 | 退款执行（D7） |
 | [OPT-S8-10](S8-开票.md) | P0 | 4 | 票据四表迁移 |
@@ -173,7 +174,6 @@
 | [OPT-S11-04](S11-分钱.md) | P0 | 4 | 应付台账 |
 | [OPT-S0-23](S0-平台底座.md) | P1 | 3 | 事件信封 |
 | [OPT-S0-28](S0-平台底座.md) | P0 | 3 | 基类拆 create / update |
-| [OPT-S5-29](S5-设备上线与归属.md) | P0 | 3 | 从出库池绑定（U1、U2，一期主流程） |
 | [OPT-S5-15](S5-设备上线与归属.md) | P0 | 3 | 指令生命周期 |
 | [OPT-S5-03](S5-设备上线与归属.md) | P0 | 3 | 新表 dev_cabinet_status_log，transit 同事务写（含原因、原新点位、操作人） |
 | [OPT-S6-21](S6-定价与借还付款.md) | P0 | 3 | 结算条件迁移（D2） |
@@ -492,6 +492,7 @@
 | [OPT-S10-05](S10-资产流转与撤场.md) | P1 | S | sharehub-svc-core | DEV-07 | API · CODE | 建单校验两端存在、可见、可用（站点非撤场 / 关闭 / 归档） |
 | [OPT-S10-06](S10-资产流转与撤场.md) | P1 | S | sharehub-svc-core | DEV-07 | DB · CODE · TEST | 一件同时只在一张未完结单 |
 | [OPT-S10-07](S10-资产流转与撤场.md) | P1 | S | sharehub-svc-core | DEV-07 · DEV-09 | DB · CODE | 撤机后续 |
+| [OPT-S10-09](S10-资产流转与撤场.md) | P1 | S | sharehub-svc-core | DEV-07 | DB · TEST | inv_warehouse（REGION）、inv_transfer（经两端派生的 site_no / wareho… |
 | [OPT-S10-12](S10-资产流转与撤场.md) | P1 | S | sharehub-svc-core | DEV-08 | API | GET /api/ops/devices/{deviceNo}/movements（柜机与宝共用）与 GET /ap… |
 | [OPT-S10-13](S10-资产流转与撤场.md) | P1 | M | sharehub-svc-core | DEV-08 | DB | 存量回填 |
 | [OPT-S10-14](S10-资产流转与撤场.md) | P1 | M | sharehub-svc-core | DEV-09 | DB · API · CODE · TEST | 差异处置改为带审批的调整 |
@@ -637,7 +638,6 @@
 | [OPT-S9-29](S9-监控告警工单客服.md) | P2 | S | sharehub-app | INF-03 | CODE · 跨仓 | 审批结论按 instanceNo 认单 |
 | [OPT-S9-31](S9-监控告警工单客服.md) | P2 | S | 跨模块 | 跨功能 | DB · API | 待办 |
 | [OPT-S10-08](S10-资产流转与撤场.md) | P2 | S | sharehub-svc-core | DEV-07 | CODE | 调拨端点收进 device.inventory 一个控制器（路径不变） |
-| [OPT-S10-09](S10-资产流转与撤场.md) | P2 | S | sharehub-svc-core | DEV-07 | DB · TEST | inv_warehouse（REGION）、inv_transfer（经两端派生的 site_no / wareho… |
 | [OPT-S10-17](S10-资产流转与撤场.md) | P2 | S | sharehub-svc-core | DEV-09 | DB · API | inv_asset_diff 加 resolution / proposed_\* / approved_\* / … |
 | [OPT-S10-22](S10-资产流转与撤场.md) | P2 | S | sharehub-svc-platform | OPR-07 | CODE | 考核口径 |
 | [OPT-S10-23](S10-资产流转与撤场.md) | P2 | S | 跨模块 | 跨功能 | CODE | 本阶段其余写后不检查行数处（§2.5）按 Updates.exactlyOne 修 |
